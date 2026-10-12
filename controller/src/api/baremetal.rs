@@ -201,12 +201,17 @@ pub async fn boot_ipxe(
         .await
         .map_err(|e| ApiError::internal(e.to_string()))?
     {
-        Some((id, token)) => Ok(text(baremetal_boot::ipxe_commission_script(
-            &base,
-            id,
-            &token,
-            &format!("{base}/dist"),
-        ))),
+        Some((id, token)) => {
+            // Pin the controller CA when there is one (the ramdisk verifies it by this).
+            let ca = crate::pki::ca_info().ok().map(|(_, fp)| fp);
+            Ok(text(baremetal_boot::ipxe_commission_script(
+                &base,
+                id,
+                &token,
+                &format!("{base}/dist"),
+                ca.as_deref(),
+            )))
+        }
         None => {
             if let Some((id, os, token)) = baremetal_deploy::deploy_boot_target(&state.pool, &q.mac)
                 .await

@@ -83,14 +83,22 @@ pub fn ipxe_commission_script(
     server_id: Uuid,
     token: &str,
     assets_base: &str,
+    ca_sha256: Option<&str>,
 ) -> String {
+    // The ramdisk pins the controller CA by this fingerprint (hex only) before trusting it.
+    let ca = match ca_sha256 {
+        Some(fp) if !fp.is_empty() && fp.chars().all(|c| c.is_ascii_hexdigit()) => {
+            format!(" machina.ca_sha256={fp}")
+        }
+        _ => String::new(),
+    };
     let c = controller_url.trim_end_matches('/');
     let a = assets_base.trim_end_matches('/');
     format!(
         "#!ipxe\n\
          kernel {a}/metal-vmlinuz initrd=metal-initrd ip=dhcp boot=live fetch={a}/metal-rootfs.squashfs \
          machina.report={c}/api/v1/baremetal/commissioning/{server_id}/report machina.token={token} \
-         machina.script={c}/api/v1/baremetal/boot/commission.sh\n\
+         machina.script={c}/api/v1/baremetal/boot/commission.sh{ca}\n\
          initrd --name metal-initrd {a}/metal-initrd\n\
          boot\n"
     )
@@ -174,10 +182,12 @@ if sys.argv[1] == "1":
     print(json.dumps(report, indent=2))
     sys.exit(0)
 
+import ssl
 url, token = cmdline("machina.report"), cmdline("machina.token")
+ctx = ssl.create_default_context(cafile=os.environ.get("MACHINA_CACERT") or None)
 req = urllib.request.Request(url, data=json.dumps(report).encode(), method="POST",
                              headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"})
-urllib.request.urlopen(req, timeout=60).read()
+urllib.request.urlopen(req, timeout=60, context=ctx).read()
 PY
 "#;
 
@@ -232,7 +242,18 @@ mod tests {
     #[test]
     fn ipxe_script_carries_report_url_and_token() {
         let id = Uuid::from_u128(7);
-        let s = ipxe_commission_script("https://c:5093/", id, "tok123", "https://c:5093/dist/");
+        let s = ipxe_commission_script(
+            "https://c:5093/",
+            id,
+            "tok123",
+            "https://c:5093/dist/",
+            Some("ab12CD"),
+        );
+        assert!(s.contains("machina.ca_sha256=ab12CD"));
+        assert!(
+            !ipxe_commission_script("http://c", id, "t", "http://c/dist", Some("x;y"))
+                .contains("ca_sha256")
+        );
         assert!(s.starts_with("#!ipxe\n"));
         assert!(s.contains(&format!(
             "machina.report=https://c:5093/api/v1/baremetal/commissioning/{id}/report"

@@ -1141,14 +1141,40 @@ cmd_dist() {
                 install -m 0644 "$src" "$dest/$f"
             done
             (cd "$dest" && sha256sum machina-agent machina-bpfd machina-agent.service machina-bpfd.service > SHA256SUMS)
+            # Keep the bare-metal ramdisk entries a previous publish-metal added.
+            [[ -f $dest/SHA256SUMS.metal ]] && cat "$dest/SHA256SUMS.metal" >> "$dest/SHA256SUMS"
             ok "published to $dest (served at /dist/ by the controller)"
             ( cd "$dest" && cat SHA256SUMS )
+            ;;
+        publish-metal)
+            # The ramdisk PXE machines boot (scripts/metal/build-image.sh output).
+            need_root
+            local dest="${MACHINA_DIST_DIR:-/var/lib/machina/dist}" from="" f
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --dir) from="${2:-}"; shift 2 ;;
+                    *) err "unknown option $1"; exit 1 ;;
+                esac
+            done
+            [[ -n $from ]] || from="${MACHINA_METAL_OUT:-/var/tmp/machina-metal-out}"
+            for f in metal-vmlinuz metal-initrd metal-rootfs.squashfs; do
+                [[ -f $from/$f ]] || { err "$from/$f not found (build it: sudo scripts/metal/build-image.sh)"; exit 1; }
+            done
+            mkdir -p "$dest"
+            for f in metal-vmlinuz metal-initrd metal-rootfs.squashfs; do
+                install -m 0644 "$from/$f" "$dest/$f"
+            done
+            (cd "$dest" && sha256sum metal-vmlinuz metal-initrd metal-rootfs.squashfs > SHA256SUMS.metal)
+            # SHA256SUMS = everything except old metal lines, plus the new ones.
+            (cd "$dest" && { [[ -f SHA256SUMS ]] && grep -v ' metal-' SHA256SUMS || true; cat SHA256SUMS.metal; } > SHA256SUMS.new && mv SHA256SUMS.new SHA256SUMS)
+            ok "bare-metal ramdisk published to $dest (served at /dist/)"
+            ( cd "$dest" && cat SHA256SUMS.metal )
             ;;
         status)
             local dest="${MACHINA_DIST_DIR:-/var/lib/machina/dist}"
             if [[ -f $dest/SHA256SUMS ]]; then ok "published in $dest"; cat "$dest/SHA256SUMS"; else warn "nothing published: run  sudo machinactl dist publish"; fi
             ;;
-        *) err "Usage: machinactl dist publish|status"; exit 1 ;;
+        *) err "Usage: machinactl dist publish|publish-metal|status"; exit 1 ;;
     esac
 }
 

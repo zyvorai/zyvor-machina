@@ -1,0 +1,14 @@
+[Unit]
+Description=Machina bare-metal commissioning/deploy runner
+After=network-online.target systemd-networkd.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/machina-metal-run
+StandardOutput=journal+console
+StandardError=journal+console
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
