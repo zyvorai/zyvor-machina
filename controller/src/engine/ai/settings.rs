@@ -186,7 +186,7 @@ mod tests {
             .execute(pool)
             .await
             .unwrap();
-        crate::db::query("UPDATE clusters SET ai_enabled = TRUE")
+        crate::db::query("UPDATE clusters SET ai_enabled = 1")
             .execute(pool)
             .await
             .unwrap();
