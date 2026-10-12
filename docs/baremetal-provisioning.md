@@ -597,13 +597,13 @@ What has actually run (details and exact wording in [claims.md](claims.md)):
 | Redfish power, state, boot override | sushy-tools (libvirt-backed): idempotent power, `ForceRestart` fallback, override | physical BMCs (iDRAC, iLO, Supermicro, Lenovo, OpenBMC) |
 | IPMI power, state, boot device, port | VirtualBMC: all of it, including the `cycle` fallback | physical BMCs; `ipmitool` other than 1.8.19 |
 | Redfish read model | mock Redfish server only | any emulator or hardware |
-| Virtual media | sushy-tools: mount, boot CD, commission | physical virtual media; UEFI ISO; deploy over virtual media |
+| Virtual media | sushy-tools: mount, boot CD (BIOS and UEFI ISOs), commission, image deploy with eject and boot from disk, join | physical virtual media (HTTPS-only URLs, one-mount limits, write protection vary by vendor) |
 | PXE → commission → ready | VM, real iPXE, real ramdisk | physical NICs and firmware |
-| Image deploy and join | VM: Ubuntu 26.04 written, booted, joined over pinned TLS, validated | physical disks, UEFI firmware |
+| Image deploy and join | VM (BIOS and UEFI firmware): Ubuntu 26.04 written, booted, joined over pinned TLS, validated | physical disks and firmware |
 | Image catalog | 7 catalog images imported and checksum-verified (BSD layout, SHA-512) | `ubuntu-26.04-arm64` |
 | `bootstrap`, `host add --file --parallel`, labels, post-join networks and pools | two VMs and one VM | the offline bundle `--join`; a failure after SSH succeeds |
 | Serial console | pty round trip with a stand-in `ipmitool` | the WebSocket in a browser; a real BMC's SOL |
-| Auto-enrol, profile top-up | unit-tested | with real machines |
+| Auto-enrol, `bmc-set`, profile top-up | two empty VMs: enrolled, commissioned, BMC attached, deployed by an `auto_deploy` profile, joined | with physical machines |
 | Web panels | typecheck only | in a browser |
 
 ## Not done
