@@ -40,11 +40,12 @@ Guide: [baremetal-provisioning.md](baremetal-provisioning.md). Status per claim:
 | Provisioning step | Verified on |
 |---|---|
 | PXE (proxyDHCP/TFTP config) and iPXE chain | VM: the controller-rendered iPXE script; the dnsmasq config is unit-tested only |
-| Virtual media boot (BIOS iPXE ISO) | sushy-tools + VM; the UEFI ISO builds but has not booted |
+| Virtual media boot (BIOS and UEFI iPXE ISOs), deploy over virtual media with eject | sushy-tools + VMs (BIOS, and UEFI with a standard OVMF code/vars pair) |
 | Commissioning ramdisk, inventory, `ready` | VM |
 | Image deploy (Ubuntu 26.04), cloud-init seed, first-boot join over pinned TLS | VM |
 | OS image catalog (Ubuntu 26.04/24.04/22.04, Debian 12/13, Rocky 9, AlmaLinux 9) | imported and checksum-verified on the lab host; `ubuntu-26.04-arm64` not imported |
 | `bootstrap`, `host add --file --parallel`, join labels, post-join networks and pools | two VMs and one VM |
+| Auto-enrol, `bmc-set`, profile top-up (`auto_deploy`) | two empty VMs, end to end |
 | Installer deploy (autoinstall, kickstart) | rendering is unit-tested; no installer was run |
 
 What the controller host needs: `ipmitool` (IPMI power, SOL), util-linux `script` (SOL),
