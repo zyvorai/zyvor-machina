@@ -617,3 +617,42 @@ pub async fn server_boot_device(
         .map_err(|e| ApiError::bad_request(e.to_string()))?;
     Ok(Json(serde_json::json!({ "id": id, "summary": msg })))
 }
+
+/// Read the BMC's own report (Redfish) and keep it; a non-OK health raises an event.
+pub async fn refresh_bmc_info(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<uuid::Uuid>,
+) -> Result<Json<crate::engine::baremetal_bmc::BmcInfo>, ApiError> {
+    require_operator(&actor)?;
+    let info = baremetal::refresh_bmc_info(&state.pool, id)
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    let h = info.identity.health.as_str();
+    if !h.is_empty() && !h.eq_ignore_ascii_case("ok") {
+        state.emit_event(
+            "baremetal.health",
+            format!("Bare-metal server {id}: BMC health is {h}"),
+        );
+    }
+    Ok(Json(info))
+}
+
+pub async fn get_bmc_info(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<uuid::Uuid>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_operator(&actor)?;
+    match baremetal::get_bmc_info(&state.pool, id)
+        .await
+        .map_err(|e| ApiError::internal(e.to_string()))?
+    {
+        Some((at, info)) => Ok(Json(
+            serde_json::json!({ "collected_at": at, "info": info }),
+        )),
+        None => Err(ApiError::not_found(
+            "no BMC details yet; POST .../bmc-info/refresh",
+        )),
+    }
+}
