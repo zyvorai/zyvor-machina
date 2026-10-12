@@ -739,3 +739,40 @@ pub async fn import_servers(
         "rows": rows,
     })))
 }
+
+#[derive(Debug, Deserialize)]
+pub struct VirtualMediaBody {
+    /// `insert` or `eject`.
+    pub action: String,
+    /// Image to mount; default is the controller's iPXE ISO.
+    #[serde(default)]
+    pub url: String,
+}
+
+/// Mount or eject the machine's virtual CD through its Redfish BMC.
+pub async fn server_virtual_media(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<uuid::Uuid>,
+    Json(body): Json<VirtualMediaBody>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&actor)?;
+    let c = baremetal::load_bmc(&state.pool, id)
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))?
+        .ok_or_else(|| ApiError::bad_request("BMC credentials are not set for this server"))?;
+    let msg = match body.action.as_str() {
+        "insert" => {
+            let url = if body.url.trim().is_empty() {
+                baremetal::ipxe_iso_url(false)
+            } else {
+                body.url.trim().to_string()
+            };
+            crate::engine::baremetal_bmc::insert_media(&c.target(), &url).await
+        }
+        "eject" => crate::engine::baremetal_bmc::eject_media(&c.target()).await,
+        _ => return Err(ApiError::bad_request("action must be insert or eject")),
+    }
+    .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    Ok(Json(serde_json::json!({ "id": id, "summary": msg })))
+}

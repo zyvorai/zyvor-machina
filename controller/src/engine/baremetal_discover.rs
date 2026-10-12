@@ -318,6 +318,7 @@ pub async fn import_discovered(
                 bmc_password: c.password.clone(),
                 mac_address: String::new(),
                 zone: zone.to_string(),
+                boot_method: "pxe".into(),
             })
         })
         .collect();
@@ -461,6 +462,7 @@ mod tests {
             bmc_password: String::new(),
             mac_address: String::new(),
             zone: String::new(),
+            boot_method: "pxe".into(),
         }
     }
 

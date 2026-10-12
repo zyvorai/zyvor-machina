@@ -1057,6 +1057,146 @@ pub async fn collect_info(target: &BmcTarget<'_>) -> anyhow::Result<BmcInfo> {
     Ok(info)
 }
 
+// --- virtual media ----------------------------------------------------------------------
+
+/// The first virtual-media member that takes a CD or DVD: its URI and document.
+pub fn pick_cd_media(members: &[(String, Value)]) -> Option<(&str, &Value)> {
+    members.iter().find_map(|(uri, doc)| {
+        let is_cd = doc
+            .get("MediaTypes")
+            .and_then(Value::as_array)
+            .is_some_and(|t| {
+                t.iter()
+                    .filter_map(Value::as_str)
+                    .any(|m| m.eq_ignore_ascii_case("CD") || m.eq_ignore_ascii_case("DVD"))
+            });
+        is_cd.then_some((uri.as_str(), doc))
+    })
+}
+
+/// URI of a `VirtualMedia` action with the standard path as the fallback.
+pub fn media_action_target(media: &Value, uri: &str, action: &str) -> String {
+    media
+        .pointer(&format!("/Actions/#VirtualMedia.{action}/target"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .unwrap_or_else(|| {
+            format!(
+                "{}/Actions/VirtualMedia.{action}",
+                uri.trim_end_matches('/')
+            )
+        })
+}
+
+impl Redfish {
+    /// The CD/DVD virtual-media slot of the machine: through the system, else its manager.
+    async fn cd_media(&self, system: &Value) -> anyhow::Result<(String, Value)> {
+        let mut collections: Vec<String> = Vec::new();
+        if let Some(c) = first_link(system, "/VirtualMedia") {
+            collections.push(c);
+        }
+        if let Some(m) = first_link(system, "/Links/ManagedBy") {
+            if let Ok(mgr) = self.get(&m).await {
+                if let Some(c) = first_link(&mgr, "/VirtualMedia") {
+                    collections.push(c);
+                }
+            }
+        }
+        for c in collections {
+            let Ok(coll) = self.get(&c).await else {
+                continue;
+            };
+            let mut docs = Vec::new();
+            for uri in member_uris(&coll).into_iter().take(8) {
+                if let Ok(d) = self.get(&uri).await {
+                    docs.push((uri, d));
+                }
+            }
+            if let Some((uri, doc)) = pick_cd_media(&docs) {
+                return Ok((uri.to_string(), doc.clone()));
+            }
+        }
+        anyhow::bail!("this BMC exposes no CD/DVD virtual media")
+    }
+}
+
+/// Mount `image_url` (http/https) as the machine's virtual CD. An image already mounted is
+/// replaced; the media is write-protected.
+pub async fn insert_media(target: &BmcTarget<'_>, image_url: &str) -> anyhow::Result<String> {
+    if !(image_url.starts_with("http://") || image_url.starts_with("https://"))
+        || image_url
+            .chars()
+            .any(|c| c.is_whitespace() || c.is_control())
+    {
+        anyhow::bail!("virtual media image must be an http(s) URL");
+    }
+    if target.kind != BmcKind::Redfish {
+        anyhow::bail!(
+            "virtual media needs a Redfish BMC; this server uses {:?}",
+            target.kind
+        );
+    }
+    let rf = Redfish::connect(target)?;
+    let (_, system) = rf.system().await?;
+    let (uri, media) = rf.cd_media(&system).await?;
+    let inserted = media
+        .get("Inserted")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let current = media.get("Image").and_then(Value::as_str).unwrap_or("");
+    if inserted && current == image_url {
+        return Ok(format!("virtual media: {image_url} is already mounted"));
+    }
+    if inserted {
+        let eject = media_action_target(&media, &uri, "EjectMedia");
+        rf.send("POST", &eject, Some(&json!({}))).await?;
+    }
+    let has_action = media
+        .pointer("/Actions/#VirtualMedia.InsertMedia")
+        .is_some();
+    if has_action {
+        let t = media_action_target(&media, &uri, "InsertMedia");
+        rf.send(
+            "POST",
+            &t,
+            Some(&json!({ "Image": image_url, "Inserted": true, "WriteProtected": true })),
+        )
+        .await?;
+    } else {
+        // Older BMCs: the slot itself is PATCHed.
+        rf.send(
+            "PATCH",
+            &uri,
+            Some(&json!({ "Image": image_url, "Inserted": true })),
+        )
+        .await?;
+    }
+    Ok(format!("virtual media: mounted {image_url}"))
+}
+
+/// Eject whatever is mounted in the CD slot (nothing mounted is not an error).
+pub async fn eject_media(target: &BmcTarget<'_>) -> anyhow::Result<String> {
+    if target.kind != BmcKind::Redfish {
+        anyhow::bail!(
+            "virtual media needs a Redfish BMC; this server uses {:?}",
+            target.kind
+        );
+    }
+    let rf = Redfish::connect(target)?;
+    let (_, system) = rf.system().await?;
+    let (uri, media) = rf.cd_media(&system).await?;
+    if !media
+        .get("Inserted")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        return Ok("virtual media: nothing mounted".into());
+    }
+    let t = media_action_target(&media, &uri, "EjectMedia");
+    rf.send("POST", &t, Some(&json!({}))).await?;
+    Ok("virtual media: ejected".into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1557,6 +1697,144 @@ mod tests {
             ..target(&addr)
         };
         assert!(collect_info(&t).await.is_err());
+    }
+
+    #[test]
+    fn virtual_media_slot_selection_and_action_targets() {
+        let members = vec![
+            (
+                "/m/Floppy".to_string(),
+                json!({"MediaTypes": ["Floppy", "USBStick"]}),
+            ),
+            (
+                "/m/CD".to_string(),
+                json!({"MediaTypes": ["CD", "DVD"],
+                "Actions": {"#VirtualMedia.InsertMedia": {"target": "/m/CD/Actions/VirtualMedia.InsertMedia"}}}),
+            ),
+        ];
+        let (uri, doc) = pick_cd_media(&members).unwrap();
+        assert_eq!(uri, "/m/CD");
+        assert_eq!(
+            media_action_target(doc, uri, "InsertMedia"),
+            "/m/CD/Actions/VirtualMedia.InsertMedia"
+        );
+        assert_eq!(
+            media_action_target(doc, uri, "EjectMedia"),
+            "/m/CD/Actions/VirtualMedia.EjectMedia"
+        );
+        assert!(pick_cd_media(&members[..1]).is_none());
+    }
+
+    fn media_bmc() -> Vec<Route> {
+        let mut r = systems();
+        r.push(route(
+            "GET",
+            "/redfish/v1/Systems/1",
+            200,
+            json!({"VirtualMedia": {"@odata.id": "/redfish/v1/Managers/1/VirtualMedia"}}),
+        ));
+        r.push(route(
+            "GET",
+            "/redfish/v1/Managers/1/VirtualMedia",
+            200,
+            json!({"Members": [{"@odata.id": "/redfish/v1/Managers/1/VirtualMedia/CD1"}]}),
+        ));
+        r
+    }
+
+    #[tokio::test]
+    async fn insert_media_posts_the_action_and_skips_an_identical_mount() {
+        let mut r = media_bmc();
+        r.push(route(
+            "GET",
+            "/redfish/v1/Managers/1/VirtualMedia/CD1",
+            200,
+            json!({"MediaTypes": ["CD"], "Inserted": false,
+                "Actions": {"#VirtualMedia.InsertMedia": {
+                    "target": "/redfish/v1/Managers/1/VirtualMedia/CD1/Actions/VirtualMedia.InsertMedia"}}}),
+        ));
+        r.push(route(
+            "POST",
+            "/redfish/v1/Managers/1/VirtualMedia/CD1/Actions/VirtualMedia.InsertMedia",
+            204,
+            json!({}),
+        ));
+        let (addr, log) = mock_redfish(r).await;
+        let out = insert_media(&target(&addr), "http://ctl/dist/metal-ipxe.iso")
+            .await
+            .unwrap();
+        assert!(out.contains("mounted"), "{out}");
+        let post = log
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(m, _, _)| m == "POST")
+            .cloned()
+            .unwrap();
+        let body: Value = serde_json::from_str(&post.2).unwrap();
+        assert_eq!(body["Image"], "http://ctl/dist/metal-ipxe.iso");
+        assert_eq!(body["Inserted"], true);
+        assert!(insert_media(&target(&addr), "ftp://x/a.iso").await.is_err());
+        assert!(insert_media(&target(&addr), "http://x/a b.iso")
+            .await
+            .is_err());
+    }
+
+    #[tokio::test]
+    async fn a_different_image_is_ejected_first_and_old_bmcs_are_patched() {
+        let mut r = media_bmc();
+        // Mounted, no InsertMedia action (older BMC): eject, then PATCH the slot.
+        r.push(route(
+            "GET",
+            "/redfish/v1/Managers/1/VirtualMedia/CD1",
+            200,
+            json!({"MediaTypes": ["CD"], "Inserted": true, "Image": "http://old/x.iso"}),
+        ));
+        r.push(route(
+            "POST",
+            "/redfish/v1/Managers/1/VirtualMedia/CD1/Actions/VirtualMedia.EjectMedia",
+            204,
+            json!({}),
+        ));
+        r.push(route(
+            "PATCH",
+            "/redfish/v1/Managers/1/VirtualMedia/CD1",
+            200,
+            json!({}),
+        ));
+        let (addr, log) = mock_redfish(r).await;
+        insert_media(&target(&addr), "http://ctl/dist/metal-ipxe.iso")
+            .await
+            .unwrap();
+        let methods: Vec<String> = log
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(m, _, _)| m != "GET")
+            .map(|(m, p, _)| format!("{m} {p}"))
+            .collect();
+        assert_eq!(
+            methods,
+            vec![
+                "POST /redfish/v1/Managers/1/VirtualMedia/CD1/Actions/VirtualMedia.EjectMedia",
+                "PATCH /redfish/v1/Managers/1/VirtualMedia/CD1",
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn eject_media_is_a_noop_when_nothing_is_mounted() {
+        let mut r = media_bmc();
+        r.push(route(
+            "GET",
+            "/redfish/v1/Managers/1/VirtualMedia/CD1",
+            200,
+            json!({"MediaTypes": ["DVD"], "Inserted": false}),
+        ));
+        let (addr, log) = mock_redfish(r).await;
+        let out = eject_media(&target(&addr)).await.unwrap();
+        assert!(out.contains("nothing mounted"), "{out}");
+        assert!(log.lock().unwrap().iter().all(|(m, _, _)| m == "GET"));
     }
 
     #[tokio::test]

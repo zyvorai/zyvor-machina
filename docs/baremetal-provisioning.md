@@ -337,6 +337,29 @@ talk to the controller (`--fleet` is implied). In the UI, Platform -> Bare Metal
 lifecycle and zone next to power state, takes BMC credentials, MAC and zone on
 registration, and has Commission and Release buttons.
 
+## Virtual media (no DHCP/TFTP on the machine's network)
+
+A server whose BMC is Redfish can reach the boot service without PXE: the BMC mounts a
+small iPXE ISO as a virtual CD, the machine boots it, iPXE gets an address by DHCP and
+chains to the controller with its MAC, and from there it is the same flow as PXE.
+
+```
+sudo scripts/metal/build-ipxe-iso.sh http://CONTROLLER:5093 /var/tmp/metal-out   # build host
+sudo machinactl dist publish-metal --dir /var/tmp/metal-out                      # also copies the ISOs
+```
+
+- Register the server with `"boot_method": "virtual_media"` (BIOS) or
+  `"virtual_media_uefi"`. Commissioning and image deploy then mount
+  `$MACHINA_PUBLIC_URL/dist/metal-ipxe.iso` (or `-uefi.iso`), set the next boot to CD,
+  and when the image is written eject it and set the next boot to disk.
+  `MACHINA_METAL_IPXE_ISO_URL` overrides the URL (a mirror the BMC can reach).
+- Manually: `POST /api/v1/baremetal/servers/{id}/virtual-media` `{"action":"insert"|"eject","url":"…"}`.
+- The BMC fetches the image itself, so it must reach the controller (or the mirror) over
+  http(s). An image already mounted is replaced; a BMC without an `InsertMedia` action is
+  patched (`Image`, `Inserted`); one with no CD/DVD slot is refused with a clear message.
+- The machine still needs DHCP for an address once iPXE runs. Only the boot-file/TFTP part
+  is replaced.
+
 ## Joining requires the TLS listener
 
 A deployed machine joins with the controller's **pinned** join command: it checks the
