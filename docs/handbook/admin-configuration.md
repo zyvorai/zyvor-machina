@@ -290,6 +290,7 @@ TLS is active only when `enabled=true` **and** both paths are non-empty.
 |----------|--------|---------|
 | `DATABASE_URL` | State store | `sqlite:///var/lib/machina/controller.db` (embedded SQLite; no external database). The PostgreSQL build of the controller takes `postgres://user:password@host:5432/db` ([guide](../guides/database.md)) |
 | `MACHINA_UPDATE_CHECK_URL` | Turns on the "new version available" banner: a URL returning `{"version": "x.y.z", "url": "release notes"}` (your own mirror or a public feed). Unset means the controller never contacts anything and no banner shows (air-gapped sites) | unset |
+| `MACHINA_FIREWALL_CLOUD_PROBE` | `1` lets the Zeus firewall cloud overview shell out to `aws` / `gcloud` and read their security groups. Off by default (local-first): the controller never runs a hyperscaler CLI unless you opt in. Azure is no longer probed | unset |
 | `MACHINA_DB_MAX_CONNECTIONS` | PostgreSQL pool size | `20` (PostgreSQL build only) |
 | `NATS_URL` | Enables NATS task fan-out | `nats://127.0.0.1:4222` (optional) |
 | `MACHINA_AGENT_ADDR` | gRPC agent address | `http://127.0.0.1:50051` |

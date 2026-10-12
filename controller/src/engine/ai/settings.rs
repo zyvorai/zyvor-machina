@@ -1,8 +1,8 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
 
-use serde::{Deserialize, Serialize};
 use crate::db::DbPool;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AiSettings {
@@ -164,5 +164,85 @@ pub async fn api_key(pool: &DbPool) -> anyhow::Result<Option<String>> {
 
 pub async fn llm_enabled(pool: &DbPool) -> anyhow::Result<bool> {
     let s = get_ai_settings(pool).await?;
-    Ok(s.enabled && s.api_key_configured && api_key(pool).await?.is_some())
+    if !s.enabled || std::env::var("MACHINA_AI_DISABLED").ok().as_deref() == Some("1") {
+        return Ok(false);
+    }
+    if s.api_key_configured && api_key(pool).await?.is_some() {
+        return Ok(true);
+    }
+    // No hosted key: AI still works when a local provider (Ollama, vLLM,
+    // llama.cpp) is enabled, since those endpoints take no key.
+    Ok(super::providers::resolve_local(pool).await?.is_some())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+
+    async fn cluster_with_ai(pool: &DbPool) {
+        crate::db::query("INSERT INTO clusters (id, name) VALUES (?, 'c')")
+            .bind(Uuid::from_u128(1))
+            .execute(pool)
+            .await
+            .unwrap();
+        crate::db::query("UPDATE clusters SET ai_enabled = TRUE")
+            .execute(pool)
+            .await
+            .unwrap();
+    }
+
+    async fn add_provider(pool: &DbPool, kind: &str, base_url: &str, key: &str) -> Uuid {
+        let id = Uuid::new_v4();
+        crate::db::query(
+            "INSERT INTO ai_providers (id, name, kind, base_url, api_key_encrypted, is_default)
+             VALUES (?, ?, ?, ?, ?, TRUE)",
+        )
+        .bind(id)
+        .bind(kind)
+        .bind(kind)
+        .bind(base_url)
+        .bind(key)
+        .execute(pool)
+        .await
+        .unwrap();
+        id
+    }
+
+    #[tokio::test]
+    async fn keyless_local_provider_enables_llm() {
+        if std::env::var("MACHINA_AI_DISABLED").is_ok()
+            || std::env::var("MACHINA_AI_API_KEY").is_ok()
+        {
+            return;
+        }
+        let pool = crate::db::testing::pool().await;
+        cluster_with_ai(&pool).await;
+        assert!(!llm_enabled(&pool).await.unwrap());
+        add_provider(&pool, "ollama", "http://127.0.0.1:11434", "").await;
+        assert!(llm_enabled(&pool).await.unwrap());
+        let r = super::super::providers::resolve_default(&pool)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(r.kind, "ollama");
+        assert!(r.api_key.is_empty());
+    }
+
+    #[tokio::test]
+    async fn keyless_hosted_provider_stays_disabled() {
+        if std::env::var("MACHINA_AI_DISABLED").is_ok()
+            || std::env::var("MACHINA_AI_API_KEY").is_ok()
+        {
+            return;
+        }
+        let pool = crate::db::testing::pool().await;
+        cluster_with_ai(&pool).await;
+        add_provider(&pool, "openai", "", "").await;
+        assert!(!llm_enabled(&pool).await.unwrap());
+        assert!(super::super::providers::resolve_default(&pool)
+            .await
+            .unwrap()
+            .is_none());
+    }
 }

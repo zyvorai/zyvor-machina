@@ -48,7 +48,7 @@ export default function PlatformFirewallCloud() {
       title="Cloud Security Groups"
       subtitle={
         <span className="flex flex-col gap-1">
-          <span className="text-[var(--text-muted)]">{summary || 'AWS · Azure · GCP edge inventory'}</span>
+          <span className="text-[var(--text-muted)]">{summary || 'Cloud probe off — host firewall inventory only'}</span>
           {platformStatSubtitle([
             { label: 'Provider', value: provider },
             { label: 'Rules', value: rules.length },

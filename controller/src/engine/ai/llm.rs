@@ -68,6 +68,10 @@ async fn complete_resolved(
     if resolved.api_key.is_empty() && !uses_local_endpoint(&resolved.kind) {
         return Ok(None);
     }
+    if let Some(why) = unusable_kind(resolved) {
+        tracing::warn!(provider = %resolved.kind, "refusing LLM request: {why}");
+        return Ok(None);
+    }
     if let Err(e) = validate_base_url(&resolved.base_url) {
         tracing::warn!(provider = %resolved.kind, "refusing LLM request: {e}");
         return Ok(None);
@@ -145,15 +149,19 @@ pub(super) fn uses_local_endpoint(kind: &str) -> bool {
     matches!(kind, "ollama" | "vllm" | "openai_compatible")
 }
 
-pub(super) fn openai_base(resolved: &ResolvedProvider) -> String {
-    // Azure requires its own path format regardless of whether base_url is set.
-    if resolved.kind == "azure_openai" {
-        let base = resolved.base_url.trim().trim_end_matches('/');
-        return format!(
-            "{}/openai/deployments/{}/chat/completions?api-version=2024-02-01",
-            base, resolved.deployment_name
-        );
+/// Why a provider cannot be called, or `None` when it can. Kinds the code no longer has
+/// an endpoint for must not fall through to api.openai.com and leak their key there.
+pub(super) fn unusable_kind(resolved: &ResolvedProvider) -> Option<&'static str> {
+    match resolved.kind.as_str() {
+        "azure_openai" => Some("azure_openai was removed (local-first); use ollama, vllm or openai_compatible"),
+        "meta" | "qwen" if resolved.base_url.trim().is_empty() => {
+            Some("this provider kind has no built-in endpoint; set a base URL (or use openai_compatible)")
+        }
+        _ => None,
     }
+}
+
+pub(super) fn openai_base(resolved: &ResolvedProvider) -> String {
     if !resolved.base_url.trim().is_empty() {
         let base = resolved.base_url.trim().trim_end_matches('/');
         if base.ends_with("/v1") {
@@ -184,11 +192,7 @@ async fn openai_compatible_complete(
     system: &str,
     user: &str,
 ) -> anyhow::Result<Option<String>> {
-    let model = if resolved.kind == "azure_openai" && !resolved.deployment_name.is_empty() {
-        resolved.deployment_name.clone()
-    } else {
-        resolved.model_id.clone()
-    };
+    let model = resolved.model_id.clone();
     let body = serde_json::json!({
         "model": model,
         "messages": [
@@ -318,4 +322,30 @@ async fn google_complete(
         );
     }
     Ok(text)
+}
+
+#[cfg(test)]
+mod local_first_tests {
+    use super::*;
+
+    fn p(kind: &str, base_url: &str) -> ResolvedProvider {
+        ResolvedProvider {
+            provider_id: uuid::Uuid::nil(),
+            kind: kind.into(),
+            base_url: base_url.into(),
+            org_id: String::new(),
+            deployment_name: String::new(),
+            api_key: String::new(),
+            model_id: "m".into(),
+        }
+    }
+
+    #[test]
+    fn removed_and_endpointless_kinds_are_unusable() {
+        assert!(unusable_kind(&p("azure_openai", "https://x")).is_some());
+        assert!(unusable_kind(&p("meta", "")).is_some());
+        assert!(unusable_kind(&p("meta", "http://127.0.0.1:8000")).is_none());
+        assert!(unusable_kind(&p("ollama", "")).is_none());
+        assert!(unusable_kind(&p("openai", "")).is_none());
+    }
 }

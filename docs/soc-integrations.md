@@ -49,25 +49,27 @@ Configure via API:
 
 Test: `POST /api/v1/soc/integrations/elastic_bulk/test`
 
-## Microsoft Sentinel
+## JSON webhook (local collector)
 
-`PATCH /api/v1/soc/integrations/sentinel_dcr`
+Replaces the removed Microsoft Sentinel (Azure Monitor DCR) exporter. Machina POSTs batches of
+ECS events as NDJSON to any endpoint you run: Vector, Fluent Bit, a Loki push proxy, Wazuh,
+Graylog, or your own script. Nothing leaves the site unless you point it elsewhere.
+
+`PATCH /api/v1/soc/integrations/webhook_json`
 
 ```json
 {
   "enabled": true,
   "config_json": {
-    "dce_endpoint": "https://<dce>.ingest.monitor.azure.com",
-    "dcr_immutable_id": "<dcr-id>",
-    "stream_name": "Custom-MachinaSoc",
-    "tenant_id": "<tenant>",
-    "client_id": "<app-id>",
-    "client_secret": "<secret>"
+    "url": "http://10.0.0.5:8686/events",
+    "bearer_token": "<optional>",
+    "insecure_tls": false
   }
 }
 ```
 
-Alternatively set `bearer_token` for a pre-issued token.
+Test: `POST /api/v1/soc/integrations/webhook_json/test`. An existing, configured `sentinel_dcr`
+row is no longer forwarded (a warning is logged); switch it to `webhook_json` or `elastic_bulk`.
 
 ## IBM QRadar
 
