@@ -18,6 +18,10 @@ machinactl metal <command>
   deploy ID --os ubuntu-24.04 --key "ssh-ed25519 AAAA…" [--timezone UTC]
   release ID                               allocated|deployed -> ready
   lifecycle ID STATE                       Move to retired, new, ready, ...
+  image list|catalog                       Imported OS images / names that can be imported
+  image add NAME [--url U --checksum HEX|--sums-url U] [--algo sha256|sha512]
+                                           NAME alone imports a catalog image (ubuntu-26.04, ...)
+  image rm NAME
   zones                                    Servers per zone
   dnsmasq --subnet CIDR-NET [--interface IF] [--tftp-root DIR]
                                            dnsmasq.conf for a site's boot host
@@ -111,6 +115,46 @@ metal_main() {
             [[ -n "${1:-}" && -n "${2:-}" ]] || np_die "usage: metal lifecycle ID STATE"
             jq -n --arg to "$2" '{to:$to}' |
                 np_api POST "/baremetal/servers/$1/lifecycle" -H 'Content-Type: application/json' --data-binary @- | jq .
+            ;;
+        image | images)
+            local isub="${1:-list}"
+            shift || true
+            case "$isub" in
+                list | ls)
+                    np_api GET /baremetal/images | jq -r '
+                      (["NAME","OS","ARCH","STATUS","SIZE_MIB","CHECKSUM","ERROR"] | @tsv),
+                      (.images[] | [.name, .os, .arch, .status, ((.size_bytes / 1048576) | floor),
+                                    (.checksum[0:16] + (if .checksum == "" then "" else "…" end)), .error] | @tsv)' |
+                        column -t -s $'\t'
+                    ;;
+                catalog)
+                    np_api GET /baremetal/images | jq -r '.catalog[] | [.name, .arch, .url] | @tsv' | column -t -s $'\t'
+                    ;;
+                add)
+                    local name="${1:-}" url="" sum="" sums="" algo=""
+                    [[ -n "$name" ]] || np_die "usage: metal image add NAME [--url U --checksum HEX]"
+                    shift
+                    while [[ $# -gt 0 ]]; do
+                        case "$1" in
+                            --url) url=${2:-}; shift 2 ;;
+                            --checksum) sum=${2:-}; shift 2 ;;
+                            --sums-url) sums=${2:-}; shift 2 ;;
+                            --algo) algo=${2:-}; shift 2 ;;
+                            *) np_die "unknown option $1" ;;
+                        esac
+                    done
+                    jq -n --arg n "$name" --arg u "$url" --arg c "$sum" --arg s "$sums" --arg a "$algo" \
+                        '{name:$n, url:$u, checksum:$c, sums_url:$s, checksum_algo:$a}' |
+                        np_api POST /baremetal/images -H 'Content-Type: application/json' --data-binary @- |
+                        jq '{name, status, source_url}'
+                    echo "downloading in the background: machinactl metal image list" >&2
+                    ;;
+                rm | delete)
+                    [[ -n "${1:-}" ]] || np_die "usage: metal image rm NAME"
+                    np_api DELETE "/baremetal/images/$1" | jq .
+                    ;;
+                *) np_die "usage: metal image list|catalog|add|rm" ;;
+            esac
             ;;
         zones)
             np_api GET /baremetal/zones | jq -r '

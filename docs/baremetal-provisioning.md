@@ -138,6 +138,32 @@ PXE-boots, `/boot/ipxe` hands it the installer and the document by URL.
 - Hostname, timezone, keys and the join command are validated before rendering; a
   value that could break out of the document is refused.
 
+## OS images
+
+Images are imported once and then written to disks by image-based deploys.
+
+```
+machinactl metal image catalog                       # names you can import
+machinactl metal image add ubuntu-26.04              # catalog image, checksum from upstream
+machinactl metal image add corp-ubuntu --url https://mirror.corp/u.img --checksum <hex>
+machinactl metal image list
+```
+
+Catalog: `ubuntu-26.04`, `ubuntu-26.04-arm64`, `ubuntu-24.04`, `ubuntu-22.04`,
+`debian-12`, `debian-13`, `rocky-9`, `almalinux-9` (cloud images from the distributions'
+own servers). The download happens in the controller, in the background
+(`status: downloading` -> `ready` or `failed` with the reason).
+
+- An image is **never kept unverified**: the checksum comes from the upstream checksum
+  file (GNU or BSD layout, SHA-256 or SHA-512) or from you; a mismatch deletes the file
+  and fails the import. A URL import with neither a `checksum` nor a `sums_url` is refused.
+- Air-gapped: import from an internal mirror by URL with an explicit checksum.
+- Files live in `$MACHINA_DIST_DIR/images/` and are served at `/dist/images/NAME` with
+  `Range` support, so a machine can resume a download. Limit per image:
+  `MACHINA_METAL_IMAGE_MAX_BYTES` (default 20 GiB).
+- Writing an image to a disk (stage 3) is not implemented yet; today's deploy still
+  uses the installer media above.
+
 ## CLI and UI
 
 ```

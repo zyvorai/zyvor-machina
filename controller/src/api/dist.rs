@@ -93,9 +93,102 @@ pub async fn serve(Path(name): Path<String>) -> Response {
     }
 }
 
+/// `GET /dist/images/{name}`: an imported OS image, streamed, with `Range: bytes=N-` so a
+/// machine's deploy script can resume a half-finished download.
+pub async fn serve_image(Path(name): Path<String>, headers: axum::http::HeaderMap) -> Response {
+    use tokio::io::{AsyncReadExt, AsyncSeekExt};
+    if !image_name_ok(&name) {
+        return (StatusCode::NOT_FOUND, "not found").into_response();
+    }
+    let path = crate::engine::baremetal_images::images_dir().join(&name);
+    let mut f = match tokio::fs::File::open(&path).await {
+        Ok(f) => f,
+        Err(_) => return (StatusCode::NOT_FOUND, "image not found").into_response(),
+    };
+    let total = match f.metadata().await {
+        Ok(m) => m.len(),
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "stat failed").into_response(),
+    };
+    let start = parse_range_start(
+        headers.get(header::RANGE).and_then(|v| v.to_str().ok()),
+        total,
+    );
+    let partial = start.is_some();
+    let start = start.unwrap_or(0);
+    if start >= total && total > 0 {
+        return (
+            StatusCode::RANGE_NOT_SATISFIABLE,
+            [(header::CONTENT_RANGE, format!("bytes */{total}"))],
+        )
+            .into_response();
+    }
+    if start > 0 && f.seek(std::io::SeekFrom::Start(start)).await.is_err() {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "seek failed").into_response();
+    }
+    let stream = futures_util::stream::unfold(f, |mut f| async move {
+        let mut buf = vec![0u8; 256 * 1024];
+        match f.read(&mut buf).await {
+            Ok(0) | Err(_) => None,
+            Ok(n) => {
+                buf.truncate(n);
+                Some((Ok::<_, std::io::Error>(bytes::Bytes::from(buf)), f))
+            }
+        }
+    });
+    let mut resp = Response::builder()
+        .header(header::CONTENT_TYPE, "application/octet-stream")
+        .header(header::ACCEPT_RANGES, "bytes")
+        .header(header::CONTENT_LENGTH, total - start);
+    if partial {
+        resp = resp.status(StatusCode::PARTIAL_CONTENT).header(
+            header::CONTENT_RANGE,
+            format!("bytes {start}-{}/{total}", total.saturating_sub(1)),
+        );
+    }
+    resp.body(Body::from_stream(stream))
+        .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
+}
+
+fn image_name_ok(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 200
+        && !name.contains("..")
+        && !name.ends_with(".part")
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+}
+
+/// Start offset of a single `bytes=N-` (or `bytes=N-M`) range; `None` when absent or unusable.
+fn parse_range_start(h: Option<&str>, total: u64) -> Option<u64> {
+    let v = h?.trim().strip_prefix("bytes=")?;
+    if v.contains(',') {
+        return None;
+    }
+    let (a, _) = v.split_once('-')?;
+    let n: u64 = a.trim().parse().ok()?;
+    let _ = total;
+    Some(n)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::allowed;
+    use super::{allowed, image_name_ok, parse_range_start};
+
+    #[test]
+    fn image_names_and_ranges() {
+        assert!(image_name_ok(
+            "ubuntu-26.04-ubuntu-26.04-server-cloudimg-amd64.img"
+        ));
+        for bad in ["", "../x", "a/b", "x.part", ".."] {
+            assert!(!image_name_ok(bad), "{bad}");
+        }
+        assert_eq!(parse_range_start(Some("bytes=100-"), 1000), Some(100));
+        assert_eq!(parse_range_start(Some("bytes=5-9"), 1000), Some(5));
+        assert_eq!(parse_range_start(Some("bytes=1-2,5-6"), 1000), None);
+        assert_eq!(parse_range_start(None, 1000), None);
+        assert_eq!(parse_range_start(Some("items=1-"), 1000), None);
+    }
 
     #[test]
     fn only_the_published_names_are_served() {

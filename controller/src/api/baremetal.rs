@@ -9,7 +9,8 @@ use serde::Deserialize;
 use crate::api::ApiError;
 use crate::auth::{require_admin, require_operator, AuthUser};
 use crate::engine::{
-    baremetal, baremetal_alloc, baremetal_boot, baremetal_deploy, baremetal_lifecycle,
+    baremetal, baremetal_alloc, baremetal_boot, baremetal_deploy, baremetal_images,
+    baremetal_lifecycle,
 };
 use crate::state::AppState;
 
@@ -376,4 +377,58 @@ pub async fn zones(
         .await
         .map_err(|e| ApiError::internal(e.to_string()))
         .map(Json)
+}
+
+pub async fn list_images(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_operator(&actor)?;
+    let images = baremetal_images::list(&state.pool)
+        .await
+        .map_err(|e| ApiError::internal(e.to_string()))?;
+    let catalog: Vec<serde_json::Value> = baremetal_images::CATALOG
+        .iter()
+        .map(|c| {
+            serde_json::json!({
+                "name": c.name, "os": c.os, "arch": c.arch, "format": c.format,
+                "url": c.url, "checksum_algo": c.algo.as_str(),
+            })
+        })
+        .collect();
+    Ok(Json(
+        serde_json::json!({ "images": images, "catalog": catalog }),
+    ))
+}
+
+/// Import a catalog image by name (`{"name": "ubuntu-26.04"}`) or a URL with a checksum.
+/// Returns at once with `status: downloading`; poll `GET /baremetal/images`.
+pub async fn import_image(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Json(body): Json<baremetal_images::ImportRequest>,
+) -> Result<
+    (
+        axum::http::StatusCode,
+        Json<baremetal_images::BaremetalImage>,
+    ),
+    ApiError,
+> {
+    require_admin(&actor)?;
+    let img = baremetal_images::start_import(&state.pool, &body)
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    Ok((axum::http::StatusCode::ACCEPTED, Json(img)))
+}
+
+pub async fn delete_image(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&actor)?;
+    baremetal_images::delete(&state.pool, &name)
+        .await
+        .map_err(|e| ApiError::not_found(e.to_string()))?;
+    Ok(Json(serde_json::json!({ "deleted": name })))
 }

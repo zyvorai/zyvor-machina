@@ -685,6 +685,14 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/baremetal/boot/dnsmasq.conf", get(baremetal::boot_dnsmasq))
         .route("/api/v1/baremetal/allocate", post(baremetal::allocate))
         .route(
+            "/api/v1/baremetal/images",
+            get(baremetal::list_images).post(baremetal::import_image),
+        )
+        .route(
+            "/api/v1/baremetal/images/{name}",
+            axum::routing::delete(baremetal::delete_image),
+        )
+        .route(
             "/api/v1/baremetal/servers/{id}/deploy",
             post(baremetal::server_deploy),
         )
@@ -2133,6 +2141,7 @@ pub fn router(state: AppState) -> Router {
         .route("/install.sh", get(enrollment::install_script))
         .route("/api/v1/pki/ca", get(fleet_pki::ca))
         .route("/api/v1/pki/ca.pem", get(fleet_pki::ca_pem))
+        .route("/dist/images/{name}", get(dist::serve_image))
         .route("/dist/{name}", get(dist::serve))
         .merge(rate_limited_public)
         .merge(console::ws_routes())
@@ -2157,6 +2166,7 @@ pub fn enrollment_router(state: AppState) -> Router {
         .route("/api/v1/health", get(health::health))
         .route("/api/v1/pki/ca", get(fleet_pki::ca))
         .route("/api/v1/pki/ca.pem", get(fleet_pki::ca_pem))
+        .route("/dist/images/{name}", get(dist::serve_image))
         .route("/dist/{name}", get(dist::serve))
         .route("/install.sh", get(enrollment::install_script))
         .merge(joins)
