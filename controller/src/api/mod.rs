@@ -683,6 +683,16 @@ pub fn router(state: AppState) -> Router {
             get(baremetal::server_inventory),
         )
         .route("/api/v1/baremetal/boot/dnsmasq.conf", get(baremetal::boot_dnsmasq))
+        .route("/api/v1/baremetal/allocate", post(baremetal::allocate))
+        .route("/api/v1/baremetal/zones", get(baremetal::zones))
+        .route(
+            "/api/v1/baremetal/servers/{id}/release",
+            post(baremetal::release),
+        )
+        .route(
+            "/api/v1/baremetal/servers/{id}/zone",
+            post(baremetal::set_zone),
+        )
         .route(
             "/api/v1/baremetal/servers/{id}/provision",
             get(baremetal::server_provision),

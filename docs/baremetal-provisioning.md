@@ -96,6 +96,20 @@ GET /api/v1/baremetal/boot/commission.sh                  (no login: the image r
 
 Register the PXE NIC's MAC with `mac_address` (and `zone`) on the server.
 
+## Zones and allocation
+
+```
+POST /api/v1/baremetal/allocate            (operator) {"zone":"a","min_cpu_cores":16,"min_memory_mib":65536}
+POST /api/v1/baremetal/servers/{id}/release (operator) allocated|deployed -> ready
+POST /api/v1/baremetal/servers/{id}/zone   (admin)    {"zone":"rack2"}
+GET  /api/v1/baremetal/zones                (operator) counts per zone
+```
+
+Allocation takes the smallest `ready` server that satisfies the request (an empty
+`zone` means any), so big machines stay free for big requests. The claim is a
+compare-and-set; losing a race retries with the next candidate. No match is 409.
+`allocated_to` records the requesting user.
+
 ## Not done yet
 
 1. A commissioning image build (kernel, initrd, rootfs). The script and the contract

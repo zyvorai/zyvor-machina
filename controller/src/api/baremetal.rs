@@ -8,7 +8,7 @@ use serde::Deserialize;
 
 use crate::api::ApiError;
 use crate::auth::{require_admin, require_operator, AuthUser};
-use crate::engine::{baremetal, baremetal_boot, baremetal_lifecycle};
+use crate::engine::{baremetal, baremetal_alloc, baremetal_boot, baremetal_lifecycle};
 use crate::state::AppState;
 
 pub async fn list_servers(
@@ -241,4 +241,64 @@ pub async fn boot_dnsmasq(
     })
     .map_err(|e| ApiError::bad_request(e.to_string()))?;
     Ok(text(conf))
+}
+
+pub async fn allocate(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Json(body): Json<baremetal_alloc::AllocateRequest>,
+) -> Result<Json<baremetal_alloc::Allocation>, ApiError> {
+    require_operator(&actor)?;
+    baremetal_alloc::allocate(&state.pool, &body, &actor.username)
+        .await
+        .map_err(|e| ApiError::conflict(e.to_string(), "register or commission more servers"))
+        .map(Json)
+}
+
+pub async fn release(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<uuid::Uuid>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_operator(&actor)?;
+    baremetal_alloc::release(&state.pool, id)
+        .await
+        .map_err(|e| {
+            ApiError::conflict(
+                e.to_string(),
+                "only allocated or deployed servers can be released",
+            )
+        })?;
+    Ok(Json(serde_json::json!({ "id": id, "lifecycle": "ready" })))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ZoneBody {
+    pub zone: String,
+}
+
+pub async fn set_zone(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<uuid::Uuid>,
+    Json(body): Json<ZoneBody>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&actor)?;
+    baremetal_alloc::set_zone(&state.pool, id, &body.zone)
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    Ok(Json(
+        serde_json::json!({ "id": id, "zone": body.zone.trim() }),
+    ))
+}
+
+pub async fn zones(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+) -> Result<Json<Vec<baremetal_alloc::ZoneSummary>>, ApiError> {
+    require_operator(&actor)?;
+    baremetal_alloc::zones(&state.pool)
+        .await
+        .map_err(|e| ApiError::internal(e.to_string()))
+        .map(Json)
 }
