@@ -9,6 +9,7 @@
 
 use std::time::Duration;
 
+use serde::Serialize;
 use serde_json::{json, Value};
 
 /// Power action, as accepted by `POST /api/v1/baremetal/servers/{id}/power`.
@@ -48,6 +49,70 @@ impl PowerAction {
             Self::Off => "off",
             Self::Cycle => "cycle",
             Self::Reset => "reset",
+        }
+    }
+}
+
+/// What the BMC says, not what we last asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PowerState {
+    On,
+    Off,
+    Unknown,
+}
+
+impl PowerState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::On => "on",
+            Self::Off => "off",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+/// Which device the next boot should use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BootDevice {
+    Pxe,
+    Disk,
+    Cdrom,
+}
+
+impl BootDevice {
+    pub fn parse(s: &str) -> anyhow::Result<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "pxe" | "network" => Ok(Self::Pxe),
+            "disk" | "hdd" => Ok(Self::Disk),
+            "cdrom" | "cd" | "dvd" => Ok(Self::Cdrom),
+            other => anyhow::bail!("device must be pxe, disk or cdrom (got '{other}')"),
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Pxe => "pxe",
+            Self::Disk => "disk",
+            Self::Cdrom => "cdrom",
+        }
+    }
+
+    /// Redfish `BootSourceOverrideTarget`.
+    pub fn redfish_target(self) -> &'static str {
+        match self {
+            Self::Pxe => "Pxe",
+            Self::Disk => "Hdd",
+            Self::Cdrom => "Cd",
+        }
+    }
+
+    /// `ipmitool chassis bootdev` argument.
+    pub fn ipmi_arg(self) -> &'static str {
+        match self {
+            Self::Pxe => "pxe",
+            Self::Disk => "disk",
+            Self::Cdrom => "cdrom",
         }
     }
 }
@@ -159,7 +224,89 @@ pub fn reset_target(system: &Value, system_uri: &str) -> String {
         })
 }
 
-/// Apply `action` through the BMC; returns a one-line summary of what happened.
+/// `PowerState` of a Redfish `ComputerSystem` document.
+pub fn parse_redfish_power_state(system: &Value) -> PowerState {
+    match system.get("PowerState").and_then(Value::as_str) {
+        Some("On" | "PoweringOn") => PowerState::On,
+        Some("Off" | "PoweringOff") => PowerState::Off,
+        _ => PowerState::Unknown,
+    }
+}
+
+/// The `ResetType` to send: the first value the BMC lists as allowed from our preference
+/// order for `action`. A BMC that lists nothing gets the standard value. A list with none of
+/// our candidates is an error that says what it does allow (many BMCs lack `PowerCycle`).
+pub fn pick_reset_type(system: &Value, action: PowerAction) -> anyhow::Result<String> {
+    let preference: &[&str] = match action {
+        PowerAction::On => &["On", "ForceOn"],
+        PowerAction::Off => &["ForceOff", "GracefulShutdown"],
+        PowerAction::Cycle => &["PowerCycle", "ForceRestart", "GracefulRestart"],
+        PowerAction::Reset => &["ForceRestart", "GracefulRestart", "PowerCycle"],
+    };
+    let allowed: Option<Vec<&str>> = system
+        .pointer("/Actions/#ComputerSystem.Reset/ResetType@Redfish.AllowableValues")
+        .and_then(Value::as_array)
+        .map(|a| a.iter().filter_map(Value::as_str).collect());
+    match allowed {
+        None => Ok(action.redfish_reset_type().to_string()),
+        Some(list) => preference
+            .iter()
+            .find(|p| list.contains(p))
+            .map(|p| (*p).to_string())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "BMC does not allow {} (it allows: {})",
+                    preference.join("/"),
+                    list.join(", ")
+                )
+            }),
+    }
+}
+
+/// The `PATCH` body that sets the boot override, checked against what the BMC allows.
+pub fn boot_override_body(
+    system: &Value,
+    device: BootDevice,
+    persistent: bool,
+    uefi: Option<bool>,
+) -> anyhow::Result<Value> {
+    let target = device.redfish_target();
+    if let Some(list) = system
+        .pointer("/Boot/BootSourceOverrideTarget@Redfish.AllowableValues")
+        .and_then(Value::as_array)
+    {
+        let names: Vec<&str> = list.iter().filter_map(Value::as_str).collect();
+        if !names.contains(&target) {
+            anyhow::bail!(
+                "BMC does not allow boot target {target} (it allows: {})",
+                names.join(", ")
+            );
+        }
+    }
+    let mut boot = json!({
+        "BootSourceOverrideTarget": target,
+        "BootSourceOverrideEnabled": if persistent { "Continuous" } else { "Once" },
+    });
+    if let Some(u) = uefi {
+        boot["BootSourceOverrideMode"] = json!(if u { "UEFI" } else { "Legacy" });
+    }
+    Ok(json!({ "Boot": boot }))
+}
+
+/// `Chassis Power is on` / `... is off` from `ipmitool chassis power status`.
+pub fn parse_ipmi_power_status(out: &str) -> PowerState {
+    let l = out.to_ascii_lowercase();
+    if l.contains("is on") {
+        PowerState::On
+    } else if l.contains("is off") {
+        PowerState::Off
+    } else {
+        PowerState::Unknown
+    }
+}
+
+/// Apply `action` through the BMC; returns a one-line summary of what happened. Powering on
+/// something that is on (or off something that is off) is a no-op, not an error.
 pub async fn power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::Result<String> {
     match target.kind {
         BmcKind::Fake => Ok(format!(
@@ -169,6 +316,49 @@ pub async fn power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::Resul
         BmcKind::Ipmi => ipmi_power(target, action).await,
         BmcKind::Libvirt => libvirt_power(target, action).await,
         BmcKind::Redfish => redfish_power(target, action).await,
+    }
+}
+
+/// The BMC's own report of the machine's power state.
+pub async fn power_state(target: &BmcTarget<'_>) -> anyhow::Result<PowerState> {
+    match target.kind {
+        BmcKind::Fake => Ok(PowerState::Unknown),
+        BmcKind::Ipmi => ipmi_power_state(target).await,
+        BmcKind::Libvirt => libvirt_power_state(target).await,
+        BmcKind::Redfish => {
+            let rf = Redfish::connect(target)?;
+            let (_, system) = rf.system().await?;
+            Ok(parse_redfish_power_state(&system))
+        }
+    }
+}
+
+/// Choose the device for the next boot (once, or until changed).
+pub async fn set_boot_device(
+    target: &BmcTarget<'_>,
+    device: BootDevice,
+    persistent: bool,
+    uefi: Option<bool>,
+) -> anyhow::Result<String> {
+    match target.kind {
+        BmcKind::Fake => Ok(format!("fake BMC: next boot {}", device.as_str())),
+        BmcKind::Libvirt => Ok(format!(
+            "libvirt domain: boot order is fixed in the domain definition; \
+             {} override not applied",
+            device.as_str()
+        )),
+        BmcKind::Ipmi => ipmi_set_boot(target, device, persistent, uefi).await,
+        BmcKind::Redfish => {
+            let rf = Redfish::connect(target)?;
+            let (uri, system) = rf.system().await?;
+            let body = boot_override_body(&system, device, persistent, uefi)?;
+            rf.send("PATCH", &uri, Some(&body)).await?;
+            Ok(format!(
+                "Redfish: next boot {} ({})",
+                device.as_str(),
+                if persistent { "until changed" } else { "once" }
+            ))
+        }
     }
 }
 
@@ -229,6 +419,23 @@ async fn virsh_ok(args: &[&str]) -> anyhow::Result<()> {
     }
 }
 
+async fn libvirt_power_state(target: &BmcTarget<'_>) -> anyhow::Result<PowerState> {
+    let name = target.address.trim();
+    libvirt_name_allowed(name)?;
+    let out = virsh(&["domstate", name]).await?;
+    if !out.status.success() {
+        anyhow::bail!(
+            "virsh domstate {name} failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        );
+    }
+    Ok(match String::from_utf8_lossy(&out.stdout).trim() {
+        "running" | "idle" | "paused" | "in shutdown" => PowerState::On,
+        "shut off" | "crashed" => PowerState::Off,
+        _ => PowerState::Unknown,
+    })
+}
+
 async fn libvirt_power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::Result<String> {
     let name = target.address.trim();
     libvirt_name_allowed(name)?;
@@ -263,7 +470,8 @@ async fn libvirt_power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::R
     ))
 }
 
-async fn ipmi_power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::Result<String> {
+/// Run `ipmitool -I lanplus ... <args>`; the password goes through `IPMI_PASSWORD`, never argv.
+async fn ipmitool(target: &BmcTarget<'_>, args: &[&str]) -> anyhow::Result<String> {
     validate_address(target.address)?;
     validate_username(target.username)?;
     // `-H` takes a bare host; drop a scheme the operator may have typed.
@@ -273,21 +481,12 @@ async fn ipmi_power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::Resu
         .trim_start_matches("https://")
         .trim_start_matches("http://")
         .trim_end_matches('/');
-    // Password via IPMI_PASSWORD (`-E`), never on argv where ps/proc would show it.
+    let mut full = vec!["-I", "lanplus", "-H", host, "-U", target.username, "-E"];
+    full.extend_from_slice(args);
     let out = tokio::time::timeout(
         Duration::from_secs(30),
         tokio::process::Command::new("ipmitool")
-            .args([
-                "-I",
-                "lanplus",
-                "-H",
-                host,
-                "-U",
-                target.username,
-                "-E",
-                "power",
-                action.ipmi_verb(),
-            ])
+            .args(&full)
             .env("IPMI_PASSWORD", target.password)
             .output(),
     )
@@ -297,69 +496,260 @@ async fn ipmi_power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::Resu
         anyhow::anyhow!("ipmitool exec failed (is it installed on the controller host?): {e}")
     })?;
     if out.status.success() {
-        Ok(format!("IPMI power {} on {host}", action.ipmi_verb()))
+        Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
     } else {
         anyhow::bail!(
-            "ipmitool power {} failed: {}",
-            action.ipmi_verb(),
+            "ipmitool {} failed: {}",
+            args.join(" "),
             String::from_utf8_lossy(&out.stderr).trim()
         )
     }
 }
 
-async fn redfish_power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::Result<String> {
-    validate_address(target.address)?;
-    validate_username(target.username)?;
-    let base = base_url(target.address);
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(20))
-        .danger_accept_invalid_certs(!verify_tls())
-        .build()?;
-    let get = |path: String| {
-        let client = client.clone();
-        let (user, pass) = (target.username.to_string(), target.password.to_string());
-        async move {
-            let resp = client
-                .get(&path)
-                .basic_auth(user, Some(pass))
-                .send()
-                .await
-                .map_err(|e| anyhow::anyhow!("Redfish GET {path}: {e}"))?;
-            if !resp.status().is_success() {
-                anyhow::bail!("Redfish GET {path}: HTTP {}", resp.status());
-            }
-            resp.json::<Value>()
-                .await
-                .map_err(|e| anyhow::anyhow!("Redfish GET {path}: bad JSON: {e}"))
-        }
-    };
-
-    let collection = get(format!("{base}/redfish/v1/Systems")).await?;
-    let system_uri = first_system_uri(&collection)
-        .ok_or_else(|| anyhow::anyhow!("Redfish: no ComputerSystem in /redfish/v1/Systems"))?;
-    let system = get(format!("{base}{system_uri}")).await?;
-    let reset = reset_target(&system, &system_uri);
-
-    let url = format!("{base}{reset}");
-    let resp = client
-        .post(&url)
-        .basic_auth(target.username, Some(target.password))
-        .json(&json!({ "ResetType": action.redfish_reset_type() }))
-        .send()
-        .await
-        .map_err(|e| anyhow::anyhow!("Redfish POST {url}: {e}"))?;
-    if !resp.status().is_success() {
-        anyhow::bail!(
-            "Redfish reset {} rejected: HTTP {}",
-            action.redfish_reset_type(),
-            resp.status()
-        );
-    }
-    Ok(format!(
-        "Redfish {} on {}",
-        action.redfish_reset_type(),
-        target.address.trim()
+async fn ipmi_power_state(target: &BmcTarget<'_>) -> anyhow::Result<PowerState> {
+    Ok(parse_ipmi_power_status(
+        &ipmitool(target, &["chassis", "power", "status"]).await?,
     ))
+}
+
+async fn ipmi_power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::Result<String> {
+    let state = ipmi_power_state(target)
+        .await
+        .unwrap_or(PowerState::Unknown);
+    let host = target.address.trim();
+    match (action, state) {
+        (PowerAction::On, PowerState::On) => return Ok(format!("IPMI: {host} is already on")),
+        (PowerAction::Off, PowerState::Off) => return Ok(format!("IPMI: {host} is already off")),
+        _ => {}
+    }
+    // `power cycle`/`reset` of a machine that is off is refused by BMCs; `on` is what is meant.
+    let verb =
+        if state == PowerState::Off && matches!(action, PowerAction::Cycle | PowerAction::Reset) {
+            "on"
+        } else {
+            action.ipmi_verb()
+        };
+    ipmitool(target, &["chassis", "power", verb]).await?;
+    Ok(format!("IPMI power {verb} on {host}"))
+}
+
+async fn ipmi_set_boot(
+    target: &BmcTarget<'_>,
+    device: BootDevice,
+    persistent: bool,
+    uefi: Option<bool>,
+) -> anyhow::Result<String> {
+    let mut opts: Vec<&str> = Vec::new();
+    if persistent {
+        opts.push("persistent");
+    }
+    if uefi == Some(true) {
+        opts.push("efiboot");
+    }
+    let opt_arg = format!("options={}", opts.join(","));
+    let mut args = vec!["chassis", "bootdev", device.ipmi_arg()];
+    if !opts.is_empty() {
+        args.push(&opt_arg);
+    }
+    ipmitool(target, &args).await?;
+    Ok(format!(
+        "IPMI: next boot {} ({})",
+        device.as_str(),
+        if persistent { "until changed" } else { "once" }
+    ))
+}
+
+/// A thin Redfish client: Basic auth, bounded retries on transport errors and 502/503/504,
+/// and a wait on asynchronous actions (HTTP 202 with a task monitor).
+struct Redfish {
+    client: reqwest::Client,
+    base: String,
+    user: String,
+    pass: String,
+}
+
+impl Redfish {
+    fn connect(target: &BmcTarget<'_>) -> anyhow::Result<Self> {
+        validate_address(target.address)?;
+        validate_username(target.username)?;
+        let mut b = reqwest::Client::builder()
+            .timeout(Duration::from_secs(20))
+            .danger_accept_invalid_certs(!verify_tls());
+        // A CA bundle the operator trusts for BMC certificates (PEM, one or more certs).
+        if let Ok(path) = std::env::var("MACHINA_BMC_CA_FILE") {
+            if !path.trim().is_empty() {
+                let pem = std::fs::read(path.trim())
+                    .map_err(|e| anyhow::anyhow!("MACHINA_BMC_CA_FILE: {e}"))?;
+                for cert in reqwest::Certificate::from_pem_bundle(&pem)
+                    .map_err(|e| anyhow::anyhow!("MACHINA_BMC_CA_FILE: {e}"))?
+                {
+                    b = b.add_root_certificate(cert);
+                }
+            }
+        }
+        Ok(Self {
+            client: b.build()?,
+            base: base_url(target.address),
+            user: target.username.to_string(),
+            pass: target.password.to_string(),
+        })
+    }
+
+    fn pause(attempt: u32) -> Duration {
+        if cfg!(test) {
+            Duration::from_millis(10)
+        } else {
+            Duration::from_millis(500 * u64::from(attempt))
+        }
+    }
+
+    /// One request with retries. Returns the final status, the JSON body (if any) and the
+    /// `Location` header.
+    async fn call(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<&Value>,
+    ) -> anyhow::Result<(reqwest::StatusCode, Option<Value>, Option<String>)> {
+        const ATTEMPTS: u32 = 3;
+        let url = if path.starts_with("http") {
+            path.to_string()
+        } else {
+            format!("{}{}", self.base, path)
+        };
+        let m = reqwest::Method::from_bytes(method.as_bytes())?;
+        let mut last = String::new();
+        for attempt in 1..=ATTEMPTS {
+            let mut req = self
+                .client
+                .request(m.clone(), &url)
+                .basic_auth(&self.user, Some(&self.pass));
+            if let Some(b) = body {
+                req = req.json(b);
+            }
+            match req.send().await {
+                Ok(resp) => {
+                    let st = resp.status();
+                    if matches!(st.as_u16(), 502 | 503 | 504) && attempt < ATTEMPTS {
+                        last = format!("HTTP {st}");
+                        tokio::time::sleep(Self::pause(attempt)).await;
+                        continue;
+                    }
+                    let loc = resp
+                        .headers()
+                        .get(reqwest::header::LOCATION)
+                        .and_then(|v| v.to_str().ok())
+                        .map(str::to_string);
+                    let text = resp.text().await.unwrap_or_default();
+                    let json = serde_json::from_str::<Value>(&text).ok();
+                    return Ok((st, json, loc));
+                }
+                Err(e) => {
+                    last = e.to_string();
+                    if attempt < ATTEMPTS {
+                        tokio::time::sleep(Self::pause(attempt)).await;
+                    }
+                }
+            }
+        }
+        anyhow::bail!("Redfish {method} {path}: {last}")
+    }
+
+    async fn get(&self, path: &str) -> anyhow::Result<Value> {
+        let (st, json, _) = self.call("GET", path, None).await?;
+        if !st.is_success() {
+            anyhow::bail!("Redfish GET {path}: HTTP {st}");
+        }
+        json.ok_or_else(|| anyhow::anyhow!("Redfish GET {path}: not JSON"))
+    }
+
+    /// PATCH/POST that must succeed; a 202 is followed to completion.
+    async fn send(&self, method: &str, path: &str, body: Option<&Value>) -> anyhow::Result<()> {
+        let (st, json, loc) = self.call(method, path, body).await?;
+        if st.as_u16() == 202 {
+            if let Some(monitor) = loc {
+                return self.wait_task(&monitor).await;
+            }
+            return Ok(());
+        }
+        if !st.is_success() {
+            let detail = json
+                .as_ref()
+                .and_then(|j| {
+                    j.pointer("/error/message")
+                        .or_else(|| j.pointer("/error/@Message.ExtendedInfo/0/Message"))
+                })
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            anyhow::bail!("Redfish {method} {path} rejected: HTTP {st} {detail}");
+        }
+        Ok(())
+    }
+
+    /// Poll a task monitor until it stops answering 202 (up to about a minute).
+    async fn wait_task(&self, monitor: &str) -> anyhow::Result<()> {
+        let tries = if cfg!(test) { 5 } else { 30 };
+        for _ in 0..tries {
+            let (st, json, _) = self.call("GET", monitor, None).await?;
+            if st.as_u16() != 202 {
+                if !st.is_success() {
+                    anyhow::bail!("Redfish task failed: HTTP {st}");
+                }
+                if let Some(state) = json
+                    .as_ref()
+                    .and_then(|j| j.get("TaskState"))
+                    .and_then(Value::as_str)
+                {
+                    if matches!(state, "Exception" | "Killed" | "Cancelled") {
+                        anyhow::bail!("Redfish task ended: {state}");
+                    }
+                }
+                return Ok(());
+            }
+            tokio::time::sleep(if cfg!(test) {
+                Duration::from_millis(10)
+            } else {
+                Duration::from_secs(2)
+            })
+            .await;
+        }
+        anyhow::bail!("Redfish task did not finish in time")
+    }
+
+    /// The first `ComputerSystem`: its URI and document.
+    async fn system(&self) -> anyhow::Result<(String, Value)> {
+        let collection = self.get("/redfish/v1/Systems").await?;
+        let uri = first_system_uri(&collection)
+            .ok_or_else(|| anyhow::anyhow!("Redfish: no ComputerSystem in /redfish/v1/Systems"))?;
+        let doc = self.get(&uri).await?;
+        Ok((uri, doc))
+    }
+}
+
+async fn redfish_power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::Result<String> {
+    let rf = Redfish::connect(target)?;
+    let (uri, system) = rf.system().await?;
+    let state = parse_redfish_power_state(&system);
+    let addr = target.address.trim();
+    match (action, state) {
+        (PowerAction::On, PowerState::On) => return Ok(format!("Redfish: {addr} is already on")),
+        (PowerAction::Off, PowerState::Off) => {
+            return Ok(format!("Redfish: {addr} is already off"))
+        }
+        _ => {}
+    }
+    // A reset or cycle of a machine that is off cannot work; powering it on is what was meant.
+    let effective =
+        if state == PowerState::Off && matches!(action, PowerAction::Reset | PowerAction::Cycle) {
+            PowerAction::On
+        } else {
+            action
+        };
+    let reset_type = pick_reset_type(&system, effective)?;
+    let reset = reset_target(&system, &uri);
+    rf.send("POST", &reset, Some(&json!({ "ResetType": reset_type })))
+        .await?;
+    Ok(format!("Redfish {reset_type} on {addr}"))
 }
 
 #[cfg(test)]
@@ -435,6 +825,316 @@ mod tests {
             "/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset"
         );
         assert!(first_system_uri(&json!({"Members": []})).is_none());
+    }
+
+    #[test]
+    fn power_state_and_reset_choice_follow_what_the_bmc_reports() {
+        assert_eq!(
+            parse_redfish_power_state(&json!({"PowerState": "On"})),
+            PowerState::On
+        );
+        assert_eq!(
+            parse_redfish_power_state(&json!({"PowerState": "Off"})),
+            PowerState::Off
+        );
+        assert_eq!(parse_redfish_power_state(&json!({})), PowerState::Unknown);
+        assert_eq!(
+            parse_ipmi_power_status("Chassis Power is on\n"),
+            PowerState::On
+        );
+        assert_eq!(
+            parse_ipmi_power_status("Chassis Power is off"),
+            PowerState::Off
+        );
+        assert_eq!(parse_ipmi_power_status("Error"), PowerState::Unknown);
+
+        let lacks_cycle = json!({"Actions": {"#ComputerSystem.Reset": {
+            "ResetType@Redfish.AllowableValues": ["On", "ForceOff", "ForceRestart"]}}});
+        assert_eq!(
+            pick_reset_type(&lacks_cycle, PowerAction::Cycle).unwrap(),
+            "ForceRestart"
+        );
+        assert_eq!(
+            pick_reset_type(&lacks_cycle, PowerAction::Off).unwrap(),
+            "ForceOff"
+        );
+        let only_on = json!({"Actions": {"#ComputerSystem.Reset": {
+            "ResetType@Redfish.AllowableValues": ["Nmi"]}}});
+        let err = pick_reset_type(&only_on, PowerAction::Off)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("Nmi"), "{err}");
+        // No list: the standard value.
+        assert_eq!(
+            pick_reset_type(&json!({}), PowerAction::Cycle).unwrap(),
+            "PowerCycle"
+        );
+    }
+
+    #[test]
+    fn boot_override_is_checked_against_the_allowed_targets() {
+        let sys = json!({"Boot": {"BootSourceOverrideTarget@Redfish.AllowableValues": ["None", "Pxe", "Hdd"]}});
+        let b = boot_override_body(&sys, BootDevice::Pxe, false, Some(true)).unwrap();
+        assert_eq!(b["Boot"]["BootSourceOverrideTarget"], "Pxe");
+        assert_eq!(b["Boot"]["BootSourceOverrideEnabled"], "Once");
+        assert_eq!(b["Boot"]["BootSourceOverrideMode"], "UEFI");
+        let c = boot_override_body(&sys, BootDevice::Disk, true, None).unwrap();
+        assert_eq!(c["Boot"]["BootSourceOverrideEnabled"], "Continuous");
+        assert!(c["Boot"].get("BootSourceOverrideMode").is_none());
+        assert!(boot_override_body(&sys, BootDevice::Cdrom, false, None).is_err());
+        assert!(BootDevice::parse("floppy").is_err());
+    }
+
+    // --- a small Redfish server for the client tests ---------------------------------
+
+    struct Route {
+        method: &'static str,
+        path: &'static str,
+        status: u16,
+        body: String,
+        location: Option<&'static str>,
+        hits_left: Option<u32>,
+    }
+
+    fn route(method: &'static str, path: &'static str, status: u16, body: Value) -> Route {
+        Route {
+            method,
+            path,
+            status,
+            body: body.to_string(),
+            location: None,
+            hits_left: None,
+        }
+    }
+
+    type RequestLog = std::sync::Arc<std::sync::Mutex<Vec<(String, String, String)>>>;
+
+    async fn mock_redfish(routes: Vec<Route>) -> (String, RequestLog) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = format!("http://{}", l.local_addr().unwrap());
+        let log: RequestLog = Default::default();
+        let routes = std::sync::Arc::new(std::sync::Mutex::new(routes));
+        let log2 = log.clone();
+        tokio::spawn(async move {
+            loop {
+                let Ok((mut s, _)) = l.accept().await else {
+                    return;
+                };
+                let (routes, log) = (routes.clone(), log2.clone());
+                tokio::spawn(async move {
+                    let mut buf = Vec::new();
+                    let mut tmp = [0u8; 4096];
+                    loop {
+                        let n = s.read(&mut tmp).await.unwrap_or(0);
+                        if n == 0 {
+                            break;
+                        }
+                        buf.extend_from_slice(&tmp[..n]);
+                        let text = String::from_utf8_lossy(&buf).to_string();
+                        if let Some(h) = text.find("\r\n\r\n") {
+                            let len = text[..h]
+                                .lines()
+                                .find_map(|l| {
+                                    l.to_ascii_lowercase()
+                                        .strip_prefix("content-length:")
+                                        .and_then(|v| v.trim().parse::<usize>().ok())
+                                })
+                                .unwrap_or(0);
+                            if buf.len() >= h + 4 + len {
+                                break;
+                            }
+                        }
+                    }
+                    let text = String::from_utf8_lossy(&buf).to_string();
+                    let mut first = text.lines().next().unwrap_or("").split_whitespace();
+                    let (m, p) = (
+                        first.next().unwrap_or("").to_string(),
+                        first.next().unwrap_or("").to_string(),
+                    );
+                    let body = text.split("\r\n\r\n").nth(1).unwrap_or("").to_string();
+                    log.lock().unwrap().push((m.clone(), p.clone(), body));
+                    let (status, payload, location) = {
+                        let mut rs = routes.lock().unwrap();
+                        match rs
+                            .iter_mut()
+                            .find(|r| r.method == m && r.path == p && r.hits_left != Some(0))
+                        {
+                            Some(r) => {
+                                if let Some(h) = r.hits_left.as_mut() {
+                                    *h -= 1;
+                                }
+                                (r.status, r.body.clone(), r.location)
+                            }
+                            None => (404, "{}".to_string(), None),
+                        }
+                    };
+                    let loc = location
+                        .map(|l| format!("Location: {l}\r\n"))
+                        .unwrap_or_default();
+                    let resp = format!(
+                        "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\n{loc}Content-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+                        payload.len()
+                    );
+                    let _ = s.write_all(resp.as_bytes()).await;
+                });
+            }
+        });
+        (addr, log)
+    }
+
+    fn systems() -> Vec<Route> {
+        vec![route(
+            "GET",
+            "/redfish/v1/Systems",
+            200,
+            json!({"Members": [{"@odata.id": "/redfish/v1/Systems/1"}]}),
+        )]
+    }
+
+    fn target<'a>(addr: &'a str) -> BmcTarget<'a> {
+        BmcTarget {
+            kind: BmcKind::Redfish,
+            address: addr,
+            username: "admin",
+            password: "pw",
+        }
+    }
+
+    #[tokio::test]
+    async fn redfish_power_on_of_a_running_machine_sends_nothing() {
+        let mut r = systems();
+        r.push(route(
+            "GET",
+            "/redfish/v1/Systems/1",
+            200,
+            json!({"PowerState": "On"}),
+        ));
+        let (addr, log) = mock_redfish(r).await;
+        let out = power(&target(&addr), PowerAction::On).await.unwrap();
+        assert!(out.contains("already on"), "{out}");
+        assert!(log.lock().unwrap().iter().all(|(m, _, _)| m == "GET"));
+        assert_eq!(power_state(&target(&addr)).await.unwrap(), PowerState::On);
+    }
+
+    #[tokio::test]
+    async fn redfish_cycle_uses_a_reset_type_the_bmc_allows_and_retries_a_503() {
+        let mut r = systems();
+        // The first answer for the system document is a 503; the retry gets the real one.
+        r.push(Route {
+            hits_left: Some(1),
+            ..route("GET", "/redfish/v1/Systems/1", 503, json!({}))
+        });
+        r.push(route(
+            "GET",
+            "/redfish/v1/Systems/1",
+            200,
+            json!({"PowerState": "On", "Actions": {"#ComputerSystem.Reset": {
+                "target": "/redfish/v1/Systems/1/Actions/ComputerSystem.Reset",
+                "ResetType@Redfish.AllowableValues": ["On", "ForceOff", "ForceRestart"]}}}),
+        ));
+        r.push(route(
+            "POST",
+            "/redfish/v1/Systems/1/Actions/ComputerSystem.Reset",
+            204,
+            json!({}),
+        ));
+        let (addr, log) = mock_redfish(r).await;
+        let out = power(&target(&addr), PowerAction::Cycle).await.unwrap();
+        assert!(out.contains("ForceRestart"), "{out}");
+        let log = log.lock().unwrap();
+        let post = log.iter().find(|(m, _, _)| m == "POST").unwrap();
+        assert!(post.2.contains("ForceRestart"), "{}", post.2);
+    }
+
+    #[tokio::test]
+    async fn redfish_reset_of_a_powered_off_machine_powers_it_on() {
+        let mut r = systems();
+        r.push(route(
+            "GET",
+            "/redfish/v1/Systems/1",
+            200,
+            json!({"PowerState": "Off"}),
+        ));
+        r.push(route(
+            "POST",
+            "/redfish/v1/Systems/1/Actions/ComputerSystem.Reset",
+            200,
+            json!({}),
+        ));
+        let (addr, log) = mock_redfish(r).await;
+        power(&target(&addr), PowerAction::Reset).await.unwrap();
+        let log = log.lock().unwrap();
+        let post = log.iter().find(|(m, _, _)| m == "POST").unwrap();
+        assert!(post.2.contains("\"On\""), "{}", post.2);
+    }
+
+    #[tokio::test]
+    async fn redfish_async_reset_is_followed_to_completion() {
+        let mut r = systems();
+        r.push(route(
+            "GET",
+            "/redfish/v1/Systems/1",
+            200,
+            json!({"PowerState": "On"}),
+        ));
+        r.push(Route {
+            location: Some("/redfish/v1/TaskService/Tasks/7"),
+            ..route(
+                "POST",
+                "/redfish/v1/Systems/1/Actions/ComputerSystem.Reset",
+                202,
+                json!({}),
+            )
+        });
+        r.push(Route {
+            hits_left: Some(1),
+            ..route("GET", "/redfish/v1/TaskService/Tasks/7", 202, json!({}))
+        });
+        r.push(route(
+            "GET",
+            "/redfish/v1/TaskService/Tasks/7",
+            200,
+            json!({"TaskState": "Completed"}),
+        ));
+        let (addr, log) = mock_redfish(r).await;
+        power(&target(&addr), PowerAction::Reset).await.unwrap();
+        let polls = log
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(m, p, _)| m == "GET" && p.contains("Tasks/7"))
+            .count();
+        assert_eq!(polls, 2);
+    }
+
+    #[tokio::test]
+    async fn redfish_boot_override_patches_the_system() {
+        let mut r = systems();
+        r.push(route(
+            "GET",
+            "/redfish/v1/Systems/1",
+            200,
+            json!({"Boot": {"BootSourceOverrideTarget@Redfish.AllowableValues": ["Pxe", "Hdd"]}}),
+        ));
+        r.push(route("PATCH", "/redfish/v1/Systems/1", 200, json!({})));
+        let (addr, log) = mock_redfish(r).await;
+        let out = set_boot_device(&target(&addr), BootDevice::Pxe, false, Some(true))
+            .await
+            .unwrap();
+        assert!(out.contains("pxe") && out.contains("once"), "{out}");
+        let log = log.lock().unwrap();
+        let patch = log.iter().find(|(m, _, _)| m == "PATCH").unwrap();
+        let body: Value = serde_json::from_str(&patch.2).unwrap();
+        assert_eq!(body["Boot"]["BootSourceOverrideTarget"], "Pxe");
+        assert_eq!(body["Boot"]["BootSourceOverrideEnabled"], "Once");
+        // A target the BMC does not list is refused before anything is sent.
+        drop(log);
+        assert!(
+            set_boot_device(&target(&addr), BootDevice::Cdrom, false, None)
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]

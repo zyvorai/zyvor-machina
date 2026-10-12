@@ -685,6 +685,14 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/baremetal/boot/dnsmasq.conf", get(baremetal::boot_dnsmasq))
         .route("/api/v1/baremetal/allocate", post(baremetal::allocate))
         .route(
+            "/api/v1/baremetal/servers/{id}/power-state",
+            get(baremetal::server_power_state),
+        )
+        .route(
+            "/api/v1/baremetal/servers/{id}/boot-device",
+            post(baremetal::server_boot_device),
+        )
+        .route(
             "/api/v1/baremetal/profiles",
             get(baremetal::list_profiles).put(baremetal::put_profile),
         )

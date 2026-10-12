@@ -302,6 +302,9 @@ TLS is active only when `enabled=true` **and** both paths are non-empty.
 | `MACHINA_FIRECRACKER_RELEASE_URL` | `install.sh`: Firecracker releases base (default the upstream GitHub releases) | upstream |
 | `MACHINA_BPF_LINKER_BASE_URL` | `install.sh`: bpf-linker release download base (default `https://github.com/aya-rs/bpf-linker/releases/download`) | upstream |
 | `MACHINA_BMC_VERIFY_TLS` | Controller: verify Redfish BMC TLS certificates (default off: BMCs ship self-signed certificates) | off |
+| `MACHINA_BMC_CA_FILE` | Controller: PEM bundle of CAs trusted for Redfish BMC certificates (use with `MACHINA_BMC_VERIFY_TLS=1`) | unset |
+| `MACHINA_METAL_ALLOW_HTTP_JOIN` | Controller: allow a bare-metal deploy to use the plain `http` join command when the TLS join listener is not enabled (lab only; the deployed agent will not become reachable) | off |
+| `MACHINA_BMC_POLL_SECS` | Controller: poll every BMC's real power state this often, in seconds (`0` = off; minimum 30) | 0 |
 | `MACHINA_METAL_RHEL_REPO` | Controller: package repository URL a kickstart install uses (required for `rhel-9`/`rocky-9`/`almalinux-9` bare-metal deploys) | unset |
 | `MACHINA_METAL_AUTO_ENROLL` | Controller: `1` records an unknown PXE-booting MAC as a bare-metal server and commissions it (default off; enable only on a provisioning network you control) | off |
 | `MACHINA_METAL_AUTODEPLOY_SECS` | Controller: seconds between bare-metal auto-deploy passes that top profiles up to their desired count (`0` = off) | 60 |

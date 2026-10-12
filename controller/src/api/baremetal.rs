@@ -577,3 +577,43 @@ pub async fn provision(
         "stopped_because": stopped,
     })))
 }
+
+/// What the BMC says the power state is right now (and record it).
+pub async fn server_power_state(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<uuid::Uuid>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_operator(&actor)?;
+    let st = baremetal::refresh_power_state(&state.pool, id)
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    Ok(Json(
+        serde_json::json!({ "id": id, "power_state": st.as_str() }),
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BootDeviceBody {
+    pub device: String,
+    #[serde(default)]
+    pub persistent: bool,
+    #[serde(default)]
+    pub uefi: Option<bool>,
+}
+
+/// Choose the next boot device through the BMC (PXE, disk or CD).
+pub async fn server_boot_device(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<uuid::Uuid>,
+    Json(body): Json<BootDeviceBody>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&actor)?;
+    let dev = crate::engine::baremetal_bmc::BootDevice::parse(&body.device)
+        .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    let msg = baremetal::set_boot_device(&state.pool, id, dev, body.persistent, body.uefi)
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    Ok(Json(serde_json::json!({ "id": id, "summary": msg })))
+}

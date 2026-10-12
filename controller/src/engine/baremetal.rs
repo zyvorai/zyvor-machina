@@ -5,7 +5,9 @@ use crate::db::DbPool;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::baremetal_bmc::{power, validate_address, BmcKind, BmcTarget, PowerAction};
+use super::baremetal_bmc::{
+    power, validate_address, BmcKind, BmcTarget, BootDevice, PowerAction, PowerState,
+};
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct BaremetalServer {
@@ -325,6 +327,154 @@ pub async fn set_power(
             Err(e)
         }
     }
+}
+
+/// A server's BMC details with the password decrypted, for one call.
+pub struct BmcCreds {
+    pub kind: BmcKind,
+    pub address: String,
+    pub username: String,
+    pub password: String,
+}
+
+impl BmcCreds {
+    pub fn target(&self) -> BmcTarget<'_> {
+        BmcTarget {
+            kind: self.kind,
+            address: &self.address,
+            username: &self.username,
+            password: &self.password,
+        }
+    }
+}
+
+/// The BMC details of `id`, or `None` when there is nothing to call (a real BMC type
+/// without credentials, or no address).
+pub async fn load_bmc(pool: &DbPool, id: Uuid) -> anyhow::Result<Option<BmcCreds>> {
+    let row: (String, String, String, String) = crate::db::query_as(
+        "SELECT bmc_type, bmc_address, bmc_username, bmc_password_enc
+         FROM baremetal_servers WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| anyhow::anyhow!("server not found"))?;
+    let kind = BmcKind::parse(&row.0)?;
+    let needs_creds = !matches!(kind, BmcKind::Fake | BmcKind::Libvirt);
+    if needs_creds && (row.1.trim().is_empty() || row.2.is_empty() || row.3.is_empty()) {
+        return Ok(None);
+    }
+    let password = if row.3.is_empty() {
+        String::new()
+    } else {
+        crate::engine::ai::crypto::load_api_key(&row.3)?
+    };
+    Ok(Some(BmcCreds {
+        kind,
+        address: row.1,
+        username: row.2,
+        password,
+    }))
+}
+
+fn power_column(p: PowerState) -> Option<&'static str> {
+    match p {
+        PowerState::On => Some("powered_on"),
+        PowerState::Off => Some("powered_off"),
+        PowerState::Unknown => None,
+    }
+}
+
+/// Ask the BMC for the real power state and record it in `state`.
+pub async fn refresh_power_state(pool: &DbPool, id: Uuid) -> anyhow::Result<PowerState> {
+    let c = load_bmc(pool, id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("BMC credentials are not set for this server"))?;
+    let st = super::baremetal_bmc::power_state(&c.target()).await?;
+    if let Some(col) = power_column(st) {
+        crate::db::query("UPDATE baremetal_servers SET state = ? WHERE id = ?")
+            .bind(col)
+            .bind(id)
+            .execute(pool)
+            .await?;
+    }
+    Ok(st)
+}
+
+/// Set the next boot device through the BMC.
+pub async fn set_boot_device(
+    pool: &DbPool,
+    id: Uuid,
+    device: BootDevice,
+    persistent: bool,
+    uefi: Option<bool>,
+) -> anyhow::Result<String> {
+    let c = load_bmc(pool, id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("BMC credentials are not set for this server"))?;
+    super::baremetal_bmc::set_boot_device(&c.target(), device, persistent, uefi).await
+}
+
+/// `set_boot_device` for the provisioning flows: a machine without usable BMC details (it
+/// PXE-boots by its own boot order) is not an error. The outcome is returned for the log.
+pub async fn set_boot_best_effort(pool: &DbPool, id: Uuid, device: BootDevice) -> String {
+    match load_bmc(pool, id).await {
+        Ok(Some(c)) => {
+            match super::baremetal_bmc::set_boot_device(&c.target(), device, false, None).await {
+                Ok(m) => m,
+                Err(e) => {
+                    tracing::warn!("boot override {} for {id}: {e:#}", device.as_str());
+                    let _ = crate::db::query(
+                        "UPDATE baremetal_servers SET last_error = ? WHERE id = ?",
+                    )
+                    .bind(format!("boot override: {e}"))
+                    .bind(id)
+                    .execute(pool)
+                    .await;
+                    format!("boot override failed: {e}")
+                }
+            }
+        }
+        Ok(None) => "no BMC credentials: boot order left as is".into(),
+        Err(e) => format!("boot override skipped: {e}"),
+    }
+}
+
+/// Opt-in poll (`MACHINA_BMC_POLL_SECS`, default off) that keeps `state` equal to what the
+/// BMCs report. Sequential, with each call bounded by the driver's own timeouts.
+pub fn spawn_power_poll(state: crate::state::AppState) {
+    let secs: u64 = std::env::var("MACHINA_BMC_POLL_SECS")
+        .ok()
+        .and_then(|v| v.trim().parse().ok())
+        .unwrap_or(0);
+    if secs == 0 {
+        return;
+    }
+    tokio::spawn(async move {
+        let mut interval = std::time::Duration::from_secs(secs);
+        if interval.as_secs() < 30 {
+            interval = std::time::Duration::from_secs(30);
+        }
+        let mut t = tokio::time::interval(interval);
+        t.tick().await;
+        loop {
+            t.tick().await;
+            if !state.leader.is_leader() {
+                continue;
+            }
+            let ids: Vec<Uuid> = crate::db::query_scalar(
+                "SELECT id FROM baremetal_servers WHERE bmc_address <> '' ORDER BY hostname",
+            )
+            .fetch_all(&state.pool)
+            .await
+            .unwrap_or_default();
+            for id in ids {
+                if let Err(e) = refresh_power_state(&state.pool, id).await {
+                    tracing::debug!("BMC power poll {id}: {e:#}");
+                }
+            }
+        }
+    });
 }
 
 #[derive(Debug, Serialize)]
