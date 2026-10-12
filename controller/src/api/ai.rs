@@ -1169,12 +1169,24 @@ pub async fn list_ai_providers(
         .map(Json)
 }
 
+/// Provider kinds that were removed with the local-first change must be a clean 400, not a 500.
+fn reject_removed_provider_kind(kind: Option<&str>) -> Result<(), ApiError> {
+    if kind.map(str::trim) == Some("azure_openai") {
+        return Err(ApiError::bad_request(
+            "azure_openai is no longer supported (local-first); use ollama, vllm or openai_compatible",
+        )
+        .with_code("provider_kind_removed"));
+    }
+    Ok(())
+}
+
 pub async fn create_ai_provider(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthUser>,
     Json(body): Json<ai::providers::CreateProviderBody>,
 ) -> Result<Json<ai::providers::AiProviderRow>, ApiError> {
     crate::auth::require_admin(&actor)?;
+    reject_removed_provider_kind(Some(body.kind.as_str()))?;
     ai::providers::create_provider(&state.pool, &body)
         .await
         .map_err(|e| ApiError::internal(e.to_string()))
@@ -1188,6 +1200,7 @@ pub async fn patch_ai_provider(
     Json(body): Json<ai::providers::PatchProviderBody>,
 ) -> Result<Json<ai::providers::AiProviderRow>, ApiError> {
     crate::auth::require_admin(&actor)?;
+    reject_removed_provider_kind(body.kind.as_deref())?;
     ai::providers::patch_provider(&state.pool, id, &body)
         .await
         .map_err(|e| ApiError::internal(e.to_string()))
