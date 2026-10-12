@@ -27,6 +27,8 @@ import {
   deleteBaremetalImage,
   listBaremetalProfiles,
   provisionBaremetal,
+  refreshBaremetalBmcInfo,
+  type BaremetalBmcInfo,
   type BaremetalCatalogImage,
   type BaremetalImage,
   type BaremetalProfile,
@@ -62,6 +64,7 @@ export default function PlatformBareMetal() {
   const [images, setImages] = useState<BaremetalImage[]>([])
   const [catalog, setCatalog] = useState<BaremetalCatalogImage[]>([])
   const [profiles, setProfiles] = useState<BaremetalProfile[]>([])
+  const [bmcDetail, setBmcDetail] = useState<{ id: string; name: string; info: BaremetalBmcInfo } | null>(null)
   const [catalogPick, setCatalogPick] = useState('')
   const [provisionCount, setProvisionCount] = useState<Record<string, number>>({})
 
@@ -147,6 +150,17 @@ export default function PlatformBareMetal() {
         toast.success(`${name} retired`)
       }
       await load()
+    } catch (e: unknown) {
+      toast.error(formatUserError(e))
+    } finally {
+      setActionInProgress(null)
+    }
+  }
+
+  const handleBmcDetails = async (id: string, name: string) => {
+    setActionInProgress(id)
+    try {
+      setBmcDetail({ id, name, info: await refreshBaremetalBmcInfo(id) })
     } catch (e: unknown) {
       toast.error(formatUserError(e))
     } finally {
@@ -322,6 +336,53 @@ export default function PlatformBareMetal() {
           </MacGlassPanel>
         )}
 
+        {bmcDetail && (
+          <MacGlassPanel title={`BMC details: ${bmcDetail.name}`}>
+            <div className="text-sm space-y-2">
+              <p>
+                {[bmcDetail.info.identity.manufacturer, bmcDetail.info.identity.model].filter(Boolean).join(' ') || 'Unknown model'}
+                {bmcDetail.info.identity.serial_number ? ` · serial ${bmcDetail.info.identity.serial_number}` : ''}
+                {bmcDetail.info.identity.bios_version ? ` · BIOS ${bmcDetail.info.identity.bios_version}` : ''}
+              </p>
+              <p className="text-[var(--text-muted)]">
+                {bmcDetail.info.identity.cpu_count} × {bmcDetail.info.identity.cpu_model || 'CPU'} · {bmcDetail.info.identity.memory_gib} GiB ·
+                power {bmcDetail.info.identity.power_state || 'unknown'}
+                {bmcDetail.info.power_consumed_watts != null ? ` (${Math.round(bmcDetail.info.power_consumed_watts)} W)` : ''} ·
+                health {bmcDetail.info.identity.health || 'unknown'}
+              </p>
+              {bmcDetail.info.temperatures.length > 0 && (
+                <p>
+                  Temperatures:{' '}
+                  {bmcDetail.info.temperatures.map((t) => `${t.name} ${Math.round(t.celsius)}°C`).join(' · ')}
+                </p>
+              )}
+              {bmcDetail.info.firmware.length > 0 && (
+                <p>Firmware: {bmcDetail.info.firmware.map((f) => `${f.name} ${f.version}`).join(' · ')}</p>
+              )}
+              {bmcDetail.info.log.length > 0 && (
+                <ul className="list-disc pl-5">
+                  {bmcDetail.info.log.slice(0, 8).map((l, i) => (
+                    <li key={i}>
+                      {l.created} · {l.severity} · {l.message}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {bmcDetail.info.unavailable.length > 0 && (
+                <p className="text-xs text-[var(--text-muted)]">
+                  Not reported by this BMC: {bmcDetail.info.unavailable.join(', ')}
+                </p>
+              )}
+              <button
+                onClick={() => setBmcDetail(null)}
+                className="px-3 py-1.5 text-sm rounded-lg border border-border/50 hover:bg-accent/10"
+              >
+                Close
+              </button>
+            </div>
+          </MacGlassPanel>
+        )}
+
         <MacGlassPanel title="OS images">
           <div className="flex flex-wrap items-center gap-2 mb-3">
             <select
@@ -439,6 +500,15 @@ export default function PlatformBareMetal() {
                   }
                   trailing={
                     <div className="flex items-center gap-1">
+                      {s.bmc_type === 'redfish' && s.bmc_credentials_configured && (
+                        <button
+                          onClick={() => void handleBmcDetails(s.id, s.hostname)}
+                          disabled={actionInProgress === s.id}
+                          className="px-2 py-1 text-xs rounded border border-border/50 hover:bg-accent/10 disabled:opacity-40"
+                        >
+                          BMC details
+                        </button>
+                      )}
                       {(s.lifecycle === 'new' || s.lifecycle === 'ready' || s.lifecycle === 'failed') && (
                         <button
                           onClick={() => void handleLifecycle(s.id, s.hostname, 'commission')}

@@ -50,6 +50,20 @@ POST /api/v1/baremetal/servers/{id}/boot-device      (admin)    {"device": "pxe|
   uses `chassis bootdev`. A machine without BMC credentials is left to its own boot order.
   The libvirt driver cannot override (boot order is fixed in the domain).
 
+### What the BMC reports about the machine (Redfish)
+
+```
+POST /api/v1/baremetal/servers/{id}/bmc-info/refresh   (operator) read the BMC now, keep the snapshot
+GET  /api/v1/baremetal/servers/{id}/bmc-info           (operator) the last snapshot
+```
+
+The snapshot holds identity (manufacturer, model, serial, BIOS, CPU count/model, memory),
+health (rollup), temperatures, power draw, firmware versions (up to 40) and the 50 newest
+log entries of the first log service. A section the BMC does not answer is listed under
+`unavailable` instead of failing the read. A health other than `OK` raises a
+`baremetal.health` event. IPMI, libvirt and fake servers have no read model. The Bare
+Metal page shows it under **BMC details**.
+
 ### Power
 
 ```

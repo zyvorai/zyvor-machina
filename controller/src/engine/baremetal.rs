@@ -465,6 +465,42 @@ pub async fn set_boot_best_effort(pool: &DbPool, id: Uuid, device: BootDevice) -
     }
 }
 
+/// Read the BMC's identity, health, sensors, firmware and log (Redfish) and keep the snapshot.
+pub async fn refresh_bmc_info(
+    pool: &DbPool,
+    id: Uuid,
+) -> anyhow::Result<super::baremetal_bmc::BmcInfo> {
+    let c = load_bmc(pool, id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("BMC credentials are not set for this server"))?;
+    let info = super::baremetal_bmc::collect_info(&c.target()).await?;
+    crate::db::query(
+        "INSERT INTO baremetal_bmc_info (server_id, health, info_json) VALUES (?, ?, ?)
+         ON CONFLICT (server_id) DO UPDATE SET health = excluded.health,
+           info_json = excluded.info_json, collected_at = CURRENT_TIMESTAMP",
+    )
+    .bind(id)
+    .bind(&info.identity.health)
+    .bind(serde_json::to_string(&info)?)
+    .execute(pool)
+    .await?;
+    Ok(info)
+}
+
+/// The last snapshot and when it was taken.
+pub async fn get_bmc_info(
+    pool: &DbPool,
+    id: Uuid,
+) -> anyhow::Result<Option<(String, super::baremetal_bmc::BmcInfo)>> {
+    let row: Option<(String, String)> = crate::db::query_as(
+        "SELECT collected_at, info_json FROM baremetal_bmc_info WHERE server_id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.and_then(|(at, j)| serde_json::from_str(&j).ok().map(|i| (at, i))))
+}
+
 /// Opt-in poll (`MACHINA_BMC_POLL_SECS`, default off) that keeps `state` equal to what the
 /// BMCs report. Sequential, with each call bounded by the driver's own timeouts.
 pub fn spawn_power_poll(state: crate::state::AppState) {
@@ -616,6 +652,38 @@ mod tests {
             now.iter().find(|x| x.id == s.id).unwrap().state,
             "registered"
         );
+    }
+
+    #[tokio::test]
+    async fn bmc_info_is_stored_and_replaced() {
+        let pool = crate::db::testing::pool().await;
+        let s = register(&pool, &body("fake", "admin", "pw")).await.unwrap();
+        assert!(get_bmc_info(&pool, s.id).await.unwrap().is_none());
+        // A fake BMC has no Redfish read model: refreshing says so instead of storing nothing.
+        assert!(refresh_bmc_info(&pool, s.id).await.is_err());
+        let info = super::super::baremetal_bmc::BmcInfo {
+            identity: super::super::baremetal_bmc::BmcIdentity {
+                model: "M".into(),
+                health: "OK".into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        for n in 0..2 {
+            crate::db::query(
+                "INSERT INTO baremetal_bmc_info (server_id, health, info_json) VALUES (?, ?, ?)
+                 ON CONFLICT (server_id) DO UPDATE SET health = excluded.health,
+                   info_json = excluded.info_json",
+            )
+            .bind(s.id)
+            .bind(format!("h{n}"))
+            .bind(serde_json::to_string(&info).unwrap())
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        let (_, got) = get_bmc_info(&pool, s.id).await.unwrap().unwrap();
+        assert_eq!(got.identity.model, "M");
     }
 
     #[tokio::test]

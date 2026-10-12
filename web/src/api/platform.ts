@@ -3193,6 +3193,33 @@ export const provisionBaremetal = (profile: string, count: number) =>
     body: JSON.stringify({ profile, count }),
   })
 
+export interface BaremetalBmcInfo {
+  identity: {
+    manufacturer: string
+    model: string
+    serial_number: string
+    sku: string
+    bios_version: string
+    cpu_count: number
+    cpu_model: string
+    memory_gib: number
+    power_state: string
+    health: string
+  }
+  temperatures: { name: string; celsius: number; health: string }[]
+  power_consumed_watts: number | null
+  firmware: { name: string; version: string }[]
+  log: { created: string; severity: string; message: string }[]
+  /** Sections this BMC did not answer (not an error). */
+  unavailable: string[]
+}
+
+export const refreshBaremetalBmcInfo = (id: string) =>
+  platformFetch<BaremetalBmcInfo>(`/api/v1/baremetal/servers/${id}/bmc-info/refresh`, { method: 'POST' })
+
+export const getBaremetalBmcInfo = (id: string) =>
+  platformFetch<{ collected_at: string; info: BaremetalBmcInfo }>(`/api/v1/baremetal/servers/${id}/bmc-info`)
+
 export interface BaremetalCommissionResult {
   id: string
   lifecycle: string

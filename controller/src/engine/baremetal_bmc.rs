@@ -752,6 +752,261 @@ async fn redfish_power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::R
     Ok(format!("Redfish {reset_type} on {addr}"))
 }
 
+// --- read model: what the BMC reports about the machine -------------------------------
+
+#[derive(Debug, Clone, Default, Serialize, serde::Deserialize, PartialEq)]
+pub struct BmcIdentity {
+    pub manufacturer: String,
+    pub model: String,
+    pub serial_number: String,
+    pub sku: String,
+    pub bios_version: String,
+    pub cpu_count: u64,
+    pub cpu_model: String,
+    pub memory_gib: f64,
+    pub power_state: String,
+    pub health: String,
+}
+
+#[derive(Debug, Clone, Serialize, serde::Deserialize, PartialEq)]
+pub struct BmcTemperature {
+    pub name: String,
+    pub celsius: f64,
+    pub health: String,
+}
+
+#[derive(Debug, Clone, Serialize, serde::Deserialize, PartialEq)]
+pub struct BmcFirmware {
+    pub name: String,
+    pub version: String,
+}
+
+#[derive(Debug, Clone, Serialize, serde::Deserialize, PartialEq)]
+pub struct BmcLogEntry {
+    pub created: String,
+    pub severity: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, serde::Deserialize)]
+pub struct BmcInfo {
+    pub identity: BmcIdentity,
+    pub temperatures: Vec<BmcTemperature>,
+    pub power_consumed_watts: Option<f64>,
+    pub firmware: Vec<BmcFirmware>,
+    pub log: Vec<BmcLogEntry>,
+    /// Sections the BMC did not answer (a missing resource is normal, not a failure).
+    pub unavailable: Vec<String>,
+}
+
+fn s(v: &Value, ptr: &str) -> String {
+    v.pointer(ptr)
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim()
+        .to_string()
+}
+
+/// Identity and health from a `ComputerSystem` document.
+pub fn parse_identity(system: &Value) -> BmcIdentity {
+    let health = {
+        let h = s(system, "/Status/HealthRollup");
+        if h.is_empty() {
+            s(system, "/Status/Health")
+        } else {
+            h
+        }
+    };
+    BmcIdentity {
+        manufacturer: s(system, "/Manufacturer"),
+        model: s(system, "/Model"),
+        serial_number: s(system, "/SerialNumber"),
+        sku: s(system, "/SKU"),
+        bios_version: s(system, "/BiosVersion"),
+        cpu_count: system
+            .pointer("/ProcessorSummary/Count")
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
+        cpu_model: s(system, "/ProcessorSummary/Model"),
+        memory_gib: system
+            .pointer("/MemorySummary/TotalSystemMemoryGiB")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0),
+        power_state: s(system, "/PowerState"),
+        health,
+    }
+}
+
+/// Readings from a `Thermal` document (sensors with no reading are skipped).
+pub fn parse_temperatures(thermal: &Value) -> Vec<BmcTemperature> {
+    thermal
+        .get("Temperatures")
+        .and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .filter_map(|t| {
+                    Some(BmcTemperature {
+                        name: s(t, "/Name"),
+                        celsius: t.get("ReadingCelsius").and_then(Value::as_f64)?,
+                        health: s(t, "/Status/Health"),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Total consumed watts from a `Power` document (the first `PowerControl` that reports one).
+pub fn parse_power_watts(power: &Value) -> Option<f64> {
+    power
+        .get("PowerControl")?
+        .as_array()?
+        .iter()
+        .find_map(|p| p.get("PowerConsumedWatts").and_then(Value::as_f64))
+}
+
+/// Entries of a log service, newest first, at most `limit`.
+pub fn parse_log_entries(entries: &Value, limit: usize) -> Vec<BmcLogEntry> {
+    let mut v: Vec<BmcLogEntry> = entries
+        .get("Members")
+        .and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .map(|e| BmcLogEntry {
+                    created: s(e, "/Created"),
+                    severity: s(e, "/Severity"),
+                    message: s(e, "/Message"),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    v.sort_by(|a, b| b.created.cmp(&a.created));
+    v.truncate(limit);
+    v
+}
+
+fn first_link(doc: &Value, pointer: &str) -> Option<String> {
+    doc.pointer(pointer)
+        .and_then(|v| match v {
+            Value::Array(a) => a.first().and_then(|m| m.get("@odata.id")),
+            other => other.get("@odata.id"),
+        })
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+fn member_uris(collection: &Value) -> Vec<String> {
+    collection
+        .get("Members")
+        .and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .filter_map(|m| m.get("@odata.id").and_then(Value::as_str))
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Everything the BMC will tell us, section by section. Redfish only; a section the BMC
+/// lacks lands in `unavailable` rather than failing the whole read.
+pub async fn collect_info(target: &BmcTarget<'_>) -> anyhow::Result<BmcInfo> {
+    if target.kind != BmcKind::Redfish {
+        anyhow::bail!(
+            "BMC details are read over Redfish; this server uses {:?}",
+            target.kind
+        );
+    }
+    let rf = Redfish::connect(target)?;
+    let (_, system) = rf.system().await?;
+    let mut info = BmcInfo {
+        identity: parse_identity(&system),
+        ..Default::default()
+    };
+
+    // Chassis: temperatures and power draw.
+    match first_link(&system, "/Links/Chassis") {
+        Some(ch_uri) => match rf.get(&ch_uri).await {
+            Ok(ch) => {
+                if let Some(t) = first_link(&ch, "/Thermal") {
+                    match rf.get(&t).await {
+                        Ok(doc) => info.temperatures = parse_temperatures(&doc),
+                        Err(_) => info.unavailable.push("thermal".into()),
+                    }
+                } else {
+                    info.unavailable.push("thermal".into());
+                }
+                if let Some(p) = first_link(&ch, "/Power") {
+                    match rf.get(&p).await {
+                        Ok(doc) => info.power_consumed_watts = parse_power_watts(&doc),
+                        Err(_) => info.unavailable.push("power".into()),
+                    }
+                } else {
+                    info.unavailable.push("power".into());
+                }
+            }
+            Err(_) => {
+                info.unavailable.push("thermal".into());
+                info.unavailable.push("power".into());
+            }
+        },
+        None => {
+            info.unavailable.push("thermal".into());
+            info.unavailable.push("power".into());
+        }
+    }
+
+    // Firmware inventory.
+    let mut fw_ok = false;
+    if let Ok(us) = rf.get("/redfish/v1/UpdateService").await {
+        if let Some(inv) = first_link(&us, "/FirmwareInventory") {
+            if let Ok(coll) = rf.get(&inv).await {
+                fw_ok = true;
+                for uri in member_uris(&coll).into_iter().take(40) {
+                    if let Ok(doc) = rf.get(&uri).await {
+                        let name = s(&doc, "/Name");
+                        let version = s(&doc, "/Version");
+                        if !name.is_empty() && !version.is_empty() {
+                            info.firmware.push(BmcFirmware { name, version });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if !fw_ok {
+        info.unavailable.push("firmware".into());
+    }
+
+    // Log: the first log service of the first manager that has entries.
+    let mut log_ok = false;
+    if let Some(mgr_uri) = first_link(&system, "/Links/ManagedBy") {
+        if let Ok(mgr) = rf.get(&mgr_uri).await {
+            if let Some(ls) = first_link(&mgr, "/LogServices") {
+                if let Ok(coll) = rf.get(&ls).await {
+                    for svc in member_uris(&coll).into_iter().take(3) {
+                        let Ok(doc) = rf.get(&svc).await else {
+                            continue;
+                        };
+                        let Some(entries) = first_link(&doc, "/Entries") else {
+                            continue;
+                        };
+                        if let Ok(list) = rf.get(&entries).await {
+                            info.log = parse_log_entries(&list, 50);
+                            log_ok = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if !log_ok {
+        info.unavailable.push("log".into());
+    }
+    Ok(info)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1135,6 +1390,106 @@ mod tests {
                 .await
                 .is_err()
         );
+    }
+
+    #[test]
+    fn redfish_documents_become_the_read_model() {
+        let sys = json!({
+            "Manufacturer": "Dell Inc.", "Model": "PowerEdge R760", "SerialNumber": "ABC123",
+            "BiosVersion": "2.1.0", "PowerState": "On",
+            "ProcessorSummary": {"Count": 2, "Model": "Xeon Gold"},
+            "MemorySummary": {"TotalSystemMemoryGiB": 512.0},
+            "Status": {"Health": "OK", "HealthRollup": "Warning"}
+        });
+        let id = parse_identity(&sys);
+        assert_eq!(id.manufacturer, "Dell Inc.");
+        assert_eq!((id.cpu_count, id.memory_gib), (2, 512.0));
+        assert_eq!(
+            id.health, "Warning",
+            "the rollup wins over the system's own health"
+        );
+
+        let thermal = json!({"Temperatures": [
+            {"Name": "CPU1", "ReadingCelsius": 54.0, "Status": {"Health": "OK"}},
+            {"Name": "Absent", "ReadingCelsius": null}]});
+        let t = parse_temperatures(&thermal);
+        assert_eq!(t.len(), 1);
+        assert_eq!(t[0].name, "CPU1");
+
+        let power = json!({"PowerControl": [{"Name": "x"}, {"PowerConsumedWatts": 312.5}]});
+        assert_eq!(parse_power_watts(&power), Some(312.5));
+        assert_eq!(parse_power_watts(&json!({})), None);
+
+        let log = json!({"Members": [
+            {"Created": "2026-10-01T00:00:00Z", "Severity": "OK", "Message": "old"},
+            {"Created": "2026-10-12T00:00:00Z", "Severity": "Critical", "Message": "fan failed"}]});
+        let l = parse_log_entries(&log, 1);
+        assert_eq!(l.len(), 1);
+        assert_eq!(l[0].message, "fan failed");
+    }
+
+    #[tokio::test]
+    async fn collect_info_reads_what_exists_and_lists_what_does_not() {
+        let mut r = systems();
+        r.push(route(
+            "GET",
+            "/redfish/v1/Systems/1",
+            200,
+            json!({"Model": "M1", "PowerState": "On", "Status": {"Health": "OK"},
+                   "Links": {"Chassis": [{"@odata.id": "/redfish/v1/Chassis/1"}],
+                             "ManagedBy": [{"@odata.id": "/redfish/v1/Managers/1"}]}}),
+        ));
+        r.push(route(
+            "GET",
+            "/redfish/v1/Chassis/1",
+            200,
+            json!({"Thermal": {"@odata.id": "/redfish/v1/Chassis/1/Thermal"}}),
+        ));
+        r.push(route(
+            "GET",
+            "/redfish/v1/Chassis/1/Thermal",
+            200,
+            json!({"Temperatures": [{"Name": "Inlet", "ReadingCelsius": 24.0}]}),
+        ));
+        r.push(route(
+            "GET",
+            "/redfish/v1/Managers/1",
+            200,
+            json!({"LogServices": {"@odata.id": "/redfish/v1/Managers/1/LogServices"}}),
+        ));
+        r.push(route(
+            "GET",
+            "/redfish/v1/Managers/1/LogServices",
+            200,
+            json!({"Members": [{"@odata.id": "/redfish/v1/Managers/1/LogServices/Sel"}]}),
+        ));
+        r.push(route(
+            "GET",
+            "/redfish/v1/Managers/1/LogServices/Sel",
+            200,
+            json!({"Entries": {"@odata.id": "/redfish/v1/Managers/1/LogServices/Sel/Entries"}}),
+        ));
+        r.push(route(
+            "GET",
+            "/redfish/v1/Managers/1/LogServices/Sel/Entries",
+            200,
+            json!({"Members": [{"Created": "2026-10-12T00:00:00Z", "Severity": "Warning", "Message": "temp high"}]}),
+        ));
+        let (addr, _) = mock_redfish(r).await;
+        let info = collect_info(&target(&addr)).await.unwrap();
+        assert_eq!(info.identity.model, "M1");
+        assert_eq!(info.temperatures.len(), 1);
+        assert_eq!(info.log[0].message, "temp high");
+        // No Power link and no UpdateService on this BMC: reported, not fatal.
+        assert!(info.unavailable.contains(&"power".to_string()));
+        assert!(info.unavailable.contains(&"firmware".to_string()));
+        assert!(!info.unavailable.contains(&"log".to_string()));
+        // Only Redfish servers have this read model.
+        let t = BmcTarget {
+            kind: BmcKind::Ipmi,
+            ..target(&addr)
+        };
+        assert!(collect_info(&t).await.is_err());
     }
 
     #[tokio::test]
