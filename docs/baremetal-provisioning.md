@@ -604,7 +604,7 @@ What has actually run (details and exact wording in [claims.md](claims.md)):
 | `bootstrap`, `host add --file --parallel`, labels, post-join networks and pools, offline bundle `--join`, a join that fails after SSH succeeds (token revoked, exit 1) | VMs | real nodes with real networks |
 | Serial console | pty round trip with a stand-in `ipmitool` | the WebSocket in a browser; a real BMC's SOL |
 | Auto-enrol, `bmc-set`, profile top-up | two empty VMs: enrolled, commissioned, BMC attached, deployed by an `auto_deploy` profile, joined | with physical machines |
-| Web panels (servers, images, profiles, BMC details, register form) | typecheck and 11 component tests with a mocked API (`PlatformBareMetal.test.tsx`) | in a browser |
+| Web panels (servers, images, profiles, BMC details, register form) | 13 component tests with a mocked API (`PlatformBareMetal.test.tsx`), and the page driven in headless Chrome 155 against the lab host (rows, badges, images, profiles, Commission, Provision with the refusal toast, register form) | a headed browser session by a person; the BMC details panel (no Redfish server with data was on the page) |
 
 ## Not done
 
