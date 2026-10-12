@@ -14,7 +14,14 @@ pub async fn health(State(state): State<AppState>) -> Json<serde_json::Value> {
         .fetch_one(&state.pool)
         .await
         .is_ok();
+    // Atlas is optional and never degrades the controller; it is reported when enabled so
+    // an operator sees a dead storage gateway next to the controller's own health.
+    let atlas = match crate::engine::atlas_bridge::cached_reachable(&state.config).await {
+        Some(up) => json!({ "enabled": true, "reachable": up }),
+        None => json!({ "enabled": false }),
+    };
     Json(json!({
+        "atlas": atlas,
         "status": if db_ok { "ok" } else { "degraded" },
         "component": "machina-controller",
         "version": env!("CARGO_PKG_VERSION"),
