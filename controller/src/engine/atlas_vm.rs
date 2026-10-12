@@ -7,8 +7,8 @@
 
 use std::time::Duration;
 
-use serde::Serialize;
 use crate::db::DbPool;
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::config::ControllerConfig;
@@ -90,6 +90,18 @@ pub async fn provision_vm_volume(
 ) -> anyhow::Result<VmAtlasVolume> {
     let cfg = &state.config;
     let client = atlas_bridge::require_client(cfg)?;
+
+    // Refuse to start a volume Atlas cannot hold, instead of failing halfway through. A summary
+    // that cannot be read does not block (see `headroom_blocker`).
+    if let Ok(summary) = client.metrics_summary().await {
+        if let Some(why) = atlas_bridge::headroom_blocker(
+            &summary,
+            size_gib.max(1) * GIB,
+            atlas_bridge::max_used_ratio(),
+        ) {
+            anyhow::bail!(why);
+        }
+    }
 
     let vm = vm_name(&state.pool, vm_id).await?;
     // Atlas uses the volume name as the Kubernetes PVC name, which must be an

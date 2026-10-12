@@ -59,6 +59,14 @@ gateway shows `machina_atlas_up 0` instead of stalling the scrape. A decision en
 Zyntra (`packs/virtualization` in the zyntra repo) reads storage headroom from this one scrape.
 Unit-tested only (not yet scraped against a live Atlas).
 
+### Health and headroom
+
+- `GET /api/v1/health` carries `atlas: {enabled, reachable}` when the integration is on (cached 15 s,
+  2 s probe). A dead Atlas never marks the controller `degraded` and never fails `/health/ready`.
+- Creating an Atlas-backed volume (`atlas_root_disk`, `POST /atlas/vms/{id}/volumes`) is refused
+  up front when it would push raw-capacity utilisation past `ATLAS_MAX_USED_RATIO` (default `0.95`).
+  A summary that cannot be read does not block provisioning.
+
 Errors propagate the upstream Atlas status (4xx pass through; Atlas 5xx → 502); an
 unreachable gateway is a typed `503 atlas_unavailable`.
 

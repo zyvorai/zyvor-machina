@@ -721,3 +721,87 @@ pub async fn prometheus_gauges(cfg: &ControllerConfig) -> String {
         .await
         .unwrap_or_default()
 }
+
+/// Default ceiling for Atlas pool utilisation when provisioning a new VM volume.
+const DEFAULT_MAX_USED_RATIO: f64 = 0.95;
+
+/// Pure headroom check over an Atlas `/metrics/summary` document. Returns the refusal
+/// message when adding `add_bytes` would push raw-capacity utilisation past `max_ratio`.
+/// Missing or zero capacity fields never block (fail open: monitoring gaps must not
+/// stop provisioning).
+pub fn headroom_blocker(
+    summary: &serde_json::Value,
+    add_bytes: i64,
+    max_ratio: f64,
+) -> Option<String> {
+    let raw = summary.get("raw_capacity_bytes").and_then(|v| v.as_f64())?;
+    let used = summary
+        .get("used_capacity_bytes")
+        .and_then(|v| v.as_f64())?;
+    if raw <= 0.0 {
+        return None;
+    }
+    let after = (used + add_bytes.max(0) as f64) / raw;
+    (after > max_ratio).then(|| {
+        format!(
+            "Atlas storage is too full for this volume: {:.0}% used now, {:.0}% after, limit {:.0}% (ATLAS_MAX_USED_RATIO)",
+            used / raw * 100.0,
+            after * 100.0,
+            max_ratio * 100.0
+        )
+    })
+}
+
+pub fn max_used_ratio() -> f64 {
+    std::env::var("ATLAS_MAX_USED_RATIO")
+        .ok()
+        .and_then(|v| v.trim().parse::<f64>().ok())
+        .filter(|r| *r > 0.0 && *r <= 1.0)
+        .unwrap_or(DEFAULT_MAX_USED_RATIO)
+}
+
+/// Reachability for the unauthenticated `/health` document: `None` when the integration is
+/// off, otherwise whether the gateway answered. Cached for 15 s so frequent probes do not
+/// each open a connection to Atlas, and bounded to 2 s.
+pub async fn cached_reachable(cfg: &ControllerConfig) -> Option<bool> {
+    use std::sync::Mutex;
+    use std::time::Instant;
+    static CACHE: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
+
+    let client = AtlasClient::from_config(cfg).ok().flatten()?;
+    if let Ok(g) = CACHE.lock() {
+        if let Some((at, up)) = *g {
+            if at.elapsed() < Duration::from_secs(15) {
+                return Some(up);
+            }
+        }
+    }
+    let up = tokio::time::timeout(Duration::from_secs(2), client.version())
+        .await
+        .map(|r| r.is_ok())
+        .unwrap_or(false);
+    if let Ok(mut g) = CACHE.lock() {
+        *g = Some((Instant::now(), up));
+    }
+    Some(up)
+}
+
+#[cfg(test)]
+mod headroom_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn blocks_only_past_the_limit() {
+        let s = json!({"raw_capacity_bytes": 1000, "used_capacity_bytes": 900});
+        assert!(headroom_blocker(&s, 40, 0.95).is_none());
+        assert!(headroom_blocker(&s, 60, 0.95).is_some());
+    }
+
+    #[test]
+    fn fails_open_on_missing_or_zero_capacity() {
+        assert!(headroom_blocker(&json!({}), 10, 0.95).is_none());
+        let zero = json!({"raw_capacity_bytes": 0, "used_capacity_bytes": 0});
+        assert!(headroom_blocker(&zero, 10, 0.95).is_none());
+    }
+}
