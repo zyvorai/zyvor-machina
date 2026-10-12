@@ -65,14 +65,53 @@ pub struct ClusterBootstrapParams {
     pub cni: CniChoice,
 }
 
-const K3S_INSTALL_URL: &str = "https://get.k3s.io";
+const K3S_INSTALL_URL_DEFAULT: &str = "https://get.k3s.io";
 const KUBECONFIG_ADMIN: &str = "/etc/rancher/k3s/k3s.yaml";
-const METRICS_SERVER_MANIFEST: &str =
+const METRICS_SERVER_MANIFEST_DEFAULT: &str =
     "https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.7.2/components.yaml";
-const KUBEVIRT_STABLE_TXT: &str =
+const KUBEVIRT_STABLE_TXT_DEFAULT: &str =
     "https://storage.googleapis.com/kubevirt-prow/release/kubevirt/kubevirt/stable.txt";
-const CDI_RELEASES_LATEST_API: &str =
+const CDI_RELEASES_LATEST_API_DEFAULT: &str =
     "https://api.github.com/repos/kubevirt/containerized-data-importer/releases/latest";
+
+const KUBEVIRT_RELEASES_DEFAULT: &str = "https://github.com/kubevirt/kubevirt/releases/download";
+const CDI_RELEASES_DEFAULT: &str =
+    "https://github.com/kubevirt/containerized-data-importer/releases/download";
+
+/// Air-gapped sites point the bootstrap at an internal mirror: each source URL can be
+/// overridden by an environment variable, and the default stays the upstream location.
+fn mirror(env: &str, default: &str) -> String {
+    std::env::var(env)
+        .ok()
+        .map(|v| v.trim().trim_end_matches('/').to_string())
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| default.to_string())
+}
+
+fn k3s_install_url() -> String {
+    mirror("MACHINA_K3S_INSTALL_URL", K3S_INSTALL_URL_DEFAULT)
+}
+fn metrics_server_manifest() -> String {
+    mirror(
+        "MACHINA_METRICS_SERVER_MANIFEST_URL",
+        METRICS_SERVER_MANIFEST_DEFAULT,
+    )
+}
+fn kubevirt_stable_txt() -> String {
+    mirror("MACHINA_KUBEVIRT_STABLE_URL", KUBEVIRT_STABLE_TXT_DEFAULT)
+}
+fn cdi_releases_latest_api() -> String {
+    mirror(
+        "MACHINA_CDI_LATEST_API_URL",
+        CDI_RELEASES_LATEST_API_DEFAULT,
+    )
+}
+fn kubevirt_releases() -> String {
+    mirror("MACHINA_KUBEVIRT_RELEASES_URL", KUBEVIRT_RELEASES_DEFAULT)
+}
+fn cdi_releases() -> String {
+    mirror("MACHINA_CDI_RELEASES_URL", CDI_RELEASES_DEFAULT)
+}
 
 const TIMEOUT_K3S_INSTALL_SECS: u64 = 900;
 const TIMEOUT_KUBECTL_SECS: u64 = 600;
@@ -281,8 +320,14 @@ async fn phase_k3s(
     stdout_log: &mut String,
     stderr_log: &mut String,
 ) -> Result<(), LibvirtError> {
+    let url = k3s_install_url();
+    if url.contains(['\'', '"', ';', '|', '&', '$', '`', '\n']) {
+        return Err(LibvirtError::Operation(
+            "MACHINA_K3S_INSTALL_URL contains shell metacharacters".into(),
+        ));
+    }
     let install = format!(
-        "curl -sfL {K3S_INSTALL_URL} | sh -s - server {}",
+        "curl -sfL '{url}' | sh -s - server {}",
         k3s_server_flags(cni)
     );
     let no_env: Vec<(String, String)> = vec![];
@@ -576,7 +621,7 @@ async fn phase_metrics(
     run_cmd_argv(
         "kubectl_apply_metrics_server",
         &kubectl,
-        &["apply".into(), "-f".into(), METRICS_SERVER_MANIFEST.into()],
+        &["apply".into(), "-f".into(), metrics_server_manifest()],
         &kube_env,
         TIMEOUT_KUBECTL_SECS,
         stdout_log,
@@ -681,18 +726,16 @@ async fn phase_kubevirt_cdi(
         .build()
         .map_err(|e| LibvirtError::Internal(format!("reqwest: {e}")))?;
 
-    let kv_ver = download_text(&client, KUBEVIRT_STABLE_TXT).await?;
+    let kv_ver = download_text(&client, &kubevirt_stable_txt()).await?;
     if kv_ver.is_empty() {
         return Err(LibvirtError::Operation(
             "empty KubeVirt stable.txt response".into(),
         ));
     }
 
-    let op_url = format!(
-        "https://github.com/kubevirt/kubevirt/releases/download/{kv_ver}/kubevirt-operator.yaml"
-    );
-    let cr_url =
-        format!("https://github.com/kubevirt/kubevirt/releases/download/{kv_ver}/kubevirt-cr.yaml");
+    let kv_base = kubevirt_releases();
+    let op_url = format!("{kv_base}/{kv_ver}/kubevirt-operator.yaml");
+    let cr_url = format!("{kv_base}/{kv_ver}/kubevirt-cr.yaml");
 
     run_cmd_argv(
         "kubectl_kubevirt_operator",
@@ -734,7 +777,7 @@ async fn phase_kubevirt_cdi(
     .await?;
 
     let body = client
-        .get(CDI_RELEASES_LATEST_API)
+        .get(cdi_releases_latest_api())
         .header("User-Agent", "machina-daemon-cluster-bootstrap/1.0")
         .header("Accept", "application/vnd.github+json")
         .send()
@@ -751,12 +794,9 @@ async fn phase_kubevirt_cdi(
         return Err(LibvirtError::Operation("empty CDI tag_name".into()));
     }
 
-    let cdi_op = format!(
-        "https://github.com/kubevirt/containerized-data-importer/releases/download/{cdi_ver}/cdi-operator.yaml"
-    );
-    let cdi_cr = format!(
-        "https://github.com/kubevirt/containerized-data-importer/releases/download/{cdi_ver}/cdi-cr.yaml"
-    );
+    let cdi_base = cdi_releases();
+    let cdi_op = format!("{cdi_base}/{cdi_ver}/cdi-operator.yaml");
+    let cdi_cr = format!("{cdi_base}/{cdi_ver}/cdi-cr.yaml");
 
     run_cmd_argv(
         "kubectl_cdi_operator",
@@ -818,7 +858,8 @@ async fn phase_kubevirt_cdi(
 
     let arch = host_arch();
     let virt_url = format!(
-        "https://github.com/kubevirt/kubevirt/releases/download/{kv_ver}/virtctl-{kv_ver}-linux-{arch}"
+        "{}/{kv_ver}/virtctl-{kv_ver}-linux-{arch}",
+        kubevirt_releases()
     );
     let tmp_virt = std::env::temp_dir().join(format!("virtctl-{}", uuid::Uuid::new_v4()));
     download_file(&client, &virt_url, &tmp_virt).await?;
