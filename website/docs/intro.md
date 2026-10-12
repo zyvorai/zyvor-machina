@@ -24,6 +24,7 @@ from a handful of Rust services on plain Linux.
 | `machina-daemon` on a host | VMs, storage, networks, consoles, sign-in and RBAC, a REST API and the web UI |
 | `+ machina-controller` and an agent per host | A fleet: HA failover with fencing, DRS, live migration, Fleet Cloud, Zyra AI |
 | `+ machina-bpfd` on each host | eBPF load balancing, Kubernetes CNI, DDoS shield, VM isolation and flow visibility |
+| `+ BMC addresses` of machines with no OS | [Bare-metal provisioning](core-concepts/bare-metal.md): discover, commission, deploy an image, join |
 
 See [Architecture](core-concepts/architecture.md) for how they connect.
 

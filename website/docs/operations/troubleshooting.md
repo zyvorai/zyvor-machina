@@ -51,3 +51,6 @@ description: The first checks to run, and fixes for the most common problems.
 
 The full symptom-by-symptom guide is the
 [troubleshooting handbook](https://github.com/zyvorai/zyvor-machina/blob/main/docs/handbook/troubleshooting.md).
+
+Bare-metal provisioning problems (BMC power, PXE and virtual media, commissioning, image deploy, join) have their own
+page: [Bare-metal troubleshooting](bare-metal-troubleshooting.md).

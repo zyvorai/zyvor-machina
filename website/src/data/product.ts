@@ -70,6 +70,14 @@ export const FEATURES: Feature[] = [
     doc: '/docs/networking/ebpf-overview',
   },
   {
+    eyebrow: 'Provision',
+    title: 'From a BMC address to a joined host.',
+    body: 'Discover or import BMCs, commission machines over PXE or BMC virtual media, write a checksum-verified OS image, and let each one join the fleet on first boot. Verified on VMs and BMC emulators; not yet on physical servers.',
+    bullets: ['Redfish and IPMI power, boot device and virtual media', 'Image catalog: Ubuntu, Debian, Rocky, AlmaLinux', 'Profiles that keep N machines deployed'],
+    shot: SHOTS[0],
+    doc: '/docs/core-concepts/bare-metal',
+  },
+  {
     eyebrow: 'Operate',
     title: 'Zyra AI: an operator that asks first.',
     body: 'Autonomous diagnostics, incident correlation, rightsizing and natural-language operations, with an approval queue in front of every change.',
