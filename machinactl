@@ -33,6 +33,7 @@
 #   integrations    Show KubeVirt/k8s/automation integration status
 #   sprite          Manage disposable sandbox VMs (list/get/create/delete/golden-images)
 #   netpol          VM network policies (CiliumNetworkPolicy schema)
+#   metal           Bare-metal provisioning (add, commission, allocate, deploy, power)
 #   flow            Packet flows (observe / top / stats)
 #   vm label        Show or edit VM labels
 #   vm quarantine   Cut a VM off the network for a fixed time (vm release lifts it)
@@ -1417,6 +1418,8 @@ cmd_sprite() {
 np_setup() {
     # shellcheck source=scripts/lib/netpol-ctl.sh
     source "$SCRIPT_DIR/scripts/lib/netpol-ctl.sh"
+    # shellcheck source=scripts/lib/metal-ctl.sh
+    source "$SCRIPT_DIR/scripts/lib/metal-ctl.sh"
     NP_BASE="$API_URL/api/$API_VERSION"
     if [[ "${NP_FLEET:-0}" == 1 ]]; then
         NP_BASE="$API_URL/api/$API_VERSION/platform/controller/api/$API_VERSION"
@@ -1560,6 +1563,7 @@ cmd_help() {
     echo "  help              Show this help"
     echo ""
     echo "🛡️  VM network policy (CiliumNetworkPolicy schema; add --fleet for the controller):"
+    echo "  metal list|add|commission|allocate|deploy|release|power|zones   Bare-metal provisioning (metal help)"
     echo "  netpol apply -f FILE [--dry-run]   Create/replace policies (CNP / CCNP / VmNetworkPolicy YAML)"
     echo "  netpol get|delete|validate         List / show (-o yaml|json|wide) / delete / lint"
     echo "  netpol test --from A --to B --port N   Trace a connection (like cilium policy trace)"
@@ -1649,6 +1653,7 @@ main() {
         integrations) cmd_integrations "$@" ;;
         sprite)     cmd_sprite "$@" ;;
         netpol|networkpolicy|cnp) np_run np_netpol_main "$@" ;;
+        metal|baremetal) np_run metal_main "$@" --fleet ;;
         flow|flows|hubble) np_run np_flow_main "$@" ;;
         vm)         cmd_vm "$@" ;;
         help|--help|-h) cmd_help ;;

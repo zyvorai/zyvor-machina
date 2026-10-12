@@ -19,6 +19,9 @@ import {
   listBaremetalServers,
   registerBaremetalServer,
   baremetalServerPower,
+  commissionBaremetalServer,
+  releaseBaremetalServer,
+  setBaremetalLifecycle,
   type BaremetalServer,
   type BmcPowerBody,
 } from '../../api/platform'
@@ -41,6 +44,10 @@ export default function PlatformBareMetal() {
   const [hostname, setHostname] = useState('')
   const [bmcAddress, setBmcAddress] = useState('')
   const [bmcType, setBmcType] = useState('redfish')
+  const [bmcUser, setBmcUser] = useState('')
+  const [bmcPassword, setBmcPassword] = useState('')
+  const [macAddress, setMacAddress] = useState('')
+  const [zone, setZone] = useState('')
   const [saving, setSaving] = useState(false)
   const [pendingPower, setPendingPower] = useState<{ id: string; name: string; action: PowerAction } | null>(null)
 
@@ -77,16 +84,50 @@ export default function PlatformBareMetal() {
     if (!hostname.trim() || !bmcAddress.trim()) return
     setSaving(true)
     try {
-      await registerBaremetalServer({ hostname: hostname.trim(), bmc_address: bmcAddress.trim(), bmc_type: bmcType })
+      await registerBaremetalServer({
+        hostname: hostname.trim(),
+        bmc_address: bmcAddress.trim(),
+        bmc_type: bmcType,
+        bmc_username: bmcUser.trim(),
+        bmc_password: bmcPassword,
+        mac_address: macAddress.trim(),
+        zone: zone.trim(),
+      })
       toast.success(`${hostname.trim()} registered`)
       setHostname('')
       setBmcAddress('')
+      setBmcUser('')
+      setBmcPassword('')
+      setMacAddress('')
+      setZone('')
       setShowRegister(false)
       await load()
     } catch (e: unknown) {
       toast.error(formatUserError(e))
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Lifecycle moves that make sense from a row; the server enforces the full state machine.
+  const handleLifecycle = async (id: string, name: string, kind: 'commission' | 'release' | 'retire') => {
+    setActionInProgress(id)
+    try {
+      if (kind === 'commission') {
+        await commissionBaremetalServer(id)
+        toast.success(`${name}: commissioning started — PXE-boot the machine`)
+      } else if (kind === 'release') {
+        await releaseBaremetalServer(id)
+        toast.success(`${name} released`)
+      } else {
+        await setBaremetalLifecycle(id, 'retired')
+        toast.success(`${name} retired`)
+      }
+      await load()
+    } catch (e: unknown) {
+      toast.error(formatUserError(e))
+    } finally {
+      setActionInProgress(null)
     }
   }
 
@@ -107,6 +148,7 @@ export default function PlatformBareMetal() {
           {platformStatSubtitle([
             { label: 'Servers', value: servers.length },
             { label: 'Online', value: onlineCount },
+            { label: 'Ready', value: servers.filter((s) => s.lifecycle === 'ready').length },
             { label: 'Capacity', value: `${totalCores} cores · ${totalMemGib} GiB` },
           ])}
         </span>
@@ -159,8 +201,49 @@ export default function PlatformBareMetal() {
                 >
                   <option value="redfish">Redfish</option>
                   <option value="ipmi">IPMI</option>
-                  <option value="ilorest">iLO REST</option>
+                  <option value="fake">Fake (no hardware)</option>
                 </select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">BMC Username</label>
+                <input
+                  value={bmcUser}
+                  onChange={(e) => setBmcUser(e.target.value)}
+                  aria-label="BMC Username"
+                  autoComplete="off"
+                  className="w-full rounded border border-border/50 bg-background/60 px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">BMC Password</label>
+                <input
+                  type="password"
+                  value={bmcPassword}
+                  onChange={(e) => setBmcPassword(e.target.value)}
+                  aria-label="BMC Password"
+                  autoComplete="new-password"
+                  className="w-full rounded border border-border/50 bg-background/60 px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">PXE MAC address</label>
+                <input
+                  value={macAddress}
+                  onChange={(e) => setMacAddress(e.target.value)}
+                  placeholder="aa:bb:cc:dd:ee:ff"
+                  aria-label="PXE MAC address"
+                  className="w-full rounded border border-border/50 bg-background/60 px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Zone</label>
+                <input
+                  value={zone}
+                  onChange={(e) => setZone(e.target.value)}
+                  placeholder="rack-a"
+                  aria-label="Zone"
+                  className="w-full rounded border border-border/50 bg-background/60 px-2 py-1.5 text-sm focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-4">
@@ -192,14 +275,37 @@ export default function PlatformBareMetal() {
                 <MacListRow
                   key={s.id}
                   title={s.hostname}
-                  subtitle={`${s.bmc_type.toUpperCase()} · ${s.bmc_address} · ${s.cpu_cores} cores · ${Math.round(s.memory_mib / 1024)} GiB`}
+                  subtitle={`${s.bmc_type.toUpperCase()} · ${s.bmc_address} · ${s.cpu_cores} cores · ${Math.round(s.memory_mib / 1024)} GiB${s.zone ? ` · zone ${s.zone}` : ''}${s.last_error ? ` · last error: ${s.last_error}` : ''}`}
                   badge={
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${isOn(s.state) ? statusBadgeClasses('ok') : 'bg-[var(--apple-fill-tertiary)] text-[var(--text-muted)]'}`}>
-                      {s.state}
+                    <span className="flex items-center gap-1">
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${s.lifecycle === 'ready' || s.lifecycle === 'deployed' ? statusBadgeClasses('ok') : s.lifecycle === 'failed' ? statusBadgeClasses('error') : 'bg-[var(--apple-fill-tertiary)] text-[var(--text-muted)]'}`}>
+                        {s.lifecycle}
+                      </span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${isOn(s.state) ? statusBadgeClasses('ok') : 'bg-[var(--apple-fill-tertiary)] text-[var(--text-muted)]'}`}>
+                        {s.state}
+                      </span>
                     </span>
                   }
                   trailing={
                     <div className="flex items-center gap-1">
+                      {(s.lifecycle === 'new' || s.lifecycle === 'ready' || s.lifecycle === 'failed') && (
+                        <button
+                          onClick={() => void handleLifecycle(s.id, s.hostname, 'commission')}
+                          disabled={actionInProgress === s.id}
+                          className="px-2 py-1 text-xs rounded bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-40"
+                        >
+                          Commission
+                        </button>
+                      )}
+                      {(s.lifecycle === 'allocated' || s.lifecycle === 'deployed') && (
+                        <button
+                          onClick={() => void handleLifecycle(s.id, s.hostname, 'release')}
+                          disabled={actionInProgress === s.id}
+                          className="px-2 py-1 text-xs rounded bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-40"
+                        >
+                          Release
+                        </button>
+                      )}
                       <button
                         onClick={() => void handlePower(s.id, s.hostname, 'on')}
                         disabled={actionInProgress === s.id || isOn(s.state)}

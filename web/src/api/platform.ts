@@ -3042,6 +3042,14 @@ export interface BaremetalServer {
   bmc_vlan: string
   pxe_vlan: string
   created_at: string
+  /** A BMC password is stored (it is never returned). */
+  bmc_credentials_configured: boolean
+  /** Outcome of the last failed live BMC call; empty when it succeeded. */
+  last_error: string
+  lifecycle:
+    | 'new' | 'commissioning' | 'ready' | 'allocated' | 'deploying' | 'deployed' | 'retired' | 'failed'
+  zone: string
+  mac_address: string
 }
 
 interface RegisterBaremetalBody {
@@ -3054,6 +3062,10 @@ interface RegisterBaremetalBody {
   firewall_enabled?: boolean
   bmc_vlan?: string
   pxe_vlan?: string
+  bmc_username?: string
+  bmc_password?: string
+  mac_address?: string
+  zone?: string
 }
 
 // The controller only accepts these four action strings (engine/baremetal.rs's set_power bails
@@ -3090,6 +3102,25 @@ export const baremetalServerPower = (id: string, body: BmcPowerBody) =>
   platformFetch<BmcPowerResult>(`/api/v1/baremetal/servers/${id}/power`, {
     method: 'POST',
     body: JSON.stringify(body),
+  })
+export interface BaremetalCommissionResult {
+  id: string
+  lifecycle: string
+  /** One-time token for the machine's report; shown once. */
+  token: string
+  report_path: string
+}
+
+export const commissionBaremetalServer = (id: string) =>
+  platformFetch<BaremetalCommissionResult>(`/api/v1/baremetal/servers/${id}/commission`, { method: 'POST' })
+
+export const releaseBaremetalServer = (id: string) =>
+  platformFetch<{ id: string; lifecycle: string }>(`/api/v1/baremetal/servers/${id}/release`, { method: 'POST' })
+
+export const setBaremetalLifecycle = (id: string, to: BaremetalServer['lifecycle']) =>
+  platformFetch<{ id: string; lifecycle: string }>(`/api/v1/baremetal/servers/${id}/lifecycle`, {
+    method: 'POST',
+    body: JSON.stringify({ to }),
   })
 export { retirePlatformVm, exportVmDisk, exportVmIac, downloadVmIacZip, downloadVmIacBundle } from './platformVmLifecycle'
 export type { VmIacExportBundle } from './platformVmLifecycle'

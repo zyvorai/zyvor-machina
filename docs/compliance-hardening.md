@@ -38,3 +38,17 @@ Use this when preparing Machina for security review (not a certification).
 
 ## Not in scope today
 
+Stated plainly so a security review does not have to find it:
+
+- **No FIPS-validated cryptography.** The controller and agent use rustls with the
+  `ring` provider (TLS 1.2 and 1.3). There is no FIPS module build.
+- **No certification or benchmark mapping.** There is no CIS, STIG, SOC 2 or ISO 27001
+  mapping; this page is a checklist, not evidence for an audit.
+- **Agent traffic is token-only** unless `MACHINA_AGENT_TLS_CERT` and `_KEY` are set.
+- **The default certificate is self-signed.**
+- **JWT signing-key rotation is manual** ([PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)).
+- **No data-residency or retention policy** is enforced for audit, telemetry or AI data.
+  With a local LLM provider nothing leaves the host; a hosted provider sends prompts to it.
+- **BMC credentials** for bare-metal power are encrypted at rest only when
+  `MACHINA_API_KEY_MASTER_KEY` is set; the fencing password in `hosts.ipmi_password`
+  is still stored as plaintext.
