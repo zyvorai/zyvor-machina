@@ -131,6 +131,19 @@ The `libvirt` driver only touches domains named `metal-test-*` unless
 `MACHINA_BMC_LIBVIRT_PREFIX` or `MACHINA_BMC_LIBVIRT_ANY=1` says otherwise, so a mistyped
 address cannot power off a real VM on the host.
 
+### Attaching or changing BMC details
+
+```
+PUT /api/v1/baremetal/servers/{id}/bmc   (admin, audited)
+{"bmc_type": "redfish", "bmc_address": "10.20.0.14", "bmc_username": "admin",
+ "bmc_password": "…", "boot_method": "virtual_media"}
+machinactl metal bmc-set <id> --type redfish --address 10.20.0.14 --user admin   # password from $MACHINA_BMC_PASSWORD
+```
+
+An auto-enrolled machine has a MAC and nothing else, so power calls are refused until its
+BMC is set here. The same validation as registration applies; an empty `bmc_password` keeps
+the stored one and an empty `boot_method` leaves it as it was.
+
 ### Finding and enrolling BMCs in bulk
 
 ```
@@ -466,6 +479,7 @@ All under `/api/v1/baremetal` unless noted. `operator` and `admin` are Machina r
 | `GET /servers`, `POST /servers` | operator, admin | list; register |
 | `POST /import` | admin | bulk registration (≤500) |
 | `POST /discover` | admin | scan a range for BMCs, optionally register |
+| `PUT /servers/{id}/bmc` | admin | attach or change BMC type, address, login (audited) |
 | `POST /servers/{id}/power` | admin | on, off, cycle, reset (`dry_run`) |
 | `GET /servers/{id}/power-state` | operator | what the BMC says |
 | `POST /servers/{id}/boot-device` | admin | pxe, disk, cdrom |
@@ -496,6 +510,7 @@ All under `/api/v1/baremetal` unless noted. `operator` and `admin` are Machina r
 |---|---|
 | `list`, `zones` | servers (lifecycle, zone, power, MAC, BMC, error); counts per zone |
 | `add HOSTNAME --bmc ADDR [--type] [--user] [--mac] [--zone]` | register (password from `$MACHINA_BMC_PASSWORD`) |
+| `bmc-set ID --type T --address A [--user U] [--boot-method M]` | attach or change BMC details |
 | `import --csv FILE` | bulk registration |
 | `discover --cidr NET [--import] [--prefix] [--zone] [--scheme] [--port]` | scan (credentials from `$MACHINA_BMC_CREDENTIALS`) |
 | `commission ID`, `inventory ID` | commissioning and its report |

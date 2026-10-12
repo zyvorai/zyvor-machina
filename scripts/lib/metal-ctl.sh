@@ -11,6 +11,9 @@ machinactl metal <command>
   list                                     Servers: lifecycle, zone, power state
   add HOSTNAME --bmc ADDR [--type redfish|ipmi|fake] [--user U] [--mac MAC] [--zone Z]
                                            (BMC password from $MACHINA_BMC_PASSWORD)
+  bmc-set ID --type redfish|ipmi|libvirt|fake --address A [--user U] [--boot-method pxe|virtual_media|virtual_media_uefi]
+                                           Attach BMC details (auto-enrolled machines have none);
+                                           password from $MACHINA_BMC_PASSWORD, empty keeps the stored one
   commission ID                            Start commissioning; prints the one-time token
   inventory ID                             Hardware report from commissioning
   power ID on|off|cycle|reset [--dry-run]  Power through the BMC
@@ -68,6 +71,24 @@ metal_main() {
                   mac_address:$m, zone:$z}' |
                 np_api POST /baremetal/servers -H 'Content-Type: application/json' --data-binary @- |
                 jq '{id, hostname, lifecycle, zone, mac_address, bmc_credentials_configured}'
+            ;;
+        bmc-set)
+            local id="${1:-}" type="" addr="" user="" bm=""
+            [[ -n "$id" ]] || np_die "usage: metal bmc-set ID --type T --address A [--user U]"
+            shift
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --type) type=${2:-}; shift 2 ;;
+                    --address) addr=${2:-}; shift 2 ;;
+                    --user) user=${2:-}; shift 2 ;;
+                    --boot-method) bm=${2:-}; shift 2 ;;
+                    *) np_die "unknown option $1" ;;
+                esac
+            done
+            [[ -n "$type" ]] || np_die "bmc-set needs --type"
+            BMC_PW="${MACHINA_BMC_PASSWORD:-}" jq -n --arg t "$type" --arg a "$addr" --arg u "$user" --arg b "$bm" \
+                '{bmc_type:$t, bmc_address:$a, bmc_username:$u, bmc_password:(env.BMC_PW // ""), boot_method:$b}' |
+                np_api PUT "/baremetal/servers/$id/bmc" -H 'Content-Type: application/json' --data-binary @- | jq .
             ;;
         commission)
             [[ -n "${1:-}" ]] || np_die "usage: metal commission ID"
