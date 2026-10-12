@@ -81,6 +81,21 @@ sudo machina-agent join --controller https://<controller-host>:5093 --token <enr
 
 Tokens are single-use and can expire; the host appears as *pending validation* until the controller has reached its agent.
 
+### Many nodes, labels, and machines with no OS yet
+
+- `sudo machinactl bootstrap --public-url https://<controller>:5093 --tls-addr 0.0.0.0:5094` sets
+  `MACHINA_PUBLIC_URL` and the join listener in `/etc/default/machina-platform` (mode 0600),
+  restarts the controller if they changed, publishes the agent and waits for health. Run it once.
+- `machinactl host add --file hosts.txt --parallel 8 --site fra1 --rack r12 --tag gpu --network br-prod --pool ssd-pool`
+  joins many nodes over SSH, one single-use token each. `site`, `rack`, `tags` are set when
+  the host joins; the named, existing networks and storage pools are set up once it passes
+  validation (each outcome is in the host's join log). The same fields exist on
+  `POST /api/v1/enrollment/tokens` (`cluster_id`, `site`, `rack`, `tags`, `networks`, `storage_pools`).
+- Offline: `sudo ./install.sh --agent --join https://<controller>:5094 --token-file /root/join.token --ca-sha256 <fp>`
+  installs from the bundle and joins in one step (libvirt and QEMU must already be there).
+- Bare machines with no OS: [baremetal-provisioning.md](baremetal-provisioning.md) takes them
+  from a BMC address to a joined host (discover, commission, deploy an image, join).
+
 ## Compatibility
 
 The release is built on **Ubuntu 22.04** (glibc 2.35, libvirt 8.0), so the binaries need **glibc 2.34 or newer** and

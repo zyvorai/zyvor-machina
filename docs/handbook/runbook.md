@@ -103,6 +103,21 @@ curl -sk -b /tmp/machina.jar https://127.0.0.1:5092/api/v1/auth/session | jq
 2. Common fixes: start libvirtd, install qemu-kvm, open 49152–49215/tcp between nodes.
 3. Re-run `POST /api/v1/hosts/{id}/validate`.
 
+### Bare-metal provisioning stuck
+
+Guide and full troubleshooting table: [baremetal-provisioning.md](../baremetal-provisioning.md).
+
+1. `machinactl metal list`: look at `LIFECYCLE`, `POWER` and `ERROR` (`last_error`) for the server.
+2. **Stays `commissioning` or `deploying`:** the machine did not reach the boot service.
+   Check its MAC is registered (`mac_address`), that it booted from the network or the virtual
+   CD (`machinactl metal power ID cycle`; `POST …/boot-device` `pxe`), and that the BMC is
+   reachable (`GET …/power-state`).
+3. **`failed`:** `last_error` says why (a commissioning test, a checksum mismatch, not
+   enough RAM to stage the image). Fix it, then `machinactl metal commission ID` again.
+4. **Deployed but never joins:** on the node `cloud-init status` and `journalctl -u machina-agent`;
+   the controller's TLS join listener must be reachable. The host's join log lists each step.
+5. **Release a machine:** `machinactl metal release ID` (allocated or deployed → ready).
+
 ### Rolling agent upgrade
 
 1. Put the host in maintenance (optionally evacuate).

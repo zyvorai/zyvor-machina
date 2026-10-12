@@ -2753,7 +2753,20 @@ async fn storage_pool_provision(state: &AppState, msg: &TaskMessage) -> anyhow::
         .ok_or_else(|| anyhow::anyhow!("storage pool path required"))?;
     let agent_addr = host_agent_addr(&state.pool, host_id).await?;
     let mut client = agent_client::connect(&agent_addr).await?;
-    agent_client::provision_storage_pool(&mut client, &row.0, &row.1, &path).await?;
+    let res = agent_client::provision_storage_pool(&mut client, &row.0, &row.1, &path).await;
+    // The join log of a joined host says whether what its token asked for really happened.
+    crate::api::join_events::record_for_host(
+        &state.pool,
+        host_id,
+        if res.is_ok() { "ok" } else { "error" },
+        "provision",
+        &match &res {
+            Ok(_) => format!("storage pool '{}' is ready on this host", row.0),
+            Err(e) => format!("storage pool '{}' could not be set up: {e:#}", row.0),
+        },
+    )
+    .await;
+    res?;
     crate::db::query("UPDATE storage_pools SET path = COALESCE(path, ?) WHERE id = ?")
         .bind(&path)
         .bind(pool_id)
@@ -2792,8 +2805,21 @@ async fn network_provision(state: &AppState, msg: &TaskMessage) -> anyhow::Resul
     let bridge = row.3.unwrap_or_else(|| "virbr0".into());
     let agent_addr = host_agent_addr(&state.pool, host_id).await?;
     let mut client = agent_client::connect(&agent_addr).await?;
-    agent_client::provision_network(&mut client, &row.0, &row.1, row.2.unwrap_or(0), &bridge)
-        .await?;
+    let res =
+        agent_client::provision_network(&mut client, &row.0, &row.1, row.2.unwrap_or(0), &bridge)
+            .await;
+    crate::api::join_events::record_for_host(
+        &state.pool,
+        host_id,
+        if res.is_ok() { "ok" } else { "error" },
+        "provision",
+        &match &res {
+            Ok(_) => format!("network '{}' is ready on this host (bridge {bridge})", row.0),
+            Err(e) => format!("network '{}' could not be set up: {e:#}", row.0),
+        },
+    )
+    .await;
+    res?;
     update_task_progress(&state.pool, msg.task_id, 100, "network provisioned").await?;
     Ok(())
 }

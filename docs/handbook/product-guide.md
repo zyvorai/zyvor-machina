@@ -100,6 +100,10 @@ The install/manage/demo CLI at the repo root. It auto-escalates to root via
 | `demo` | Interactive REST API demo |
 | `audit verify [N]` | Verify the signed audit log (via API or local file) |
 | `integrations` | Show KubeVirt/k8s/automation status |
+| `bootstrap` | Controller: set the public URL and pinned-TLS join listener, publish the agent, wait until ready |
+| `host list\|add\|drain\|undrain\|remove` | Fleet nodes; `host add USER@HOST… \| --file hosts.txt --parallel N --site --rack --tag --network --pool` joins many over SSH |
+| `metal …` | Bare-metal provisioning: `discover`, `import`, `commission`, `power`, `allocate`, `deploy`, `image`, `profile`, `provision` (see [baremetal-provisioning.md](../baremetal-provisioning.md)) |
+| `dist publish\|publish-metal\|status` | Publish the agent and the bare-metal ramdisk/ISOs for joining nodes |
 
 There is also `scripts/platformctl` — a thin CLI over the **controller** REST API
 (`${MACHINA_CONTROLLER_URL:-http://127.0.0.1:5093}`): `health`, `hosts`,
@@ -291,6 +295,20 @@ desired-state reconciliation, a task bus (in-memory or NATS), and the AI
 engine behind Zyra AI. See [../controller-ha.md](../controller-ha.md),
 [../daemon-peer-fleet.md](../daemon-peer-fleet.md) and the
 [operator runbook](runbook.md).
+
+### Bare-metal provisioning
+
+Machines with no OS yet go from a BMC address to a joined host without hand-copied media:
+discover or import BMCs (Redfish, IPMI), commission them over PXE or BMC virtual media, keep
+a pool by zone, write a checksum-verified OS image (Ubuntu 26.04/24.04/22.04, Debian 12/13,
+Rocky 9, AlmaLinux 9) to the smallest suitable disk, and let the machine join on first boot
+over the controller's pinned TLS listener with its site, tags, networks and storage pools.
+A profile names what a machine of a kind gets (`machinactl metal provision --profile web
+--count 8`) and can keep N deployed. BMC calls are idempotent, read the real power state, set
+the next boot device, and include a Redfish read model (health, sensors, firmware, log) and
+an IPMI serial-over-LAN console. Guide:
+[../baremetal-provisioning.md](../baremetal-provisioning.md); what has actually run:
+[../claims.md](../claims.md) C49 to C51.
 
 ### Integrations
 

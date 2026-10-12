@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-10-12 — Bare-metal provisioning: BMCs to joined hosts
+
+See [docs/baremetal-provisioning.md](docs/baremetal-provisioning.md). Claims C49 to C51.
+
+- **Pipeline.** Discover or import BMCs, commission them (PXE or Redfish virtual media), pool by zone, allocate,
+  deploy a checksum-verified OS image (or an Ubuntu/RHEL-family installer), join over the pinned TLS listener with
+  site/rack/tags and named networks and pools. Profiles, one-step `provision`, auto top-up, opt-in auto-enrol
+  (#145, #146, #154, #152).
+- **BMC control.** Redfish and IPMI power are idempotent and read back the real state; boot-device override;
+  virtual media; a Redfish read model (health, temperatures, power, firmware, log); an IPMI serial-over-LAN
+  console; `host:port`; a `cycle` fallback. BMC and fencing passwords are encrypted at rest (#148, #150, #151,
+  #153, #154, #155).
+- **Images.** Catalog (Ubuntu 26.04/24.04/22.04, Debian 12/13, Rocky 9, AlmaLinux 9) with upstream-checksum
+  verification, retries and `Range` serving (#146, #147).
+- **Operators.** `machinactl bootstrap`, `host add --file --parallel`, `metal …`, bundle `install.sh --join` (#146).
+- **Verification.** The flow has run end to end against VMs and BMC emulators (sushy-tools, VirtualBMC) on a lab
+  host; nothing has run on physical servers or BMCs. Migrations 074 to 083.
+- **Fixed on the way.** `main` did not compile at #145 (a private module); `machinactl bootstrap` rejected every
+  URL (a bracket expression); IPMI addresses with a port; a plain-http join left the agent on loopback.
+
 ## 2026-10-08 — EC2 compatibility: one endpoint, four services, one reference
 
 See [docs/cloud-ec2-api.md](docs/cloud-ec2-api.md) and [docs/cloud-ec2-clients.md](docs/cloud-ec2-clients.md).

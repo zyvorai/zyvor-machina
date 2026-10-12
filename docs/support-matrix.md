@@ -24,17 +24,32 @@ Sources: [INSTALL.md](INSTALL.md), `install.sh`, `packaging/nfpm/`,
 Hardware needs KVM. Preflight (`machinactl preflight`) checks KVM, BTF, cgroup v2,
 ports, disk, memory and the clock.
 
-## Bare-metal management (BMC)
+## Bare-metal management (BMC) and provisioning
 
-| Interface | Status |
+Guide: [baremetal-provisioning.md](baremetal-provisioning.md). Status per claim:
+[claims.md](claims.md) C49 to C51. "Emulator" below means a lab host with sushy-tools
+(Redfish, libvirt-backed) or VirtualBMC (IPMI, libvirt-backed) driving throwaway VMs.
+
+| Interface | Capabilities | Verified on |
+|---|---|---|
+| Redfish | power on/off/cycle/reset (idempotent, `ResetType` from the BMC's allowed list, async tasks, retries), power-state read-back, boot-device override, virtual media (InsertMedia/EjectMedia), read model (identity, health, temperatures, power, firmware, log) | power, state, override, virtual media: **emulator**; read model: mock server only |
+| IPMI (`ipmitool` lanplus) | power, power-state, boot device, `host:port`, `cycle` fallback, serial-over-LAN console | power, state, boot device, port, cycle fallback: **emulator** (VirtualBMC); SOL: pty round trip with a stand-in `ipmitool` |
+| libvirt (lab only) | power, power-state for `metal-test-*` domains | lab host |
+| Vendors (Dell iDRAC, HPE iLO, Supermicro, Lenovo XCC, OpenBMC) | none validated on hardware | record the models you test in `claims.md` C51 |
+
+| Provisioning step | Verified on |
 |---|---|
-| IPMI (`ipmitool`, lanplus) | Fencing and power code exist; **never run against real hardware** |
-| Redfish | Power on/off/cycle/reset implemented; unit-tested only; no vendor validated |
-| Vendors (Dell iDRAC, HPE iLO, Supermicro, Lenovo XCC) | None validated. Record the models you test in `claims.md` C49 |
+| PXE (proxyDHCP/TFTP config) and iPXE chain | VM: the controller-rendered iPXE script; the dnsmasq config is unit-tested only |
+| Virtual media boot (BIOS iPXE ISO) | sushy-tools + VM; the UEFI ISO builds but has not booted |
+| Commissioning ramdisk, inventory, `ready` | VM |
+| Image deploy (Ubuntu 26.04), cloud-init seed, first-boot join over pinned TLS | VM |
+| OS image catalog (Ubuntu 26.04/24.04/22.04, Debian 12/13, Rocky 9, AlmaLinux 9) | imported and checksum-verified on the lab host; `ubuntu-26.04-arm64` not imported |
+| `bootstrap`, `host add --file --parallel`, join labels, post-join networks and pools | two VMs and one VM |
+| Installer deploy (autoinstall, kickstart) | rendering is unit-tested; no installer was run |
 
-Network boot (PXE/iPXE) and OS deploy are described in
-[baremetal-provisioning.md](baremetal-provisioning.md); none of it has run on real
-hardware yet.
+What the controller host needs: `ipmitool` (IPMI power, SOL), util-linux `script` (SOL),
+`virsh` (libvirt driver, labs only). Ramdisk and ISO builds need a Linux build host with
+mkosi (ramdisk) or git/make/gcc/xorriso (iPXE ISOs).
 
 ## Database
 
