@@ -9,7 +9,8 @@ use serde::Deserialize;
 use crate::api::ApiError;
 use crate::auth::{require_admin, require_operator, AuthUser};
 use crate::engine::{
-    baremetal, baremetal_alloc, baremetal_boot, baremetal_deploy, baremetal_lifecycle,
+    baremetal, baremetal_alloc, baremetal_boot, baremetal_deploy, baremetal_images,
+    baremetal_lifecycle, baremetal_profiles,
 };
 use crate::state::AppState;
 
@@ -201,17 +202,37 @@ pub async fn boot_ipxe(
         .await
         .map_err(|e| ApiError::internal(e.to_string()))?
     {
-        Some((id, token)) => Ok(text(baremetal_boot::ipxe_commission_script(
-            &base,
-            id,
-            &token,
-            &format!("{base}/dist"),
-        ))),
+        Some((id, token)) => {
+            // Pin the controller CA when there is one (the ramdisk verifies it by this).
+            let ca = crate::pki::ca_info().ok().map(|(_, fp)| fp);
+            Ok(text(baremetal_boot::ipxe_commission_script(
+                &base,
+                id,
+                &token,
+                &format!("{base}/dist"),
+                ca.as_deref(),
+            )))
+        }
         None => {
             if let Some((id, os, token)) = baremetal_deploy::deploy_boot_target(&state.pool, &q.mac)
                 .await
                 .map_err(|e| ApiError::internal(e.to_string()))?
             {
+                // An imported image: boot the ramdisk, which writes it to disk.
+                if baremetal_images::get(&state.pool, &os)
+                    .await
+                    .map_err(|e| ApiError::internal(e.to_string()))?
+                    .is_some()
+                {
+                    let ca = crate::pki::ca_info().ok().map(|(_, fp)| fp);
+                    return Ok(text(baremetal_boot::ipxe_image_deploy_script(
+                        &base,
+                        id,
+                        &token,
+                        &format!("{base}/dist"),
+                        ca.as_deref(),
+                    )));
+                }
                 let kind = baremetal_deploy::install_kind(&os)
                     .map_err(|e| ApiError::internal(e.to_string()))?;
                 let repo = std::env::var("MACHINA_METAL_RHEL_REPO").unwrap_or_default();
@@ -371,4 +392,188 @@ pub async fn zones(
         .await
         .map_err(|e| ApiError::internal(e.to_string()))
         .map(Json)
+}
+
+pub async fn list_images(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_operator(&actor)?;
+    let images = baremetal_images::list(&state.pool)
+        .await
+        .map_err(|e| ApiError::internal(e.to_string()))?;
+    let catalog: Vec<serde_json::Value> = baremetal_images::CATALOG
+        .iter()
+        .map(|c| {
+            serde_json::json!({
+                "name": c.name, "os": c.os, "arch": c.arch, "format": c.format,
+                "url": c.url, "checksum_algo": c.algo.as_str(),
+            })
+        })
+        .collect();
+    Ok(Json(
+        serde_json::json!({ "images": images, "catalog": catalog }),
+    ))
+}
+
+/// Import a catalog image by name (`{"name": "ubuntu-26.04"}`) or a URL with a checksum.
+/// Returns at once with `status: downloading`; poll `GET /baremetal/images`.
+pub async fn import_image(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Json(body): Json<baremetal_images::ImportRequest>,
+) -> Result<
+    (
+        axum::http::StatusCode,
+        Json<baremetal_images::BaremetalImage>,
+    ),
+    ApiError,
+> {
+    require_admin(&actor)?;
+    let img = baremetal_images::start_import(&state.pool, &body)
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    Ok((axum::http::StatusCode::ACCEPTED, Json(img)))
+}
+
+pub async fn delete_image(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&actor)?;
+    baremetal_images::delete(&state.pool, &name)
+        .await
+        .map_err(|e| ApiError::not_found(e.to_string()))?;
+    Ok(Json(serde_json::json!({ "deleted": name })))
+}
+
+pub async fn boot_deploy_script() -> axum::response::Response {
+    text(baremetal_boot::DEPLOY_SCRIPT.to_string())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DiskQuery {
+    #[serde(default)]
+    pub disk: String,
+}
+
+/// The deploy plan, for the ramdisk. The token in the path is the one minted at PXE time.
+pub async fn deploy_plan(
+    State(state): State<AppState>,
+    Path((id, token)): Path<(uuid::Uuid, String)>,
+    axum::extract::Query(q): axum::extract::Query<DiskQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let base = state
+        .config
+        .public_base_url
+        .trim_end_matches('/')
+        .to_string();
+    let hint = (!q.disk.is_empty()).then_some(q.disk.as_str());
+    match baremetal_deploy::image_plan(&state.pool, id, &token, &base, hint).await {
+        Ok(Some(v)) => Ok(Json(v)),
+        Ok(None) => Err(ApiError::not_found("no deploy plan")),
+        Err(e) => Err(ApiError::bad_request(e.to_string())),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DeployReport {
+    pub status: String,
+    #[serde(default)]
+    pub message: String,
+}
+
+pub async fn deploy_complete(
+    State(state): State<AppState>,
+    Path(id): Path<uuid::Uuid>,
+    headers: axum::http::HeaderMap,
+    Json(body): Json<DeployReport>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let token = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .unwrap_or("");
+    baremetal_deploy::report_deploy(&state.pool, id, token, &body.status, &body.message)
+        .await
+        .map_err(|e| ApiError::forbidden(e.to_string()))?;
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+pub async fn list_profiles(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+) -> Result<Json<Vec<baremetal_profiles::Profile>>, ApiError> {
+    require_operator(&actor)?;
+    baremetal_profiles::list(&state.pool)
+        .await
+        .map_err(|e| ApiError::internal(e.to_string()))
+        .map(Json)
+}
+
+pub async fn put_profile(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Json(body): Json<baremetal_profiles::ProfileBody>,
+) -> Result<Json<baremetal_profiles::Profile>, ApiError> {
+    require_admin(&actor)?;
+    baremetal_profiles::upsert(&state.pool, &body)
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))
+        .map(Json)
+}
+
+pub async fn delete_profile(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&actor)?;
+    baremetal_profiles::delete(&state.pool, &name)
+        .await
+        .map_err(|e| ApiError::not_found(e.to_string()))?;
+    Ok(Json(serde_json::json!({ "deleted": name })))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProvisionBody {
+    pub profile: String,
+    #[serde(default = "one")]
+    pub count: usize,
+}
+
+fn one() -> usize {
+    1
+}
+
+/// Allocate and deploy `count` machines for a profile in one call.
+pub async fn provision(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Json(body): Json<ProvisionBody>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&actor)?;
+    if body.count == 0 || body.count > 100 {
+        return Err(ApiError::bad_request("count must be between 1 and 100"));
+    }
+    let base = state
+        .config
+        .public_base_url
+        .trim_end_matches('/')
+        .to_string();
+    let (started, stopped) = baremetal_profiles::provision(
+        &state.pool,
+        &body.profile,
+        body.count,
+        &actor.username,
+        &base,
+    )
+    .await
+    .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    Ok(Json(serde_json::json!({
+        "requested": body.count,
+        "started": started,
+        "stopped_because": stopped,
+    })))
 }

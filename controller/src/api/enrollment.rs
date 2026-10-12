@@ -27,6 +27,21 @@ pub struct EnrollmentTokenResponse {
 pub struct CreateEnrollmentRequest {
     #[serde(default)]
     pub ttl_hours: i64,
+    /// Join this cluster instead of the first one.
+    #[serde(default)]
+    pub cluster_id: Option<Uuid>,
+    /// Placement set on the host when it joins.
+    #[serde(default)]
+    pub site: String,
+    #[serde(default)]
+    pub rack: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// Existing networks / storage pools (by name) to set up on the host once it validates.
+    #[serde(default)]
+    pub networks: Vec<String>,
+    #[serde(default)]
+    pub storage_pools: Vec<String>,
 }
 
 pub async fn create_enrollment_token(
@@ -45,17 +60,43 @@ pub async fn create_enrollment_token(
     };
     let token = format!("join-{}", Uuid::new_v4());
     let expires = Utc::now() + Duration::hours(ttl);
-    let cluster_id: Uuid = crate::db::query_scalar("SELECT id FROM clusters LIMIT 1")
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or_else(|| ApiError::internal("no cluster configured"))?;
+    let cluster_id: Uuid = match req.cluster_id {
+        Some(c) => crate::db::query_scalar("SELECT id FROM clusters WHERE id = ?")
+            .bind(c)
+            .fetch_optional(&state.pool)
+            .await?
+            .ok_or_else(|| ApiError::bad_request("cluster_id does not exist"))?,
+        None => crate::db::query_scalar("SELECT id FROM clusters LIMIT 1")
+            .fetch_optional(&state.pool)
+            .await?
+            .ok_or_else(|| ApiError::internal("no cluster configured"))?,
+    };
+    let tags = crate::engine::host_post_join::clean_names(&req.tags).map_err(ApiError::bad_request)?;
+    let networks =
+        crate::engine::host_post_join::clean_names(&req.networks).map_err(ApiError::bad_request)?;
+    let pools = crate::engine::host_post_join::clean_names(&req.storage_pools)
+        .map_err(ApiError::bad_request)?;
+    for (what, v) in [("site", &req.site), ("rack", &req.rack)] {
+        if v.len() > 64 || v.chars().any(|c| c.is_control()) {
+            return Err(ApiError::bad_request(format!("invalid {what}")));
+        }
+    }
 
-    crate::db::query("INSERT INTO enrollment_tokens (token, cluster_id, expires_at) VALUES (?, ?, ?)")
-        .bind(&token)
-        .bind(cluster_id)
-        .bind(expires)
-        .execute(&state.pool)
-        .await?;
+    crate::db::query(
+        "INSERT INTO enrollment_tokens
+         (token, cluster_id, expires_at, site, rack, tags, networks, storage_pools)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&token)
+    .bind(cluster_id)
+    .bind(expires)
+    .bind(req.site.trim())
+    .bind(req.rack.trim())
+    .bind(serde_json::to_string(&tags).unwrap_or_else(|_| "[]".into()))
+    .bind(serde_json::to_string(&networks).unwrap_or_else(|_| "[]".into()))
+    .bind(serde_json::to_string(&pools).unwrap_or_else(|_| "[]".into()))
+    .execute(&state.pool)
+    .await?;
 
     // Use the configured public URL (MACHINA_PUBLIC_URL) for the join command —
     // `state.config.host` is the bind address, which is typically 0.0.0.0 and thus

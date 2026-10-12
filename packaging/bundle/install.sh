@@ -8,11 +8,13 @@
 # packages (the host may be air-gapped); it checks for what Machina needs and says exactly what is missing.
 #
 #   sudo ./install.sh [--all | --controller | --agent | --daemon] [--no-start] [--bind 0.0.0.0]
+#   sudo ./install.sh --agent --join https://CTL:5094 --token join-... [--ca-sha256 FP] [--no-expose]
+#       (--token-file F reads the token from a file, so it is not on the command line)
 #   sudo ./install.sh --uninstall [--purge]
 set -eu
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ROLES=""; START=1; BIND=""; UNINSTALL=0; PURGE=0
+ROLES=""; START=1; BIND=""; UNINSTALL=0; PURGE=0; JOIN=""; TOKEN=""; CA_FP=""; EXPOSE=1
 while [ $# -gt 0 ]; do
     case "$1" in
         --all) ROLES="daemon controller agent" ;;
@@ -23,12 +25,22 @@ while [ $# -gt 0 ]; do
         --bind) BIND="$2"; shift ;;
         --uninstall) UNINSTALL=1 ;;
         --purge) PURGE=1 ;;
-        -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --join) JOIN="$2"; shift ;;
+        --token) TOKEN="$2"; shift ;;
+        --token-file) TOKEN="$(cat "$2")" || exit 1; shift ;;
+        --ca-sha256) CA_FP="$2"; shift ;;
+        --no-expose) EXPOSE=0 ;;
+        -h|--help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
     shift
 done
 [ -n "$ROLES" ] || ROLES="daemon controller agent"
+if [ -n "$JOIN" ]; then
+    [ -n "$TOKEN" ] || { echo "--join needs --token (or --token-file)" >&2; exit 2; }
+    has_role_early() { case " $ROLES " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
+    has_role_early agent || { echo "--join needs the agent role (--agent or --all)" >&2; exit 2; }
+fi
 [ "$(id -u)" = 0 ] || { echo "run as root (sudo ./install.sh)" >&2; exit 1; }
 
 say() { printf '  %s\n' "$*"; }
@@ -108,9 +120,20 @@ if [ "$START" = 1 ] && systemd_up; then
     has_role daemon && systemctl enable --now machina-backup.timer >/dev/null 2>&1 || true
 fi
 
+# 5. Join the fleet (the agent role, when asked): the same call install.sh from a controller makes.
+if [ -n "$JOIN" ]; then
+    echo
+    say "joining $JOIN"
+    set -- join --controller "$JOIN" --token "$TOKEN"
+    [ -z "$CA_FP" ] || set -- "$@" --ca-sha256 "$CA_FP"
+    [ "$EXPOSE" = 0 ] || set -- "$@" --expose
+    /usr/local/bin/machina-agent "$@" || die "the agent could not join $JOIN (token single use: mint a new one)"
+    say "joined; check on the controller: machinactl host list"
+fi
+
 echo
 echo "Done."
 has_role daemon && echo "  Web UI:   https://$(hostname -f 2>/dev/null || hostname):5092  (self-signed certificate until you add your own)"
 [ -f /etc/machina/INITIAL_ADMIN_PASSWORD ] && echo "  Sign in:  cat /etc/machina/INITIAL_ADMIN_PASSWORD   (root only — change it after first login)"
-has_role agent && ! has_role controller && echo "  Enrol this host: machina-agent join --controller URL --token TOKEN"
+[ -z "$JOIN" ] && has_role agent && ! has_role controller && echo "  Enrol this host: machina-agent join --controller URL --token TOKEN"
 exit 0

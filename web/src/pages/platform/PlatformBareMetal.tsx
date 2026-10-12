@@ -22,6 +22,14 @@ import {
   commissionBaremetalServer,
   releaseBaremetalServer,
   setBaremetalLifecycle,
+  listBaremetalImages,
+  importBaremetalImage,
+  deleteBaremetalImage,
+  listBaremetalProfiles,
+  provisionBaremetal,
+  type BaremetalCatalogImage,
+  type BaremetalImage,
+  type BaremetalProfile,
   type BaremetalServer,
   type BmcPowerBody,
 } from '../../api/platform'
@@ -51,11 +59,26 @@ export default function PlatformBareMetal() {
   const [saving, setSaving] = useState(false)
   const [pendingPower, setPendingPower] = useState<{ id: string; name: string; action: PowerAction } | null>(null)
 
+  const [images, setImages] = useState<BaremetalImage[]>([])
+  const [catalog, setCatalog] = useState<BaremetalCatalogImage[]>([])
+  const [profiles, setProfiles] = useState<BaremetalProfile[]>([])
+  const [catalogPick, setCatalogPick] = useState('')
+  const [provisionCount, setProvisionCount] = useState<Record<string, number>>({})
+
   const load = useCallback(async () => {
     setError(null)
     setLoading(true)
     try {
       setServers(await listBaremetalServers())
+      // Images and profiles are secondary: a failure there must not hide the server list.
+      try {
+        const [img, prof] = await Promise.all([listBaremetalImages(), listBaremetalProfiles()])
+        setImages(img.images)
+        setCatalog(img.catalog)
+        setProfiles(prof)
+      } catch {
+        /* older controller without the image catalog */
+      }
     } catch (e: unknown) {
       setError(formatUserError(e))
     } finally {
@@ -128,6 +151,43 @@ export default function PlatformBareMetal() {
       toast.error(formatUserError(e))
     } finally {
       setActionInProgress(null)
+    }
+  }
+
+  const handleImport = async () => {
+    if (!catalogPick) return
+    setSaving(true)
+    try {
+      await importBaremetalImage({ name: catalogPick })
+      toast.success(`${catalogPick}: download started, verified against the upstream checksum`)
+      setCatalogPick('')
+      await load()
+    } catch (e: unknown) {
+      toast.error(formatUserError(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteImage = async (name: string) => {
+    try {
+      await deleteBaremetalImage(name)
+      await load()
+    } catch (e: unknown) {
+      toast.error(formatUserError(e))
+    }
+  }
+
+  const handleProvision = async (profile: string) => {
+    const count = provisionCount[profile] ?? 1
+    try {
+      const r = await provisionBaremetal(profile, count)
+      const msg = `${r.started.length} of ${r.requested} deploying`
+      if (r.stopped_because) toast.warning(`${msg}: ${r.stopped_because}`)
+      else toast.success(msg)
+      await load()
+    } catch (e: unknown) {
+      toast.error(formatUserError(e))
     }
   }
 
@@ -258,6 +318,97 @@ export default function PlatformBareMetal() {
                 {saving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
                 Register
               </button>
+            </div>
+          </MacGlassPanel>
+        )}
+
+        <MacGlassPanel title="OS images">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <select
+              value={catalogPick}
+              onChange={(e) => setCatalogPick(e.target.value)}
+              aria-label="Catalog image"
+              className="rounded border border-border/50 bg-background/60 px-2 py-1.5 text-sm"
+            >
+              <option value="">Import a catalog image…</option>
+              {catalog
+                .filter((c) => !images.some((i) => i.name === c.name && i.status !== 'failed'))
+                .map((c) => (
+                  <option key={c.name} value={c.name}>
+                    {c.name} ({c.arch})
+                  </option>
+                ))}
+            </select>
+            <button
+              onClick={() => void handleImport()}
+              disabled={saving || !catalogPick}
+              className="px-3 py-1.5 text-sm rounded-lg bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50"
+            >
+              Import
+            </button>
+            <span className="text-xs text-[var(--text-muted)]">
+              Downloaded by the controller and verified against the upstream checksum before use.
+            </span>
+          </div>
+          {images.length === 0 ? (
+            <p className="text-sm text-[var(--text-muted)]">No images imported yet.</p>
+          ) : (
+            <div className="divide-y divide-border/40">
+              {images.map((i) => (
+                <MacListRow
+                  key={i.id}
+                  title={i.name}
+                  subtitle={`${i.arch} · ${i.format} · ${Math.round(i.size_bytes / 1048576)} MiB${i.error ? ` · ${i.error}` : ''}`}
+                  badge={
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${i.status === 'ready' ? statusBadgeClasses('ok') : i.status === 'failed' ? statusBadgeClasses('error') : 'bg-[var(--apple-fill-tertiary)] text-[var(--text-muted)]'}`}>
+                      {i.status}
+                    </span>
+                  }
+                  trailing={
+                    <button
+                      onClick={() => void handleDeleteImage(i.name)}
+                      className="px-2 py-1 text-xs rounded bg-red-500/10 text-red-600 hover:bg-red-500/20"
+                    >
+                      Delete
+                    </button>
+                  }
+                />
+              ))}
+            </div>
+          )}
+        </MacGlassPanel>
+
+        {profiles.length > 0 && (
+          <MacGlassPanel title="Deploy profiles">
+            <div className="divide-y divide-border/40">
+              {profiles.map((p) => (
+                <MacListRow
+                  key={p.name}
+                  title={p.name}
+                  subtitle={`${p.image}${p.zone ? ` · zone ${p.zone}` : ''}${p.min_cpu_cores ? ` · ≥${p.min_cpu_cores} cores` : ''}${p.auto_deploy ? ` · keeps ${p.desired_count} deployed` : ''}`}
+                  trailing={
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={provisionCount[p.name] ?? 1}
+                        onChange={(e) =>
+                          setProvisionCount((c) => ({ ...c, [p.name]: Math.max(1, Number(e.target.value) || 1) }))
+                        }
+                        aria-label={`Machines to provision for ${p.name}`}
+                        className="w-16 rounded border border-border/50 bg-background/60 px-2 py-1 text-xs"
+                      />
+                      <button
+                        onClick={() => void handleProvision(p.name)}
+                        className="px-2 py-1 text-xs rounded bg-primary/10 text-primary hover:bg-primary/20"
+                      >
+                        Provision
+                      </button>
+                    </div>
+                  }
+                />
+              ))}
             </div>
           </MacGlassPanel>
         )}

@@ -14,8 +14,11 @@ POST /api/v1/baremetal/servers   (admin)
   "bmc_username": "admin", "bmc_password": "…" }
 ```
 
-- `bmc_type` is `redfish` (default), `ipmi` or `fake`. `fake` touches no hardware
-  and is meant for tests and demos.
+- `bmc_type` is `redfish` (default), `ipmi`, `libvirt` or `fake`. `fake` touches no
+  hardware (tests, demos). `libvirt` uses a libvirt domain on the controller host as the
+  machine's BMC (`bmc_address` = domain name, via `virsh`), so the whole PXE flow can be
+  tried on a throwaway VM; it only touches domains named `metal-test-*` unless
+  `MACHINA_BMC_LIBVIRT_PREFIX` or `MACHINA_BMC_LIBVIRT_ANY=1` says otherwise.
 - The password is stored encrypted (AES-256-GCM) when `MACHINA_API_KEY_MASTER_KEY`
   is set, and is never returned. The server record shows
   `bmc_credentials_configured` and `last_error`.
@@ -137,6 +140,116 @@ PXE-boots, `/boot/ipxe` hands it the installer and the document by URL.
   (`meta-data`, `vendor-data`, `ks.cfg`); `{token}` is minted at PXE time.
 - Hostname, timezone, keys and the join command are validated before rendering; a
   value that could break out of the document is refused.
+
+## OS images
+
+Images are imported once and then written to disks by image-based deploys.
+
+```
+machinactl metal image catalog                       # names you can import
+machinactl metal image add ubuntu-26.04              # catalog image, checksum from upstream
+machinactl metal image add corp-ubuntu --url https://mirror.corp/u.img --checksum <hex>
+machinactl metal image list
+```
+
+Catalog: `ubuntu-26.04`, `ubuntu-26.04-arm64`, `ubuntu-24.04`, `ubuntu-22.04`,
+`debian-12`, `debian-13`, `rocky-9`, `almalinux-9` (cloud images from the distributions'
+own servers). The download happens in the controller, in the background
+(`status: downloading` -> `ready` or `failed` with the reason).
+
+- An image is **never kept unverified**: the checksum comes from the upstream checksum
+  file (GNU or BSD layout, SHA-256 or SHA-512) or from you; a mismatch deletes the file
+  and fails the import. A URL import with neither a `checksum` nor a `sums_url` is refused.
+- Air-gapped: import from an internal mirror by URL with an explicit checksum.
+- Files live in `$MACHINA_DIST_DIR/images/` and are served at `/dist/images/NAME` with
+  `Range` support, so a machine can resume a download. Limit per image:
+  `MACHINA_METAL_IMAGE_MAX_BYTES` (default 20 GiB).
+
+### Deploy an image to disk
+
+`POST .../servers/{id}/deploy` with `"os": "<image name>"` (an imported, `ready` image)
+deploys without any installer media. The server must be allocated, have a `mac_address`
+and have been commissioned (the inventory picks the disk).
+
+1. The machine PXE-boots the Machina ramdisk (built by `scripts/metal/build-image.sh`,
+   published with `machinactl dist publish-metal`).
+2. `contrib/metal/deploy.sh` fetches the plan
+   (`/api/v1/baremetal/boot/plan/{id}/{token}`), downloads the image **into RAM**,
+   verifies the checksum, and only then `qemu-img convert`s it to the target disk.
+   The machine needs free RAM of about the image size plus 768 MiB; it fails with a clear
+   message otherwise.
+3. Target disk: the smallest non-removable disk that holds the image (8 GiB floor).
+   `?disk=sdb` (or a serial) on the plan URL overrides.
+4. It writes a cloud-init NoCloud seed (`/var/lib/cloud/seed/nocloud`) onto the image's
+   root filesystem: key-only login for `machina`, hostname, timezone, and a first-boot
+   script running the normal join command. cloud-init also grows the root partition.
+5. It reports `written`; from then on `/boot/ipxe` answers `exit` for that machine, so a
+   reboot falls through to the disk. The host joining marks the server `deployed`.
+   A failure is reported as `failed` (server -> `failed`, reason in `last_error`).
+
+The image must contain cloud-init (all catalog images do).
+
+## Profiles, one-step provisioning and auto-enroll
+
+A profile is "what a machine of this kind gets": image, SSH keys, zone, minimum size.
+
+```
+machinactl metal profile add web --image ubuntu-26.04 --key "ssh-ed25519 AAAA… ops" --zone rack2 --cores 16
+machinactl metal provision --profile web --count 8     # allocate 8 ready machines and deploy each
+machinactl metal profile add web --image ubuntu-26.04 --key … --auto --count 8   # keep 8 deployed
+```
+
+- `provision` allocates the smallest ready machine that fits (as `allocate` does), deploys
+  it, and stops at the first shortage, reporting how many started and why it stopped.
+  A machine whose deploy cannot start is returned to `ready`.
+- With `auto_deploy` and a `desired_count`, the leader checks every
+  `MACHINA_METAL_AUTODEPLOY_SECS` (default 60, `0` = off) and tops up to the desired count
+  as machines become `ready`, at most 10 per pass. Machines allocated, deploying or
+  deployed under the profile count toward it.
+- **Auto-enroll** (`MACHINA_METAL_AUTO_ENROLL=1`, off by default): a PXE-booting machine
+  with an unknown MAC is recorded as `metal-<mac>` and commissioned straight away, so a
+  newly racked machine reaches `ready` with no registration. It has no BMC details yet,
+  so power calls are refused until you set them. With it on, any machine that can reach
+  the boot service and PXE-boots is enrolled and its hardware report accepted: enable it
+  only on a provisioning network you control.
+
+## Join labels (any join, not only bare metal)
+
+`POST /api/v1/enrollment/tokens` accepts, besides `ttl_hours`:
+
+```
+{"ttl_hours": 4, "cluster_id": "<uuid>", "site": "fra1", "rack": "r12",
+ "tags": ["gpu"], "networks": ["br-prod"], "storage_pools": ["ssd-pool"]}
+```
+
+- `cluster_id` (default: the first cluster), `site`, `rack` and `tags` are set on the host
+  when it joins.
+- `networks` and `storage_pools` are **existing** networks and pools, named. Once the host
+  has passed validation the controller queues `network.provision` and
+  `storage.pool.provision` for it, and logs each step in the join log. A name that does not
+  exist is reported there and skipped.
+- A machine deployed from bare metal joins with `site` = the zone it was allocated from.
+- Not done: validation does not yet check that the bridge or pool really exists on the host
+  afterwards, and `MACHINA_METAL`-style profiles do not carry networks or pools yet.
+
+## Machines that already have an OS
+
+```
+sudo machinactl bootstrap --public-url https://ctl.example:5093   # on the controller, once
+machinactl host add --file hosts.txt --parallel 8 --site fra1 --rack r12 \
+    --tag gpu --network br-prod --pool ssd-pool
+sudo ./install.sh --agent --join https://ctl:5094 --token-file /root/join.token --ca-sha256 <fp>   # offline bundle
+```
+
+- `bootstrap` writes `MACHINA_PUBLIC_URL` and `MACHINA_CONTROLLER_TLS_ADDR` (and
+  `_SANS`) to `/etc/default/machina-platform` (mode 0600), restarts the controller only
+  if they changed, runs `dist publish`, and waits for health. It prints what to run next.
+- `host add` mints one single-use token per host (with the labels above) and runs the
+  join command over SSH, up to `--parallel` at a time, revoking the token of any host that
+  fails and exiting non-zero with the list. Lines of `--file` are `USER@HOST`, `#` comments.
+  With a single host it keeps the interactive terminal as before.
+- The offline bundle's `install.sh` joins in the same step with `--join`; it still never
+  installs OS packages, so libvirt and QEMU must already be present.
 
 ## CLI and UI
 

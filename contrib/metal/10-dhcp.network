@@ -1,0 +1,9 @@
+[Match]
+Name=en* eth* eno* ens* enp*
+
+[Network]
+DHCP=ipv4
+LinkLocalAddressing=no
+
+[DHCPv4]
+UseDNS=yes

@@ -109,6 +109,9 @@ pub async fn register(
     if kind != BmcKind::Fake && !body.bmc_address.trim().is_empty() {
         validate_address(&body.bmc_address)?;
     }
+    if kind == BmcKind::Libvirt {
+        super::baremetal_bmc::libvirt_name_allowed(body.bmc_address.trim())?;
+    }
     let password_enc = if body.bmc_password.is_empty() {
         String::new()
     } else {
@@ -269,7 +272,7 @@ pub async fn set_power(
     .bind(id)
     .fetch_one(pool)
     .await?;
-    if kind != BmcKind::Fake && (user.is_empty() || enc.is_empty()) {
+    if !matches!(kind, BmcKind::Fake | BmcKind::Libvirt) && (user.is_empty() || enc.is_empty()) {
         anyhow::bail!(
             "BMC credentials are not set for {}; register it with bmc_username and bmc_password",
             row.hostname

@@ -57,6 +57,10 @@ pub enum BmcKind {
     Redfish,
     Ipmi,
     Fake,
+    /// A libvirt domain on the controller host acting as the machine's BMC (labs and tests:
+    /// PXE-boot a throwaway VM through the whole provisioning flow). `address` is the
+    /// domain name.
+    Libvirt,
 }
 
 impl BmcKind {
@@ -65,7 +69,10 @@ impl BmcKind {
             "redfish" | "" => Ok(Self::Redfish),
             "ipmi" => Ok(Self::Ipmi),
             "fake" => Ok(Self::Fake),
-            other => anyhow::bail!("unsupported bmc_type '{other}' (redfish, ipmi or fake)"),
+            "libvirt" => Ok(Self::Libvirt),
+            other => {
+                anyhow::bail!("unsupported bmc_type '{other}' (redfish, ipmi, libvirt or fake)")
+            }
         }
     }
 }
@@ -160,8 +167,100 @@ pub async fn power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::Resul
             action.ipmi_verb()
         )),
         BmcKind::Ipmi => ipmi_power(target, action).await,
+        BmcKind::Libvirt => libvirt_power(target, action).await,
         BmcKind::Redfish => redfish_power(target, action).await,
     }
+}
+
+/// Domains a libvirt "BMC" may touch must start with this prefix (default `metal-test-`),
+/// so a mistyped address cannot power off a real VM on the host. `MACHINA_BMC_LIBVIRT_ANY=1`
+/// lifts the rule.
+pub fn libvirt_name_allowed(name: &str) -> anyhow::Result<()> {
+    if name.is_empty()
+        || name.starts_with('-')
+        || !name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+    {
+        anyhow::bail!("invalid libvirt domain name '{name}'");
+    }
+    if matches!(
+        std::env::var("MACHINA_BMC_LIBVIRT_ANY").ok().as_deref(),
+        Some("1" | "true" | "yes")
+    ) {
+        return Ok(());
+    }
+    let prefix =
+        std::env::var("MACHINA_BMC_LIBVIRT_PREFIX").unwrap_or_else(|_| "metal-test-".into());
+    if !name.starts_with(&prefix) {
+        anyhow::bail!(
+            "libvirt domain '{name}' does not start with '{prefix}' \
+             (set MACHINA_BMC_LIBVIRT_PREFIX, or MACHINA_BMC_LIBVIRT_ANY=1 to allow any domain)"
+        );
+    }
+    Ok(())
+}
+
+async fn virsh(args: &[&str]) -> anyhow::Result<std::process::Output> {
+    let uri = std::env::var("MACHINA_BMC_LIBVIRT_URI").unwrap_or_else(|_| "qemu:///system".into());
+    let mut full = vec!["-c", uri.as_str()];
+    full.extend_from_slice(args);
+    tokio::time::timeout(
+        Duration::from_secs(30),
+        tokio::process::Command::new("virsh").args(&full).output(),
+    )
+    .await
+    .map_err(|_| anyhow::anyhow!("virsh timed out after 30s"))?
+    .map_err(|e| {
+        anyhow::anyhow!("virsh exec failed (is libvirt installed on the controller host?): {e}")
+    })
+}
+
+async fn virsh_ok(args: &[&str]) -> anyhow::Result<()> {
+    let out = virsh(args).await?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        anyhow::bail!(
+            "virsh {} failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr).trim()
+        )
+    }
+}
+
+async fn libvirt_power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::Result<String> {
+    let name = target.address.trim();
+    libvirt_name_allowed(name)?;
+    let running = async {
+        let out = virsh(&["domstate", name]).await?;
+        Ok::<bool, anyhow::Error>(
+            out.status.success() && String::from_utf8_lossy(&out.stdout).trim() == "running",
+        )
+    };
+    match action {
+        PowerAction::On => {
+            if !running.await? {
+                virsh_ok(&["start", name]).await?;
+            }
+        }
+        PowerAction::Off => {
+            if running.await? {
+                virsh_ok(&["destroy", name]).await?;
+            }
+        }
+        PowerAction::Reset => virsh_ok(&["reset", name]).await?,
+        PowerAction::Cycle => {
+            if running.await? {
+                virsh_ok(&["destroy", name]).await?;
+            }
+            virsh_ok(&["start", name]).await?;
+        }
+    }
+    Ok(format!(
+        "libvirt domain {name}: power {}",
+        action.ipmi_verb()
+    ))
 }
 
 async fn ipmi_power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::Result<String> {
@@ -287,6 +386,22 @@ mod tests {
         assert_eq!(BmcKind::parse("").unwrap(), BmcKind::Redfish);
         assert_eq!(BmcKind::parse("IPMI").unwrap(), BmcKind::Ipmi);
         assert!(BmcKind::parse("amt").is_err());
+        assert_eq!(BmcKind::parse("libvirt").unwrap(), BmcKind::Libvirt);
+    }
+
+    #[test]
+    fn libvirt_domains_are_limited_to_the_test_prefix() {
+        // Env vars are process-wide; this test only reads the default rule.
+        if std::env::var("MACHINA_BMC_LIBVIRT_ANY").is_ok()
+            || std::env::var("MACHINA_BMC_LIBVIRT_PREFIX").is_ok()
+        {
+            return;
+        }
+        assert!(libvirt_name_allowed("metal-test-1").is_ok());
+        assert!(libvirt_name_allowed("asg-prod-1").is_err());
+        assert!(libvirt_name_allowed("-metal-test-1").is_err());
+        assert!(libvirt_name_allowed("metal-test-1; rm").is_err());
+        assert!(libvirt_name_allowed("").is_err());
     }
 
     #[test]

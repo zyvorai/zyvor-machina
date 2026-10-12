@@ -2516,6 +2516,10 @@ async fn host_validate_task(state: &AppState, msg: &TaskMessage) -> anyhow::Resu
         .await;
     }
     if report.ok {
+        // Networks and pools named on the enrollment token (no-op for other hosts).
+        if let Err(e) = crate::engine::host_post_join::apply(state, host_id).await {
+            tracing::warn!(host_id = %host_id, "post-join provisioning failed to queue: {e:#}");
+        }
         if let Err(e) = enqueue_task(
             state,
             "host.inventory",

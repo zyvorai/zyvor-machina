@@ -21,8 +21,8 @@ mod cluster;
 mod content;
 pub mod cpu_compat;
 mod developer;
-mod dist;
-mod enrollment;
+pub(crate) mod dist;
+pub(crate) mod enrollment;
 mod fleet_pki;
 pub(crate) mod join_events;
 mod enterprise_security;
@@ -684,6 +684,23 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/v1/baremetal/boot/dnsmasq.conf", get(baremetal::boot_dnsmasq))
         .route("/api/v1/baremetal/allocate", post(baremetal::allocate))
+        .route(
+            "/api/v1/baremetal/profiles",
+            get(baremetal::list_profiles).put(baremetal::put_profile),
+        )
+        .route(
+            "/api/v1/baremetal/profiles/{name}",
+            axum::routing::delete(baremetal::delete_profile),
+        )
+        .route("/api/v1/baremetal/provision", post(baremetal::provision))
+        .route(
+            "/api/v1/baremetal/images",
+            get(baremetal::list_images).post(baremetal::import_image),
+        )
+        .route(
+            "/api/v1/baremetal/images/{name}",
+            axum::routing::delete(baremetal::delete_image),
+        )
         .route(
             "/api/v1/baremetal/servers/{id}/deploy",
             post(baremetal::server_deploy),
@@ -2099,6 +2116,18 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/baremetal/commissioning/{id}/report",
             post(baremetal::commissioning_report),
         )
+        .route(
+            "/api/v1/baremetal/boot/deploy.sh",
+            get(baremetal::boot_deploy_script),
+        )
+        .route(
+            "/api/v1/baremetal/boot/plan/{id}/{token}",
+            get(baremetal::deploy_plan),
+        )
+        .route(
+            "/api/v1/baremetal/deploy/{id}/complete",
+            post(baremetal::deploy_complete),
+        )
         .route("/api/v1/baremetal/boot/ipxe", get(baremetal::boot_ipxe))
         .route(
             "/api/v1/baremetal/boot/install/{id}/{token}/{name}",
@@ -2133,6 +2162,7 @@ pub fn router(state: AppState) -> Router {
         .route("/install.sh", get(enrollment::install_script))
         .route("/api/v1/pki/ca", get(fleet_pki::ca))
         .route("/api/v1/pki/ca.pem", get(fleet_pki::ca_pem))
+        .route("/dist/images/{name}", get(dist::serve_image))
         .route("/dist/{name}", get(dist::serve))
         .merge(rate_limited_public)
         .merge(console::ws_routes())
@@ -2149,6 +2179,22 @@ pub fn enrollment_router(state: AppState) -> Router {
             "/api/v1/baremetal/commissioning/{id}/report",
             post(baremetal::commissioning_report),
         )
+        .route(
+            "/api/v1/baremetal/boot/plan/{id}/{token}",
+            get(baremetal::deploy_plan),
+        )
+        .route(
+            "/api/v1/baremetal/deploy/{id}/complete",
+            post(baremetal::deploy_complete),
+        )
+        .route(
+            "/api/v1/baremetal/boot/deploy.sh",
+            get(baremetal::boot_deploy_script),
+        )
+        .route(
+            "/api/v1/baremetal/boot/commission.sh",
+            get(baremetal::boot_commission_script),
+        )
         .route_layer(middleware::from_fn_with_state(
             rate_limiter,
             rate_limit_middleware,
@@ -2157,6 +2203,7 @@ pub fn enrollment_router(state: AppState) -> Router {
         .route("/api/v1/health", get(health::health))
         .route("/api/v1/pki/ca", get(fleet_pki::ca))
         .route("/api/v1/pki/ca.pem", get(fleet_pki::ca_pem))
+        .route("/dist/images/{name}", get(dist::serve_image))
         .route("/dist/{name}", get(dist::serve))
         .route("/install.sh", get(enrollment::install_script))
         .merge(joins)

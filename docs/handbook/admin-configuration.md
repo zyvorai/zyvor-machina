@@ -303,6 +303,10 @@ TLS is active only when `enabled=true` **and** both paths are non-empty.
 | `MACHINA_BPF_LINKER_BASE_URL` | `install.sh`: bpf-linker release download base (default `https://github.com/aya-rs/bpf-linker/releases/download`) | upstream |
 | `MACHINA_BMC_VERIFY_TLS` | Controller: verify Redfish BMC TLS certificates (default off: BMCs ship self-signed certificates) | off |
 | `MACHINA_METAL_RHEL_REPO` | Controller: package repository URL a kickstart install uses (required for `rhel-9`/`rocky-9`/`almalinux-9` bare-metal deploys) | unset |
+| `MACHINA_METAL_AUTO_ENROLL` | Controller: `1` records an unknown PXE-booting MAC as a bare-metal server and commissions it (default off; enable only on a provisioning network you control) | off |
+| `MACHINA_METAL_AUTODEPLOY_SECS` | Controller: seconds between bare-metal auto-deploy passes that top profiles up to their desired count (`0` = off) | 60 |
+| `MACHINA_METAL_IMAGE_MAX_BYTES` | Controller: largest OS image an import may download | 20 GiB |
+| `MACHINA_ENV_FILE` | `machinactl bootstrap`: env file to update (default `/etc/default/machina-platform`) | default |
 | `MACHINA_DB_MAX_CONNECTIONS` | PostgreSQL pool size | `20` (PostgreSQL build only) |
 | `NATS_URL` | Enables NATS task fan-out | `nats://127.0.0.1:4222` (optional) |
 | `MACHINA_AGENT_ADDR` | gRPC agent address | `http://127.0.0.1:50051` |
