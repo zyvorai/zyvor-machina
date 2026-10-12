@@ -211,7 +211,7 @@ Platform desktop has three density tiers (Normal / Power User / Advanced), switc
 ## Testing
 
 - **Rust unit tests**: `cargo test --workspace` or `cargo test -p <crate>`
-- **Web unit tests**: `cd web && npm test` (vitest)
+- **Web unit tests**: `cd web && npm test` (vitest) (needs Node 22+: on Node 20 the jsdom component tests fail to start and are skipped; `npx -y node@22 ./node_modules/vitest/vitest.mjs run` works)
 - **Web E2E**: `cd web && npm run test:e2e` (Playwright; requires a running daemon)
 - **API smoke test**: `./machinactl verify` or `VSPASS=… ./scripts/e2e-test.sh https://HOST:5092 USER`
 - **Media / guest-tools features**: `./scripts/feature-test.sh HOST USER PASS` — ISO upload+download jobs, CD-ROM lifecycle, guest-agent channel, console plan. Default VM is `win10-msedge` (`os_hint=windows`); for Linux smoke VMs set `VM=chrome-e2e-vm` or `VM=iw-e2e-1` (`os_hint=linux`). CD-ROM auto-target must be unoccupied (virtio-root Linux often gets free SATA `sda`). Asserts each feature's failure mode too, not just the happy path.
