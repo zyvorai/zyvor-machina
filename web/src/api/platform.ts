@@ -3103,6 +3103,96 @@ export const baremetalServerPower = (id: string, body: BmcPowerBody) =>
     method: 'POST',
     body: JSON.stringify(body),
   })
+export interface BaremetalImage {
+  id: string
+  name: string
+  os: string
+  arch: string
+  format: string
+  size_bytes: number
+  checksum: string
+  checksum_algo: string
+  source_url: string
+  status: 'downloading' | 'ready' | 'failed' | string
+  error: string
+  created_at: string
+}
+
+export interface BaremetalCatalogImage {
+  name: string
+  os: string
+  arch: string
+  format: string
+  url: string
+  checksum_algo: string
+}
+
+export const listBaremetalImages = () =>
+  platformFetch<{ images: BaremetalImage[]; catalog: BaremetalCatalogImage[] }>('/api/v1/baremetal/images')
+
+/** Import a catalog image by name; with `url` it is a URL import and needs `checksum` or `sums_url`. */
+export const importBaremetalImage = (body: {
+  name: string
+  url?: string
+  checksum?: string
+  sums_url?: string
+}) =>
+  platformFetch<BaremetalImage>('/api/v1/baremetal/images', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+
+export const deleteBaremetalImage = (name: string) =>
+  platformFetch<{ deleted: string }>(`/api/v1/baremetal/images/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+  })
+
+export interface BaremetalProfile {
+  name: string
+  image: string
+  ssh_keys: string
+  timezone: string
+  zone: string
+  min_cpu_cores: number
+  min_memory_mib: number
+  auto_deploy: boolean
+  desired_count: number
+}
+
+export const listBaremetalProfiles = () =>
+  platformFetch<BaremetalProfile[]>('/api/v1/baremetal/profiles')
+
+export const saveBaremetalProfile = (body: {
+  name: string
+  image: string
+  ssh_keys: string[]
+  timezone?: string
+  zone?: string
+  min_cpu_cores?: number
+  min_memory_mib?: number
+  auto_deploy?: boolean
+  desired_count?: number
+}) =>
+  platformFetch<BaremetalProfile>('/api/v1/baremetal/profiles', {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+
+export const deleteBaremetalProfile = (name: string) =>
+  platformFetch<{ deleted: string }>(`/api/v1/baremetal/profiles/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+  })
+
+export const provisionBaremetal = (profile: string, count: number) =>
+  platformFetch<{
+    requested: number
+    started: { server_id: string; hostname: string; status: string }[]
+    stopped_because: string | null
+  }>('/api/v1/baremetal/provision', {
+    method: 'POST',
+    body: JSON.stringify({ profile, count }),
+  })
+
 export interface BaremetalCommissionResult {
   id: string
   lifecycle: string
