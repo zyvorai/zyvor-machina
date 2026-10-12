@@ -6,6 +6,7 @@
 pub mod agent_client;
 pub mod api;
 pub mod auth;
+pub mod baremetal_sol;
 pub mod config;
 pub mod console;
 pub mod consolehub;

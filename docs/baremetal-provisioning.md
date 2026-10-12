@@ -337,6 +337,21 @@ talk to the controller (`--fleet` is implied). In the UI, Platform -> Bare Metal
 lifecycle and zone next to power state, takes BMC credentials, MAC and zone on
 registration, and has Commission and Release buttons.
 
+## Serial-over-LAN console (IPMI)
+
+```
+POST /api/v1/baremetal/servers/{id}/sol-token   (admin, audited) -> {"ws_path": "/ws/v1/baremetal/{id}/sol?token=…"}
+```
+
+Connect a WebSocket to `ws_path` (the web terminal's serial protocol: bytes in, bytes out).
+The controller runs `ipmitool -I lanplus … sol activate` on a pseudo terminal and bridges
+it; the BMC password goes through `IPMI_PASSWORD`, not argv, and a stale SOL session on the
+BMC is deactivated first and again when the socket closes. One SOL session per BMC can be
+active, so a second console replaces the first. Read-only grants are refused. Needs
+`ipmitool` and util-linux `script` on the controller host, an IPMI (`bmc_type: ipmi`)
+server, and SOL enabled on the BMC. Redfish-only BMCs are not covered (their serial console
+interfaces are vendor-specific).
+
 ## Virtual media (no DHCP/TFTP on the machine's network)
 
 A server whose BMC is Redfish can reach the boot service without PXE: the BMC mounts a

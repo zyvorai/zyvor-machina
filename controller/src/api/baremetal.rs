@@ -776,3 +776,36 @@ pub async fn server_virtual_media(
     .map_err(|e| ApiError::bad_request(e.to_string()))?;
     Ok(Json(serde_json::json!({ "id": id, "summary": msg })))
 }
+
+/// A short-lived token for the serial-over-LAN WebSocket of an IPMI server. Audited.
+pub async fn sol_token(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<uuid::Uuid>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&actor)?;
+    let c = baremetal::load_bmc(&state.pool, id)
+        .await
+        .map_err(|e| ApiError::not_found(e.to_string()))?
+        .ok_or_else(|| ApiError::bad_request("BMC credentials are not set for this server"))?;
+    if c.kind != crate::engine::baremetal_bmc::BmcKind::Ipmi {
+        return Err(ApiError::bad_request(
+            "serial-over-LAN needs an IPMI BMC (bmc_type ipmi)",
+        ));
+    }
+    let token = state.ws_tokens.issue(id, false).await;
+    let _ = crate::db::query(
+        "INSERT INTO audit_logs (id, actor, action, resource_type, detail)
+         VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(uuid::Uuid::new_v4())
+    .bind(&actor.username)
+    .bind("baremetal.sol.token")
+    .bind("baremetal_server")
+    .bind(serde_json::json!({ "server_id": id }))
+    .execute(&state.pool)
+    .await;
+    Ok(Json(serde_json::json!({
+        "ws_path": format!("/ws/v1/baremetal/{id}/sol?token={token}"),
+    })))
+}

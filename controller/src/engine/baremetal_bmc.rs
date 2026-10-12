@@ -183,7 +183,7 @@ pub fn validate_address(addr: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn validate_username(user: &str) -> anyhow::Result<()> {
+pub fn validate_username(user: &str) -> anyhow::Result<()> {
     if user.is_empty() || user.starts_with('-') || user.chars().any(|c| c.is_control()) {
         anyhow::bail!("invalid BMC username");
     }
