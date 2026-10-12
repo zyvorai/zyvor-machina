@@ -329,6 +329,31 @@ pub async fn set_power(
     }
 }
 
+/// Encrypt fencing passwords that were stored in plaintext before they were encrypted at rest.
+/// Idempotent; a no-op without `MACHINA_API_KEY_MASTER_KEY` (the stored value stays plaintext).
+/// Returns how many rows were rewritten.
+pub async fn encrypt_legacy_fence_passwords(pool: &DbPool) -> anyhow::Result<usize> {
+    let rows: Vec<(Uuid, String)> = crate::db::query_as(
+        "SELECT id, ipmi_password FROM hosts
+         WHERE ipmi_password IS NOT NULL AND ipmi_password <> '' AND ipmi_password NOT LIKE 'enc:%'",
+    )
+    .fetch_all(pool)
+    .await?;
+    let mut n = 0;
+    for (id, plain) in rows {
+        let enc = crate::engine::ai::crypto::store_api_key(&plain)?;
+        if enc != plain {
+            crate::db::query("UPDATE hosts SET ipmi_password = ? WHERE id = ?")
+                .bind(enc)
+                .bind(id)
+                .execute(pool)
+                .await?;
+            n += 1;
+        }
+    }
+    Ok(n)
+}
+
 /// A server's BMC details with the password decrypted, for one call.
 pub struct BmcCreds {
     pub kind: BmcKind,
@@ -591,6 +616,37 @@ mod tests {
             now.iter().find(|x| x.id == s.id).unwrap().state,
             "registered"
         );
+    }
+
+    #[tokio::test]
+    async fn legacy_fence_password_backfill_is_a_noop_without_a_master_key() {
+        if std::env::var("MACHINA_API_KEY_MASTER_KEY").is_ok() {
+            return;
+        }
+        let pool = crate::db::testing::pool().await;
+        crate::db::query("INSERT INTO clusters (id, name) VALUES (?, 'c')")
+            .bind(Uuid::from_u128(1))
+            .execute(&pool)
+            .await
+            .unwrap();
+        crate::db::query(
+            "INSERT INTO hosts (id, cluster_id, hostname, ipmi_password) VALUES (?, ?, 'h1', 'pw')",
+        )
+        .bind(Uuid::new_v4())
+        .bind(Uuid::from_u128(1))
+        .execute(&pool)
+        .await
+        .unwrap();
+        // Without a key the value cannot be encrypted, so nothing is rewritten (and nothing breaks).
+        assert_eq!(encrypt_legacy_fence_passwords(&pool).await.unwrap(), 0);
+        let pw: String =
+            crate::db::query_scalar("SELECT ipmi_password FROM hosts WHERE hostname = 'h1'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(pw, "pw");
+        // A plaintext stored value still decrypts to itself for fencing.
+        assert_eq!(crate::engine::ai::crypto::load_api_key(&pw).unwrap(), "pw");
     }
 
     #[tokio::test]

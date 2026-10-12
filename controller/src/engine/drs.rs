@@ -354,6 +354,8 @@ pub async fn fence_host(state: &AppState, host_id: Uuid) -> anyhow::Result<bool>
     .fetch_optional(&state.pool)
     .await?
     .ok_or_else(|| anyhow::anyhow!("host {} not found — may have been removed while HA was scanning", host_id))?;
+    // Stored encrypted when a master key is configured; legacy plaintext passes through.
+    let ipmi_pass = crate::engine::ai::crypto::load_api_key(&ipmi_pass)?;
 
     let (action, command, result): (&str, String, anyhow::Result<String>) =
         if method == "ipmi" && !ipmi_addr.is_empty() {
