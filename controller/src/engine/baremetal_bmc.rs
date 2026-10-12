@@ -470,18 +470,45 @@ async fn libvirt_power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::R
     ))
 }
 
-/// Run `ipmitool -I lanplus ... <args>`; the password goes through `IPMI_PASSWORD`, never argv.
-async fn ipmitool(target: &BmcTarget<'_>, args: &[&str]) -> anyhow::Result<String> {
-    validate_address(target.address)?;
-    validate_username(target.username)?;
-    // `-H` takes a bare host; drop a scheme the operator may have typed.
-    let host = target
-        .address
+/// `host` and optional port of a BMC address as an operator types it: `10.0.0.5`,
+/// `10.0.0.5:6230`, `bmc1.example:623`, `[fd00::5]:623`, `https://10.0.0.5/`.
+pub fn split_host_port(addr: &str) -> (&str, Option<u16>) {
+    let a = addr
         .trim()
         .trim_start_matches("https://")
         .trim_start_matches("http://")
         .trim_end_matches('/');
+    if let Some(rest) = a.strip_prefix('[') {
+        // `[v6]` or `[v6]:port`
+        if let Some((host, tail)) = rest.split_once(']') {
+            let port = tail.strip_prefix(':').and_then(|p| p.parse().ok());
+            return (host, port);
+        }
+        return (a, None);
+    }
+    // Exactly one colon: host:port. More than one is a bare IPv6 address.
+    if a.matches(':').count() == 1 {
+        if let Some((h, p)) = a.split_once(':') {
+            if let Ok(port) = p.parse::<u16>() {
+                return (h, Some(port));
+            }
+        }
+    }
+    (a, None)
+}
+
+/// Run `ipmitool -I lanplus ... <args>`; the password goes through `IPMI_PASSWORD`, never argv.
+async fn ipmitool(target: &BmcTarget<'_>, args: &[&str]) -> anyhow::Result<String> {
+    validate_address(target.address)?;
+    validate_username(target.username)?;
+    // `-H` takes a bare host and `-p` the port: split `host:port` (and `[v6]:port`), and
+    // drop a scheme the operator may have typed.
+    let (host, port) = split_host_port(target.address);
+    let port_arg = port.map(|p| p.to_string());
     let mut full = vec!["-I", "lanplus", "-H", host, "-U", target.username, "-E"];
+    if let Some(p) = port_arg.as_deref() {
+        full.extend_from_slice(&["-p", p]);
+    }
     full.extend_from_slice(args);
     let out = tokio::time::timeout(
         Duration::from_secs(30),
@@ -529,6 +556,29 @@ async fn ipmi_power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::Resu
         } else {
             action.ipmi_verb()
         };
+    if verb == "cycle" {
+        // Some BMCs and emulators do not implement `power cycle` ("Invalid data field in
+        // request"). Fall back to `reset`, then to off followed by on.
+        if let Err(first) = ipmitool(target, &["chassis", "power", "cycle"]).await {
+            tracing::warn!("IPMI power cycle on {host}: {first:#}; trying reset");
+            if ipmitool(target, &["chassis", "power", "reset"])
+                .await
+                .is_err()
+            {
+                ipmitool(target, &["chassis", "power", "off"]).await?;
+                tokio::time::sleep(if cfg!(test) {
+                    Duration::from_millis(10)
+                } else {
+                    Duration::from_secs(3)
+                })
+                .await;
+                ipmitool(target, &["chassis", "power", "on"]).await?;
+                return Ok(format!("IPMI power cycle on {host} (off, then on)"));
+            }
+            return Ok(format!("IPMI power cycle on {host} (as reset)"));
+        }
+        return Ok(format!("IPMI power cycle on {host}"));
+    }
     ipmitool(target, &["chassis", "power", verb]).await?;
     Ok(format!("IPMI power {verb} on {host}"))
 }
@@ -1060,6 +1110,23 @@ mod tests {
         assert!(validate_address("host name").is_err());
         assert!(validate_username("ADMIN").is_ok());
         assert!(validate_username("-U").is_err());
+    }
+
+    #[test]
+    fn ipmi_addresses_split_into_host_and_port() {
+        assert_eq!(split_host_port("10.0.0.5"), ("10.0.0.5", None));
+        assert_eq!(split_host_port("10.0.0.5:6230"), ("10.0.0.5", Some(6230)));
+        assert_eq!(
+            split_host_port("bmc1.example:623"),
+            ("bmc1.example", Some(623))
+        );
+        assert_eq!(split_host_port("[fd00::5]:623"), ("fd00::5", Some(623)));
+        assert_eq!(split_host_port("[fd00::5]"), ("fd00::5", None));
+        assert_eq!(split_host_port("fd00::5"), ("fd00::5", None));
+        assert_eq!(
+            split_host_port("https://10.0.0.5:8443/"),
+            ("10.0.0.5", Some(8443))
+        );
     }
 
     #[test]

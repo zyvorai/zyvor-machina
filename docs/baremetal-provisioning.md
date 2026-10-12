@@ -40,6 +40,9 @@ POST /api/v1/baremetal/servers/{id}/boot-device      (admin)    {"device": "pxe|
   nothing; `cycle`/`reset` of a stopped machine powers it on. Redfish picks the
   `ResetType` the BMC lists as allowed (many lack `PowerCycle`; it falls back to
   `ForceRestart`), and an async action (HTTP 202) is followed to completion.
+- IPMI `cycle` falls back to `reset`, then to off followed by on, for BMCs that reject
+  `power cycle` (VirtualBMC does). IPMI addresses may carry a port (`10.0.0.5:6230`,
+  `[fd00::5]:623`).
 - Requests are retried (3 attempts) on connection errors and 502/503/504.
   `MACHINA_BMC_CA_FILE` is a PEM bundle trusted for BMC certificates (with
   `MACHINA_BMC_VERIFY_TLS=1`).
