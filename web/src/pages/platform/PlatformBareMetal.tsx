@@ -65,6 +65,7 @@ export default function PlatformBareMetal() {
   const [catalog, setCatalog] = useState<BaremetalCatalogImage[]>([])
   const [profiles, setProfiles] = useState<BaremetalProfile[]>([])
   const [bmcDetail, setBmcDetail] = useState<{ id: string; name: string; info: BaremetalBmcInfo } | null>(null)
+  const [pendingImageDelete, setPendingImageDelete] = useState<string | null>(null)
   const [catalogPick, setCatalogPick] = useState('')
   const [provisionCount, setProvisionCount] = useState<Record<string, number>>({})
 
@@ -427,7 +428,7 @@ export default function PlatformBareMetal() {
                   }
                   trailing={
                     <button
-                      onClick={() => void handleDeleteImage(i.name)}
+                      onClick={() => setPendingImageDelete(i.name)}
                       className="px-2 py-1 text-xs rounded bg-red-500/10 text-red-600 hover:bg-red-500/20"
                     >
                       Delete
@@ -556,6 +557,19 @@ export default function PlatformBareMetal() {
           )}
         </MacGlassPanel>
       </div>
+      <ConfirmDialog
+        open={pendingImageDelete !== null}
+        title="Delete OS image"
+        message={`Delete "${pendingImageDelete}"? Servers cannot be deployed from it until it is imported again.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onCancel={() => setPendingImageDelete(null)}
+        onConfirm={async () => {
+          const name = pendingImageDelete
+          setPendingImageDelete(null)
+          if (name) await handleDeleteImage(name)
+        }}
+      />
       <ConfirmDialog
         open={pendingPower !== null}
         title={pendingPower?.action === 'reset' ? 'Reset Server' : 'Power Off Server'}

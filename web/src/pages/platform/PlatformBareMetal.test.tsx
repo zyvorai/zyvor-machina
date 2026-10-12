@@ -159,6 +159,29 @@ describe('PlatformBareMetal', () => {
     expect(Array.from(select.options).map((o) => o.value)).toContain('ubuntu-26.04')
   })
 
+  it('asks before deleting an image, and only then calls the API', async () => {
+    stub({ images: [image()] })
+    vi.mocked(api.deleteBaremetalImage).mockResolvedValue({ deleted: 'ubuntu-26.04' })
+    view()
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    expect(api.deleteBaremetalImage).not.toHaveBeenCalled()
+    expect(screen.getByText(/Delete "ubuntu-26.04"\?/)).toBeTruthy()
+    // The confirm button in the dialog (the row button is also called Delete).
+    const confirm = screen.getAllByRole('button', { name: 'Delete' }).find((b) => b.closest('[role="dialog"]'))
+    expect(confirm).toBeTruthy()
+    fireEvent.click(confirm!)
+    await waitFor(() => expect(api.deleteBaremetalImage).toHaveBeenCalledWith('ubuntu-26.04'))
+  })
+
+  it('does not delete an image when the dialog is cancelled', async () => {
+    stub({ images: [image()] })
+    view()
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByText(/Delete "ubuntu-26.04"\?/)).toBeNull())
+    expect(api.deleteBaremetalImage).not.toHaveBeenCalled()
+  })
+
   it('provisions N machines from a profile and reports a shortage', async () => {
     stub({ profiles: [profile()] })
     vi.mocked(api.provisionBaremetal).mockResolvedValue({
