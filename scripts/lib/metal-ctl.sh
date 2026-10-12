@@ -26,6 +26,10 @@ machinactl metal <command>
   profile add NAME --image IMG --key "ssh-ed25519 …" [--zone Z] [--cores N] [--memory-mib N]
                     [--timezone TZ] [--auto --count N]
   provision --profile NAME [--count N]     Allocate and deploy N machines in one step
+  discover --cidr 10.20.0.0/24 [--import] [--prefix bmc-] [--zone Z] [--scheme https|http] [--port N]
+                                           Scan for Redfish BMCs; credentials from $MACHINA_BMC_CREDENTIALS
+                                           ("user:pass,user2:pass2", at most 3 are tried per BMC)
+  import --csv FILE                        hostname,bmc_address,bmc_type,username,password,mac,zone
   zones                                    Servers per zone
   dnsmasq --subnet CIDR-NET [--interface IF] [--tftp-root DIR]
                                            dnsmasq.conf for a site's boot host
@@ -213,6 +217,62 @@ metal_main() {
             [[ -n "$prof" ]] || np_die "usage: metal provision --profile NAME [--count N]"
             jq -n --arg p "$prof" --argjson c "$count" '{profile:$p, count:$c}' |
                 np_api POST /baremetal/provision -H 'Content-Type: application/json' --data-binary @- | jq .
+            ;;
+        discover)
+            local cidr="" imp=false prefix="bmc-" zone="" scheme=https port=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --cidr) cidr=${2:-}; shift 2 ;;
+                    --import) imp=true; shift ;;
+                    --prefix) prefix=${2:-}; shift 2 ;;
+                    --zone) zone=${2:-}; shift 2 ;;
+                    --scheme) scheme=${2:-}; shift 2 ;;
+                    --port) port=${2:-}; shift 2 ;;
+                    *) np_die "unknown option $1" ;;
+                esac
+            done
+            [[ -n "$cidr" ]] || np_die "usage: metal discover --cidr 10.20.0.0/24 [--import]"
+            [[ -n "${MACHINA_BMC_CREDENTIALS:-}" ]] || np_die "set MACHINA_BMC_CREDENTIALS=\"user:pass,user2:pass2\""
+            # Credentials go in the request body (stdin), never on a command line.
+            python3 -c '
+import json, os, sys
+creds = []
+for part in os.environ["MACHINA_BMC_CREDENTIALS"].split(","):
+    u, _, p = part.partition(":")
+    if u:
+        creds.append({"username": u, "password": p})
+a = sys.argv
+body = {"cidr": a[1], "credentials": creds, "import": a[2] == "true", "hostname_prefix": a[3],
+        "zone": a[4], "scheme": a[5]}
+if a[6]:
+    body["port"] = int(a[6])
+print(json.dumps(body))' "$cidr" "$imp" "$prefix" "$zone" "$scheme" "$port" |
+                np_api POST /baremetal/discover -H 'Content-Type: application/json' --data-binary @- |
+                jq -r '"found \(.found|length) BMC(s), \(.authenticated) accepted a credential",
+                       (.found[] | "  \(.address)\t\(.vendor) \(.product)\t\(.manufacturer) \(.model)\t\(.serial_number)\t" +
+                                   (if .credential_index == null then "no credential accepted" else "credential #\(.credential_index + 1)" end)),
+                       (.imported[]? | "  import \(.hostname): \(.status) \(.error)")'
+            ;;
+        import)
+            local csv=""
+            [[ "${1:-}" == "--csv" ]] && csv=${2:-}
+            [[ -n "$csv" && -r "$csv" ]] || np_die "usage: metal import --csv FILE (hostname,bmc_address,bmc_type,username,password,mac,zone)"
+            python3 -c '
+import csv, json, sys
+rows = []
+with open(sys.argv[1], newline="") as f:
+    for r in csv.DictReader(f):
+        if not (r.get("hostname") or "").strip():
+            continue
+        rows.append({
+            "hostname": r["hostname"].strip(), "bmc_address": (r.get("bmc_address") or "").strip(),
+            "bmc_type": (r.get("bmc_type") or "redfish").strip(),
+            "bmc_username": (r.get("username") or "").strip(), "bmc_password": r.get("password") or "",
+            "mac_address": (r.get("mac") or "").strip(), "zone": (r.get("zone") or "").strip()})
+print(json.dumps({"servers": rows}))' "$csv" |
+                np_api POST /baremetal/import -H 'Content-Type: application/json' --data-binary @- |
+                jq -r '"created \(.created), already there \(.exists), errors \(.errors)",
+                       (.rows[] | select(.status == "error") | "  \(.hostname): \(.error)")'
             ;;
         zones)
             np_api GET /baremetal/zones | jq -r '

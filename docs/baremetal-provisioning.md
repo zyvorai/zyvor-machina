@@ -252,6 +252,32 @@ machinactl metal profile add web --image ubuntu-26.04 --key … --auto --count 8
   the boot service and PXE-boots is enrolled and its hardware report accepted: enable it
   only on a provisioning network you control.
 
+## Finding and enrolling BMCs in bulk
+
+```
+export MACHINA_BMC_CREDENTIALS="root:calvin,ADMIN:ADMIN"      # at most 3 are tried per BMC
+machinactl metal discover --cidr 10.20.0.0/24                 # list what answers
+machinactl metal discover --cidr 10.20.0.0/24 --import --zone rack2   # and register them
+machinactl metal import --csv servers.csv                     # hostname,bmc_address,bmc_type,username,password,mac,zone
+```
+
+- `POST /api/v1/baremetal/discover` probes the Redfish service root (`/redfish/v1`) on each
+  address (32 at a time, 4 s timeout), then tries the credentials in order against
+  `/redfish/v1/Systems`. It returns vendor, product, Redfish version and, when a credential
+  worked, manufacturer, model and serial number. With `import: true` the authenticated
+  ones are registered as `<prefix><address-with-dashes>` with that credential (encrypted).
+- **Account lockout**: BMCs lock accounts after a few failures. At most 3 credentials are
+  tried per BMC and a scan covers at most 512 addresses. Do not point it at a range with
+  unknown or shared accounts unless you accept that.
+- **Scope**: private ranges only (`MACHINA_BMC_SCAN_ANY=1` to allow others); loopback,
+  link-local (cloud metadata), multicast and broadcast are never scanned. IPv4 only.
+  Admin only.
+- `POST /api/v1/baremetal/import` (admin) takes up to 500 registrations. A row whose
+  hostname or BMC address already exists is skipped; a bad row is reported and the rest go
+  through, so the import can be re-run.
+- The CSV holds BMC passwords: keep the file `0600` and delete it afterwards.
+- Redfish only; IPMI-only BMCs need `import` with `bmc_type=ipmi` (they cannot be probed).
+
 ## Join labels (any join, not only bare metal)
 
 `POST /api/v1/enrollment/tokens` accepts, besides `ttl_hours`:
