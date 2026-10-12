@@ -684,6 +684,8 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/v1/baremetal/boot/dnsmasq.conf", get(baremetal::boot_dnsmasq))
         .route("/api/v1/baremetal/allocate", post(baremetal::allocate))
+        .route("/api/v1/baremetal/discover", post(baremetal::discover))
+        .route("/api/v1/baremetal/import", post(baremetal::import_servers))
         .route(
             "/api/v1/baremetal/servers/{id}/bmc-info",
             get(baremetal::get_bmc_info),
