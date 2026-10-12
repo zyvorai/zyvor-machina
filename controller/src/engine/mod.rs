@@ -11,6 +11,7 @@ pub mod baremetal;
 pub mod baremetal_alloc;
 pub mod baremetal_bmc;
 pub mod baremetal_boot;
+pub mod baremetal_deploy;
 pub mod baremetal_lifecycle;
 pub mod bpf;
 pub mod cert_monitor;

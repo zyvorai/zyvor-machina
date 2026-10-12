@@ -586,6 +586,8 @@ async fn link_baremetal_firewall_on_join(pool: &crate::db::DbPool, host_id: Uuid
     {
         let _ = crate::engine::baremetal::link_host_firewall_profile(pool, metal_id, host_id).await;
     }
+    // A machine deployed through bare-metal provisioning has now joined.
+    crate::engine::baremetal_deploy::mark_deployed_by_hostname(pool, hostname).await;
 }
 
 #[derive(Debug, Deserialize)]

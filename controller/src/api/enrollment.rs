@@ -65,9 +65,7 @@ pub async fn create_enrollment_token(
         .public_base_url
         .trim_end_matches('/')
         .to_string();
-    let install_command = format!(
-        "curl -fsSL {controller_base}/install.sh | sudo bash -s -- --controller {controller_base} --token {token}"
-    );
+    let (install_command, join_command) = join_commands(&controller_base, &token);
 
     crate::db::query(
         "INSERT INTO audit_logs (id, actor, action, resource_type, detail)
@@ -91,9 +89,23 @@ pub async fn create_enrollment_token(
         &format!("enrollment token issued by {}, valid {ttl} h", actor.username),
     )
     .await;
+    Ok(Json(EnrollmentTokenResponse {
+        token,
+        expires_at: expires.to_rfc3339(),
+        install_command,
+        join_command,
+    }))
+}
+
+/// The commands a machine runs to join: the plain one, and (with the network TLS listener on)
+/// the one that pins the controller by its CA fingerprint and checks the script's checksum.
+pub fn join_commands(controller_base: &str, token: &str) -> (String, Option<String>) {
+    let install_command = format!(
+        "curl -fsSL {controller_base}/install.sh | sudo bash -s -- --controller {controller_base} --token {token}"
+    );
     // With the network (TLS) listener on, the node pins the controller by its CA fingerprint.
     let join_command = crate::enrollment_tls::configured_addr().and_then(|tls_addr| {
-        let url = crate::enrollment_tls::public_https_url(&controller_base, &tls_addr)?;
+        let url = crate::enrollment_tls::public_https_url(controller_base, &tls_addr)?;
         let (_, fp) = crate::pki::ca_info().ok()?;
         let sum = install_script_sha256();
         // The script is fetched without trusting the certificate, so its checksum is in the
@@ -102,12 +114,7 @@ pub async fn create_enrollment_token(
             "curl -fsSk {url}/install.sh -o /tmp/machina-install.sh && echo \"{sum}  /tmp/machina-install.sh\" | sha256sum -c - && sudo bash /tmp/machina-install.sh --controller {url} --ca-sha256 {fp} --token {token}"
         ))
     });
-    Ok(Json(EnrollmentTokenResponse {
-        token,
-        expires_at: expires.to_rfc3339(),
-        install_command,
-        join_command,
-    }))
+    (install_command, join_command)
 }
 
 /// The bootstrap a bare machine runs (see `install.sh`); served as text, unauthenticated, and

@@ -684,6 +684,10 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/v1/baremetal/boot/dnsmasq.conf", get(baremetal::boot_dnsmasq))
         .route("/api/v1/baremetal/allocate", post(baremetal::allocate))
+        .route(
+            "/api/v1/baremetal/servers/{id}/deploy",
+            post(baremetal::server_deploy),
+        )
         .route("/api/v1/baremetal/zones", get(baremetal::zones))
         .route(
             "/api/v1/baremetal/servers/{id}/release",
@@ -2096,6 +2100,10 @@ pub fn router(state: AppState) -> Router {
             post(baremetal::commissioning_report),
         )
         .route("/api/v1/baremetal/boot/ipxe", get(baremetal::boot_ipxe))
+        .route(
+            "/api/v1/baremetal/boot/install/{id}/{token}/{name}",
+            get(baremetal::install_document),
+        )
         .route(
             "/api/v1/baremetal/boot/commission.sh",
             get(baremetal::boot_commission_script),

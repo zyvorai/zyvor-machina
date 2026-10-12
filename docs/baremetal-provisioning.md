@@ -110,12 +110,40 @@ Allocation takes the smallest `ready` server that satisfies the request (an empt
 compare-and-set; losing a race retries with the next candidate. No match is 409.
 `allocated_to` records the requesting user.
 
+## Deploy
+
+```
+POST /api/v1/baremetal/servers/{id}/deploy   (admin)
+{"os": "ubuntu-24.04", "ssh_authorized_keys": ["ssh-ed25519 AAAA… ops"], "timezone": "UTC"}
+```
+
+`allocated -> deploying`. The server needs a `mac_address`. The controller issues an
+enrollment token, renders the installer document and stores it; when the machine
+PXE-boots, `/boot/ipxe` hands it the installer and the document by URL.
+
+| os | installer | notes |
+|---|---|---|
+| `ubuntu-22.04`, `ubuntu-24.04` | autoinstall (cloud-init NoCloud-net) | needs `install-<os>-vmlinuz`, `install-<os>-initrd`, `install-<os>.iso` in `MACHINA_DIST_DIR` |
+| `rhel-9`, `rocky-9`, `almalinux-9` | kickstart | needs `install-<os>-vmlinuz`, `-initrd`, and `MACHINA_METAL_RHEL_REPO` (your mirror URL) |
+
+- No password login: at least one SSH public key is required; root and the `machina`
+  user are locked.
+- First boot runs the normal join command (the TLS-pinned one when the network
+  listener is on) from `/usr/local/sbin/machina-join.sh`, so the machine joins as an
+  ordinary host. When it joins under the registered hostname the server becomes
+  `deployed` and the stored document, which holds the enrollment token, is deleted.
+  Releasing the server deletes it too.
+- The document is served at `/api/v1/baremetal/boot/install/{id}/{token}/user-data`
+  (`meta-data`, `vendor-data`, `ks.cfg`); `{token}` is minted at PXE time.
+- Hostname, timezone, keys and the join command are validated before rendering; a
+  value that could break out of the document is refused.
+
 ## Not done yet
 
 1. A commissioning image build (kernel, initrd, rootfs). The script and the contract
    are here; the image is not built or shipped.
-3. Zones, allocation, autoinstall/kickstart rendering, first-boot join through the
-   existing enrollment token.
-4. Moving `hosts.ipmi_password` (fencing) to the same encrypted storage.
+3. Building or fetching installer media; the operator copies it into `MACHINA_DIST_DIR`.
+4. Disk layout beyond LVM on the default disk, static IPs, NIC bonding.
+5. Moving `hosts.ipmi_password` (fencing) to the same encrypted storage.
 
 Claim status: C49 in [claims.md](claims.md).

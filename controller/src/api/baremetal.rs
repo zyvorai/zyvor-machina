@@ -8,7 +8,9 @@ use serde::Deserialize;
 
 use crate::api::ApiError;
 use crate::auth::{require_admin, require_operator, AuthUser};
-use crate::engine::{baremetal, baremetal_alloc, baremetal_boot, baremetal_lifecycle};
+use crate::engine::{
+    baremetal, baremetal_alloc, baremetal_boot, baremetal_deploy, baremetal_lifecycle,
+};
 use crate::state::AppState;
 
 pub async fn list_servers(
@@ -205,8 +207,76 @@ pub async fn boot_ipxe(
             &token,
             &format!("{base}/dist"),
         ))),
-        None => Ok(text(baremetal_boot::ipxe_exit_script().to_string())),
+        None => {
+            if let Some((id, os, token)) = baremetal_deploy::deploy_boot_target(&state.pool, &q.mac)
+                .await
+                .map_err(|e| ApiError::internal(e.to_string()))?
+            {
+                let kind = baremetal_deploy::install_kind(&os)
+                    .map_err(|e| ApiError::internal(e.to_string()))?;
+                let repo = std::env::var("MACHINA_METAL_RHEL_REPO").unwrap_or_default();
+                return Ok(text(baremetal_deploy::ipxe_deploy_script(
+                    &base, id, &token, &os, kind, &repo,
+                )));
+            }
+            Ok(text(baremetal_boot::ipxe_exit_script().to_string()))
+        }
     }
+}
+
+/// Deploy an allocated server: allocated -> deploying, renders the installer document.
+pub async fn server_deploy(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<uuid::Uuid>,
+    Json(body): Json<baremetal_deploy::DeployRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&actor)?;
+    let base = state
+        .config
+        .public_base_url
+        .trim_end_matches('/')
+        .to_string();
+    baremetal_deploy::begin_deploy(&state.pool, id, &body, &base)
+        .await
+        .map_err(|e| {
+            ApiError::conflict(
+                e.to_string(),
+                "the server must be allocated, have a mac_address, and the request must be valid",
+            )
+        })?;
+    Ok(Json(serde_json::json!({
+        "id": id,
+        "lifecycle": "deploying",
+        "os": body.os,
+        "next": "PXE-boot the machine; it installs, reboots and joins as a host",
+    })))
+}
+
+/// Installer documents. The token in the path is minted when the machine PXE-boots.
+pub async fn install_document(
+    State(state): State<AppState>,
+    Path((id, token, name)): Path<(uuid::Uuid, String, String)>,
+) -> Result<axum::response::Response, ApiError> {
+    let body = match name.as_str() {
+        "meta-data" => format!("instance-id: {id}\n"),
+        "vendor-data" => String::new(),
+        "user-data" | "ks.cfg" => baremetal_deploy::document(&state.pool, id, &token)
+            .await
+            .map_err(|e| ApiError::internal(e.to_string()))?
+            .ok_or_else(|| ApiError::not_found("no installer document"))?,
+        _ => return Err(ApiError::not_found("no installer document")),
+    };
+    // meta-data / vendor-data carry nothing secret, but are still gated by the same token.
+    if matches!(name.as_str(), "meta-data" | "vendor-data")
+        && baremetal_deploy::document(&state.pool, id, &token)
+            .await
+            .map_err(|e| ApiError::internal(e.to_string()))?
+            .is_none()
+    {
+        return Err(ApiError::not_found("no installer document"));
+    }
+    Ok(text(body))
 }
 
 pub async fn boot_commission_script() -> axum::response::Response {

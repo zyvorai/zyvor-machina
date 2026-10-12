@@ -92,6 +92,10 @@ pub async fn release(pool: &DbPool, id: Uuid) -> anyhow::Result<()> {
     if res.rows_affected() == 0 {
         anyhow::bail!("server is not allocated or deployed");
     }
+    let _ = crate::db::query("DELETE FROM baremetal_deployments WHERE server_id = ?")
+        .bind(id)
+        .execute(pool)
+        .await;
     Ok(())
 }
 
