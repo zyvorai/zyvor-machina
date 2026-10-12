@@ -14,8 +14,11 @@ POST /api/v1/baremetal/servers   (admin)
   "bmc_username": "admin", "bmc_password": "…" }
 ```
 
-- `bmc_type` is `redfish` (default), `ipmi` or `fake`. `fake` touches no hardware
-  and is meant for tests and demos.
+- `bmc_type` is `redfish` (default), `ipmi`, `libvirt` or `fake`. `fake` touches no
+  hardware (tests, demos). `libvirt` uses a libvirt domain on the controller host as the
+  machine's BMC (`bmc_address` = domain name, via `virsh`), so the whole PXE flow can be
+  tried on a throwaway VM; it only touches domains named `metal-test-*` unless
+  `MACHINA_BMC_LIBVIRT_PREFIX` or `MACHINA_BMC_LIBVIRT_ANY=1` says otherwise.
 - The password is stored encrypted (AES-256-GCM) when `MACHINA_API_KEY_MASTER_KEY`
   is set, and is never returned. The server record shows
   `bmc_credentials_configured` and `last_error`.
