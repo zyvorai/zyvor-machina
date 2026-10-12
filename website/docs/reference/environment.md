@@ -62,3 +62,8 @@ environment variables from their env files.
 ## Kubernetes CNI
 
 See [Kubernetes CNI](../networking/kubernetes-cni.md#configuration) for `MACHINA_CNI_*`.
+
+## Bare metal
+
+The bare-metal provisioning variables (`MACHINA_BMC_*`, `MACHINA_METAL_*`, `MACHINA_IPMITOOL`) are listed with their
+defaults in [Bare-metal API and CLI](bare-metal-api.md#configuration).

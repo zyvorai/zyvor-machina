@@ -71,3 +71,6 @@ stack or your existing OIDC, SAML or LDAP provider, and networking and security 
 | `translate` | libvirt domain XML to internal types, QEMU helpers |
 | `virt-image-build` | virt-builder and Packer golden-image job runner |
 | `vessel-core` | Podman and Docker container engine |
+
+Bare-metal machines that have no OS yet are provisioned by the controller before an agent exists on them; see
+[Bare-metal provisioning](bare-metal.md).

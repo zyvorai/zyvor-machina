@@ -14,6 +14,10 @@ See [docs/baremetal-provisioning.md](docs/baremetal-provisioning.md). Claims C49
   #153, #154, #155).
 - **Images.** Catalog (Ubuntu 26.04/24.04/22.04, Debian 12/13, Rocky 9, AlmaLinux 9) with upstream-checksum
   verification, retries and `Range` serving (#146, #147).
+- **Later in the day.** `PUT /api/v1/baremetal/servers/{id}/bmc` and `machinactl metal bmc-set`; UEFI and virtual-media
+  deploy, offline bundle `--join` and the failing-join path verified on the lab host; Bare Metal page component
+  tests (jsdom suites need Node 22) and an image-delete confirmation, run in headless Chrome (#159 to #164).
+- **Docs.** Website pages for concepts, getting started, API/CLI/configuration and troubleshooting.
 - **Operators.** `machinactl bootstrap`, `host add --file --parallel`, `metal …`, bundle `install.sh --join` (#146).
 - **Verification.** The flow has run end to end against VMs and BMC emulators (sushy-tools, VirtualBMC) on a lab
   host; nothing has run on physical servers or BMCs. Migrations 074 to 083.

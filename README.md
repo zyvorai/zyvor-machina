@@ -28,6 +28,11 @@
 
 ## What's new
 
+**Bare-metal provisioning.** Discover or import BMCs, commission machines over PXE or BMC virtual media, write a
+checksum-verified OS image and let each machine join the fleet on first boot, driven from `machinactl metal …` or the
+Bare Metal page. Verified on VMs and BMC emulators, **not yet on physical servers**; see the
+[guide](docs/baremetal-provisioning.md) and [claims C49 to C51](docs/claims.md).
+
 **EC2-style Fleet Cloud.** Launch several instances at once with a key pair and first-boot user data, tag everything,
 firewall with **enforced security groups whose status tells the truth**, attach volumes with live I/O limits, scale groups from
 alarms, give a team a project-scoped API key, and drive it all from `awscli` or boto3 against the built-in EC2-compatible endpoint.

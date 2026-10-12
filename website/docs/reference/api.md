@@ -69,3 +69,7 @@ Generated specs live in the repository:
 
 Clients: the [TypeScript SDK](https://github.com/zyvorai/zyvor-machina/blob/main/sdk/typescript/README.md), the
 [Terraform provider](https://github.com/zyvorai/zyvor-machina/blob/main/terraform/machina/README.md) and `machinactl`.
+
+## Bare metal
+
+Provisioning endpoints under `/api/v1/baremetal` are listed in [Bare-metal API and CLI](bare-metal-api.md).
