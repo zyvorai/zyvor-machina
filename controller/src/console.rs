@@ -605,4 +605,6 @@ pub fn ws_routes() -> axum::Router<AppState> {
         .route("/ws/v1/platform/vnc/{vm_id}", get(vnc_ws_proxy))
         .route("/ws/v1/platform/serial/{vm_id}", get(serial_ws_proxy))
         .route("/ws/v1/platform/spice/{vm_id}", get(spice_ws_proxy))
+        // Bare-metal serial-over-LAN (IPMI SOL through a pty).
+        .route("/ws/v1/baremetal/{id}/sol", get(crate::baremetal_sol::sol_ws))
 }
