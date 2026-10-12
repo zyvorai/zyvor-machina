@@ -412,16 +412,17 @@ pub async fn join_host(
     // concurrent joins can't both observe it unused and each enroll a host
     // (the old flow validated with a read outside any tx, then stamped used_at
     // unconditionally — a TOCTOU that let one token enroll N hosts).
-    let consumed: Option<(Uuid,)> = crate::db::query_as(
+    let consumed: Option<(Uuid, String, String, String, String, String)> = crate::db::query_as(
         "UPDATE enrollment_tokens SET used_at = datetime('now')
          WHERE token = ? AND used_at IS NULL
            AND (expires_at IS NULL OR expires_at > datetime('now'))
-         RETURNING cluster_id",
+         RETURNING cluster_id, site, rack, tags, networks, storage_pools",
     )
     .bind(&req.token)
     .fetch_optional(&mut *tx)
     .await?;
-    let Some((cluster_id,)) = consumed else {
+    let Some((cluster_id, tok_site, tok_rack, tok_tags, tok_networks, tok_pools)) = consumed
+    else {
         super::join_events::record(
             &state.pool,
             &req.token,
@@ -473,6 +474,36 @@ pub async fn join_host(
             .bind(&req.hostname)
             .fetch_one(&mut *tx)
             .await?;
+    // Placement and post-join setup carried by the enrollment token.
+    if !tok_site.is_empty() || !tok_rack.is_empty() || tok_tags != "[]" {
+        crate::db::query(
+            "UPDATE hosts SET site = CASE WHEN ? <> '' THEN ? ELSE site END,
+                              rack = CASE WHEN ? <> '' THEN ? ELSE rack END,
+                              tags = CASE WHEN ? <> '[]' THEN ? ELSE tags END
+             WHERE id = ?",
+        )
+        .bind(&tok_site)
+        .bind(&tok_site)
+        .bind(&tok_rack)
+        .bind(&tok_rack)
+        .bind(&tok_tags)
+        .bind(&tok_tags)
+        .bind(host_id)
+        .execute(&mut *tx)
+        .await?;
+    }
+    if tok_networks != "[]" || tok_pools != "[]" {
+        crate::db::query(
+            "INSERT INTO host_post_join (host_id, networks, storage_pools) VALUES (?, ?, ?)
+             ON CONFLICT (host_id) DO UPDATE SET networks = excluded.networks,
+               storage_pools = excluded.storage_pools",
+        )
+        .bind(host_id)
+        .bind(&tok_networks)
+        .bind(&tok_pools)
+        .execute(&mut *tx)
+        .await?;
+    }
     // The address the fleet really uses for this host (an existing routable one is preserved).
     let (used_addr, used_console): (String, Option<String>) = crate::db::query_as(
         "SELECT agent_grpc_addr, agent_console_addr FROM hosts WHERE id = ?",

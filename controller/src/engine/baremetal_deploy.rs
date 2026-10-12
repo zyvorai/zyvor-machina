@@ -383,12 +383,18 @@ pub async fn begin_deploy(
     };
 
     transition(pool, id, Lifecycle::Deploying).await?;
+    // The machine joins into the zone it was allocated from, as its site.
+    let zone: String = crate::db::query_scalar("SELECT zone FROM baremetal_servers WHERE id = ?")
+        .bind(id)
+        .fetch_one(pool)
+        .await?;
     crate::db::query(
-        "INSERT INTO enrollment_tokens (token, cluster_id, expires_at) VALUES (?, ?, ?)",
+        "INSERT INTO enrollment_tokens (token, cluster_id, expires_at, site) VALUES (?, ?, ?, ?)",
     )
     .bind(&enroll)
     .bind(cluster_id)
     .bind(Utc::now() + Duration::hours(ttl))
+    .bind(zone)
     .execute(pool)
     .await?;
     crate::db::query(

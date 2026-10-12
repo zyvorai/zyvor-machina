@@ -52,6 +52,7 @@ pub mod health_watchdog;
 pub mod host_revalidate;
 pub mod host_os;
 pub mod host_shell;
+pub mod host_post_join;
 pub mod host_validate;
 pub mod kubevirt_inventory;
 pub mod kubevirt_ssh;

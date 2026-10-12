@@ -210,6 +210,25 @@ machinactl metal profile add web --image ubuntu-26.04 --key … --auto --count 8
   the boot service and PXE-boots is enrolled and its hardware report accepted: enable it
   only on a provisioning network you control.
 
+## Join labels (any join, not only bare metal)
+
+`POST /api/v1/enrollment/tokens` accepts, besides `ttl_hours`:
+
+```
+{"ttl_hours": 4, "cluster_id": "<uuid>", "site": "fra1", "rack": "r12",
+ "tags": ["gpu"], "networks": ["br-prod"], "storage_pools": ["ssd-pool"]}
+```
+
+- `cluster_id` (default: the first cluster), `site`, `rack` and `tags` are set on the host
+  when it joins.
+- `networks` and `storage_pools` are **existing** networks and pools, named. Once the host
+  has passed validation the controller queues `network.provision` and
+  `storage.pool.provision` for it, and logs each step in the join log. A name that does not
+  exist is reported there and skipped.
+- A machine deployed from bare metal joins with `site` = the zone it was allocated from.
+- Not done: validation does not yet check that the bridge or pool really exists on the host
+  afterwards, and `MACHINA_METAL`-style profiles do not carry networks or pools yet.
+
 ## CLI and UI
 
 ```
