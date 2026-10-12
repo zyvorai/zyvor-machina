@@ -841,8 +841,12 @@ pub async fn patch_host(
     }
     if let Some(v) = &body.ipmi_password {
         if !v.is_empty() && v != "***" {
+            // Encrypted at rest like the LLM provider keys (plaintext only when no
+            // MACHINA_API_KEY_MASTER_KEY is configured); fencing decrypts it when used.
+            let stored = crate::engine::ai::crypto::store_api_key(v)
+                .map_err(|e| ApiError::internal(e.to_string()))?;
             crate::db::query("UPDATE hosts SET ipmi_password = ? WHERE id = ?")
-                .bind(v)
+                .bind(stored)
                 .bind(id)
                 .execute(&mut *tx)
                 .await?;

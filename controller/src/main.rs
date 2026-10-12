@@ -200,6 +200,11 @@ async fn main() -> anyhow::Result<()> {
     machina_controller::engine::scheduled_jobs_runner::spawn(state.clone());
     machina_controller::engine::health_watchdog::spawn(state.clone());
     machina_controller::engine::host_revalidate::spawn(state.clone());
+    match machina_controller::engine::baremetal::encrypt_legacy_fence_passwords(&state.pool).await {
+        Ok(0) => {}
+        Ok(n) => tracing::info!("encrypted {n} stored fencing password(s) at rest"),
+        Err(e) => tracing::warn!("fencing password re-encryption: {e:#}"),
+    }
     machina_controller::engine::baremetal_profiles::spawn(state.clone());
     machina_controller::engine::baremetal::spawn_power_poll(state.clone());
     machina_controller::engine::channel_worker::spawn(state.pool.clone(), state.leader.clone());

@@ -49,6 +49,7 @@ Stated plainly so a security review does not have to find it:
 - **JWT signing-key rotation is manual** ([PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)).
 - **No data-residency or retention policy** is enforced for audit, telemetry or AI data.
   With a local LLM provider nothing leaves the host; a hosted provider sends prompts to it.
-- **BMC credentials** for bare-metal power are encrypted at rest only when
-  `MACHINA_API_KEY_MASTER_KEY` is set; the fencing password in `hosts.ipmi_password`
-  is still stored as plaintext.
+- **BMC and fencing credentials** are encrypted at rest (AES-256-GCM) only when
+  `MACHINA_API_KEY_MASTER_KEY` is set. That covers bare-metal BMC passwords and the fencing
+  password in `hosts.ipmi_password` (new writes, and existing plaintext rows are rewritten at
+  controller start once a key is configured). Without a key they stay plaintext.
