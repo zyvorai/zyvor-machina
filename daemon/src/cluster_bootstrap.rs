@@ -80,7 +80,7 @@ const CDI_RELEASES_DEFAULT: &str =
 
 /// Air-gapped sites point the bootstrap at an internal mirror: each source URL can be
 /// overridden by an environment variable, and the default stays the upstream location.
-fn mirror(env: &str, default: &str) -> String {
+pub(crate) fn mirror(env: &str, default: &str) -> String {
     std::env::var(env)
         .ok()
         .map(|v| v.trim().trim_end_matches('/').to_string())
@@ -88,7 +88,7 @@ fn mirror(env: &str, default: &str) -> String {
         .unwrap_or_else(|| default.to_string())
 }
 
-fn k3s_install_url() -> String {
+pub(crate) fn k3s_install_url() -> String {
     mirror("MACHINA_K3S_INSTALL_URL", K3S_INSTALL_URL_DEFAULT)
 }
 fn metrics_server_manifest() -> String {

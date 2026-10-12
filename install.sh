@@ -556,7 +556,8 @@ ensure_firecracker() {
 
     # CI kernel bucket lookup — mirrors Firecracker's own getting-started
     # guide verbatim (see this function's doc comment).
-    local s3="https://s3.amazonaws.com/spec.ccfc.min"
+    # Air-gapped sites mirror the Firecracker CI bucket and set MACHINA_FIRECRACKER_CI_URL.
+    local s3="${MACHINA_FIRECRACKER_CI_URL:-https://s3.amazonaws.com/spec.ccfc.min}"
     local ci_prefix latest_kernel_key
     # `|| true` on each pipeline: under this script's `set -eo pipefail`, a
     # zero-match grep (or a failed curl) makes the whole pipeline's exit
