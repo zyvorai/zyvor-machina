@@ -216,21 +216,22 @@ async fn virsh(args: &[&str]) -> anyhow::Result<std::process::Output> {
     })
 }
 
+async fn virsh_ok(args: &[&str]) -> anyhow::Result<()> {
+    let out = virsh(args).await?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        anyhow::bail!(
+            "virsh {} failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr).trim()
+        )
+    }
+}
+
 async fn libvirt_power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::Result<String> {
     let name = target.address.trim();
     libvirt_name_allowed(name)?;
-    let run = |args: Vec<&str>| async move {
-        let out = virsh(&args).await?;
-        if out.status.success() {
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!(
-                "virsh {} failed: {}",
-                args.join(" "),
-                String::from_utf8_lossy(&out.stderr).trim()
-            ))
-        }
-    };
     let running = async {
         let out = virsh(&["domstate", name]).await?;
         Ok::<bool, anyhow::Error>(
@@ -240,20 +241,20 @@ async fn libvirt_power(target: &BmcTarget<'_>, action: PowerAction) -> anyhow::R
     match action {
         PowerAction::On => {
             if !running.await? {
-                run(vec!["start", name]).await?;
+                virsh_ok(&["start", name]).await?;
             }
         }
         PowerAction::Off => {
             if running.await? {
-                run(vec!["destroy", name]).await?;
+                virsh_ok(&["destroy", name]).await?;
             }
         }
-        PowerAction::Reset => run(vec!["reset", name]).await?,
+        PowerAction::Reset => virsh_ok(&["reset", name]).await?,
         PowerAction::Cycle => {
             if running.await? {
-                run(vec!["destroy", name]).await?;
+                virsh_ok(&["destroy", name]).await?;
             }
-            run(vec!["start", name]).await?;
+            virsh_ok(&["start", name]).await?;
         }
     }
     Ok(format!(
