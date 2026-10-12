@@ -671,6 +671,18 @@ pub fn router(state: AppState) -> Router {
             post(baremetal::server_power),
         )
         .route(
+            "/api/v1/baremetal/servers/{id}/lifecycle",
+            post(baremetal::server_lifecycle),
+        )
+        .route(
+            "/api/v1/baremetal/servers/{id}/commission",
+            post(baremetal::server_commission),
+        )
+        .route(
+            "/api/v1/baremetal/servers/{id}/inventory",
+            get(baremetal::server_inventory),
+        )
+        .route(
             "/api/v1/baremetal/servers/{id}/provision",
             get(baremetal::server_provision),
         )
@@ -2068,6 +2080,10 @@ pub fn router(state: AppState) -> Router {
     // the same rate-limited-public bucket as password login and host join.
     let rate_limited_public = Router::new()
         .route("/api/v1/hosts/join", post(hosts::join_host))
+        .route(
+            "/api/v1/baremetal/commissioning/{id}/report",
+            post(baremetal::commissioning_report),
+        )
         .route("/api/v1/auth/login", post(crate::auth::login))
         .route("/ec2", post(ec2::query))
         .route("/ec2/", post(ec2::query))
@@ -2105,6 +2121,10 @@ pub fn enrollment_router(state: AppState) -> Router {
     let rate_limiter = RateLimiter::from_env(state.config.jwt_secret.clone());
     let joins = Router::new()
         .route("/api/v1/hosts/join", post(hosts::join_host))
+        .route(
+            "/api/v1/baremetal/commissioning/{id}/report",
+            post(baremetal::commissioning_report),
+        )
         .route_layer(middleware::from_fn_with_state(
             rate_limiter,
             rate_limit_middleware,

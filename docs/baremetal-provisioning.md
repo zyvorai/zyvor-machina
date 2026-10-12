@@ -47,13 +47,32 @@ are self-signed, so verification is off unless `MACHINA_BMC_VERIFY_TLS=1`.
 `ipmitool` must be installed on the controller host; the password is passed through
 `IPMI_PASSWORD`, not argv.
 
+## Lifecycle and commissioning
+
+`new -> commissioning -> ready -> allocated -> deploying -> deployed -> retired`, plus
+`failed`. Allowed moves: `new->commissioning`; `commissioning->ready|failed|new`;
+`ready->allocated|commissioning|retired`; `allocated->deploying|ready`;
+`deploying->deployed|failed`; `deployed->ready|retired`; `failed->commissioning|new|retired`;
+`retired->new`. Anything else is 409. `lifecycle` is separate from `state` (power).
+
+```
+POST /api/v1/baremetal/servers/{id}/commission     (admin) -> {token, report_path}
+POST /api/v1/baremetal/servers/{id}/lifecycle      (admin) {"to": "retired"}
+GET  /api/v1/baremetal/servers/{id}/inventory      (operator)
+POST /api/v1/baremetal/commissioning/{id}/report   (bearer token, no login)
+```
+
+The report is a JSON object: `cpu_cores`, `memory_mib`, `disks[]`, `nics[]`, `dmi{}`,
+`tests[{name, passed, detail}]`. Any failed test moves the server to `failed`, otherwise
+to `ready`; its cores and memory are copied onto the server. The token is single-use,
+only its SHA-256 is stored, and the report is limited to 256 KiB.
+
 ## Not done yet
 
-1. Lifecycle states `new, commissioning, ready, allocated, deploying, deployed, retired`.
-2. Boot service (proxyDHCP, TFTP, iPXE/HTTP boot) on a site agent.
-3. Commissioning image and `baremetal_inventory` (disks, NICs, DMI, firmware).
-4. Zones, allocation, autoinstall/kickstart rendering, first-boot join through the
+1. Boot service (proxyDHCP, TFTP, iPXE/HTTP boot) on a site agent.
+2. Commissioning image that produces the report above.
+3. Zones, allocation, autoinstall/kickstart rendering, first-boot join through the
    existing enrollment token.
-5. Moving `hosts.ipmi_password` (fencing) to the same encrypted storage.
+4. Moving `hosts.ipmi_password` (fencing) to the same encrypted storage.
 
 Claim status: C49 in [claims.md](claims.md).

@@ -9,6 +9,7 @@ pub mod atlas_vm;
 pub mod backup_verifier;
 pub mod baremetal;
 pub mod baremetal_bmc;
+pub mod baremetal_lifecycle;
 pub mod bpf;
 pub mod cert_monitor;
 pub mod channel_worker;
