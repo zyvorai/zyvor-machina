@@ -185,21 +185,21 @@ ensure_node_20() {
             if [ "$node_ver" -gt 0 ] 2>/dev/null; then
                 $PKG_MANAGER remove -y nodejs npm 2>/dev/null || true
             fi
-            curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - >> "$LOG_FILE" 2>&1 || fail "NodeSource setup failed"
+            curl -fsSL ${MACHINA_NODESOURCE_RPM_URL:-https://rpm.nodesource.com/setup_20.x} | bash - >> "$LOG_FILE" 2>&1 || fail "NodeSource setup failed"
             $PKG_MANAGER install -y nodejs >> "$LOG_FILE" 2>&1 || fail "Node.js install failed"
             ;;
         rhel)
             $PKG_MANAGER remove -y nodejs npm nodejs-full-i18n nodejs-libs 2>/dev/null || true
-            curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - >> "$LOG_FILE" 2>&1 || fail "NodeSource setup failed"
+            curl -fsSL ${MACHINA_NODESOURCE_RPM_URL:-https://rpm.nodesource.com/setup_20.x} | bash - >> "$LOG_FILE" 2>&1 || fail "NodeSource setup failed"
             $PKG_MANAGER install -y nodejs >> "$LOG_FILE" 2>&1 || fail "Node.js install failed"
             ;;
         debian)
-            curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >> "$LOG_FILE" 2>&1 || fail "NodeSource setup failed"
+            curl -fsSL ${MACHINA_NODESOURCE_DEB_URL:-https://deb.nodesource.com/setup_20.x} | bash - >> "$LOG_FILE" 2>&1 || fail "NodeSource setup failed"
             DEBIAN_FRONTEND=noninteractive $PKG_MANAGER install -y nodejs >> "$LOG_FILE" 2>&1 || fail "Node.js install failed"
             ;;
         suse)
             $PKG_MANAGER install -y nodejs20 npm20 >> "$LOG_FILE" 2>&1 || {
-                curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - >> "$LOG_FILE" 2>&1 || true
+                curl -fsSL ${MACHINA_NODESOURCE_RPM_URL:-https://rpm.nodesource.com/setup_20.x} | bash - >> "$LOG_FILE" 2>&1 || true
                 $PKG_MANAGER install -y nodejs >> "$LOG_FILE" 2>&1 || fail "Node.js install failed"
             }
             ;;
@@ -431,7 +431,7 @@ ensure_helm() {
         fail "Helm: package install failed and curl is missing; install helm or curl manually. See https://helm.sh/docs/intro/install/"
     fi
     info "Trying official get-helm-3 installer…"
-    curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash >>"$LOG_FILE" 2>&1 || \
+    curl -fsSL "${MACHINA_HELM_INSTALL_URL:-https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3}" | bash >>"$LOG_FILE" 2>&1 || \
         fail "Helm install failed. See https://helm.sh/docs/intro/install/ and log $LOG_FILE"
     hash -r 2>/dev/null || true
     command -v helm &>/dev/null || fail "Helm still not on PATH after get-helm-3"
@@ -464,7 +464,7 @@ ensure_cloud_hypervisor() {
             return 0
             ;;
     esac
-    local base="https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download/${ver}"
+    local base="${MACHINA_CLOUD_HYPERVISOR_BASE_URL:-https://github.com/cloud-hypervisor/cloud-hypervisor/releases/download}/${ver}"
     if ! curl -fsSL -o /tmp/cloud-hypervisor "${base}/${chv_asset}"; then
         warn "Failed to download Cloud Hypervisor ${ver} — cloudhypervisor sprite backend will be unavailable (sprites still work via libvirt)"
         return 0
@@ -477,7 +477,7 @@ ensure_cloud_hypervisor() {
     # Cloud Hypervisor has no built-in BIOS the way QEMU does — booting a
     # disk image requires an explicit --firmware (or --kernel). CLOUDHV.fd is
     # the upstream cloud-hypervisor/edk2 firmware build for exactly this.
-    if ! curl -fsSL -o /tmp/CLOUDHV.fd "https://github.com/cloud-hypervisor/edk2/releases/latest/download/CLOUDHV.fd"; then
+    if ! curl -fsSL -o /tmp/CLOUDHV.fd "${MACHINA_CLOUDHV_FD_URL:-https://github.com/cloud-hypervisor/edk2/releases/latest/download/CLOUDHV.fd}"; then
         warn "Failed to download Cloud Hypervisor firmware (CLOUDHV.fd) — cloudhypervisor sprite backend will be unavailable (sprites still work via libvirt)"
         rm -f /tmp/cloud-hypervisor /tmp/ch-remote
         return 0
@@ -526,7 +526,7 @@ ensure_firecracker() {
             ;;
     esac
 
-    local release_url="https://github.com/firecracker-microvm/firecracker/releases"
+    local release_url="${MACHINA_FIRECRACKER_RELEASE_URL:-https://github.com/firecracker-microvm/firecracker/releases}"
     local ver="${FIRECRACKER_VERSION:-}"
     if [ -z "$ver" ]; then
         ver=$(basename "$(curl -fsSLI -o /dev/null -w '%{url_effective}' "${release_url}/latest")")
@@ -986,7 +986,7 @@ ensure_bpf_toolchain() {
         *) warn "no prebuilt bpf-linker for $(uname -m) — run: cargo install bpf-linker"; return ;;
     esac
     command -v zstd >/dev/null 2>&1 || install_pkg_quiet zstd
-    local url="https://github.com/aya-rs/bpf-linker/releases/download/${BPF_LINKER_VERSION}/bpf-linker-${arch}-unknown-linux-musl.tar.zst"
+    local url="${MACHINA_BPF_LINKER_BASE_URL:-https://github.com/aya-rs/bpf-linker/releases/download}/${BPF_LINKER_VERSION}/bpf-linker-${arch}-unknown-linux-musl.tar.zst"
     local tmp
     tmp="$(mktemp -d /tmp/bpf-linker-XXXXXX)"
     info "Downloading bpf-linker ${BPF_LINKER_VERSION} (${arch})..."

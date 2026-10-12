@@ -296,6 +296,13 @@ TLS is active only when `enabled=true` **and** both paths are non-empty.
 | `MACHINA_K3S_INSTALL_URL`, `MACHINA_METRICS_SERVER_MANIFEST_URL`, `MACHINA_KUBEVIRT_STABLE_URL`, `MACHINA_KUBEVIRT_RELEASES_URL`, `MACHINA_CDI_LATEST_API_URL`, `MACHINA_CDI_RELEASES_URL` (also used by the k3s install route) | Daemon: internal mirrors for the cluster bootstrap downloads (get.k3s.io, GitHub releases, the KubeVirt stable.txt), for air-gapped sites. Unset keeps the upstream URL | upstream |
 | `MACHINA_KATA_LATEST_API_URL`, `MACHINA_KATA_HELM_CHART`, `MACHINA_KATA_EXAMPLES_URL` | Daemon: mirrors for the Kata Containers deploy (GitHub releases API, OCI Helm chart, example manifests). Unset keeps upstream | upstream |
 | `MACHINA_FIRECRACKER_CI_URL` | `install.sh`: mirror of the Firecracker CI kernel bucket (default `https://s3.amazonaws.com/spec.ccfc.min`). The kernel is optional; without it the firecracker sprite backend is skipped | upstream |
+| `MACHINA_NODESOURCE_RPM_URL` / `MACHINA_NODESOURCE_DEB_URL` | `install.sh`: Node.js setup script for RPM / DEB distros (default NodeSource `setup_20.x`). Point at an internal mirror or a script that configures your own repo | upstream |
+| `MACHINA_HELM_INSTALL_URL` | `install.sh`: Helm installer script (default the upstream `get-helm-3`) | upstream |
+| `MACHINA_CLOUD_HYPERVISOR_BASE_URL` / `MACHINA_CLOUDHV_FD_URL` | `install.sh`: Cloud Hypervisor release download base (the version is appended) and the `CLOUDHV.fd` firmware file | upstream |
+| `MACHINA_FIRECRACKER_RELEASE_URL` | `install.sh`: Firecracker releases base (default the upstream GitHub releases) | upstream |
+| `MACHINA_BPF_LINKER_BASE_URL` | `install.sh`: bpf-linker release download base (default `https://github.com/aya-rs/bpf-linker/releases/download`) | upstream |
+| `MACHINA_BMC_VERIFY_TLS` | Controller: verify Redfish BMC TLS certificates (default off: BMCs ship self-signed certificates) | off |
+| `MACHINA_METAL_RHEL_REPO` | Controller: package repository URL a kickstart install uses (required for `rhel-9`/`rocky-9`/`almalinux-9` bare-metal deploys) | unset |
 | `MACHINA_DB_MAX_CONNECTIONS` | PostgreSQL pool size | `20` (PostgreSQL build only) |
 | `NATS_URL` | Enables NATS task fan-out | `nats://127.0.0.1:4222` (optional) |
 | `MACHINA_AGENT_ADDR` | gRPC agent address | `http://127.0.0.1:50051` |
