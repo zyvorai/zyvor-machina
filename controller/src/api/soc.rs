@@ -492,7 +492,9 @@ pub async fn test_integration(
             splunk_hec::test_connection(&row.config_json, &state.config.controller_id).await?
         }
         "elastic_bulk" => elastic_bulk::test_connection(&row.config_json).await?,
-        "webhook_json" => webhook_json::test_connection(&row.config_json).await?,
+        "webhook_json" => webhook_json::test_connection(&row.config_json)
+            .await
+            .map_err(|e| ApiError::bad_request(e.to_string()))?,
         "qradar_rest" => qradar_rest::test_connection(&row.config_json).await?,
         other => {
             return Err(ApiError::bad_request(format!(
