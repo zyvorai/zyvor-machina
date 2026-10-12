@@ -242,10 +242,11 @@ pub async fn detach(
 ) -> Result<Json<TaskResponse>, ApiError> {
     require_operator(&actor)?;
     let (_, host, _) = vm_row(&state, id).await?;
-    let is_fork: Option<i64> = crate::db::query_scalar("SELECT 1 FROM vm_forks WHERE fork_vm_id = ?")
-        .bind(id)
-        .fetch_optional(&state.pool)
-        .await?;
+    let is_fork: Option<i64> =
+        crate::db::query_scalar("SELECT 1 FROM vm_forks WHERE fork_vm_id = ?")
+            .bind(id)
+            .fetch_optional(&state.pool)
+            .await?;
     if is_fork.is_none() {
         return Err(ApiError::bad_request("this VM is not a fork"));
     }

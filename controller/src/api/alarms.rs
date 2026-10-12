@@ -83,7 +83,8 @@ fn none() -> String {
 
 pub(crate) fn validate(b: &CreateAlarm) -> Result<(), String> {
     machina_spec::validate_name(&b.name).map_err(|e| e.to_string())?;
-    if b.subject.is_empty() || b.subject.len() > 128 || b.metric.is_empty() || b.metric.len() > 128 {
+    if b.subject.is_empty() || b.subject.len() > 128 || b.metric.is_empty() || b.metric.len() > 128
+    {
         return Err("subject and metric are required (at most 128 characters)".into());
     }
     if !["Average", "Minimum", "Maximum", "Sum", "SampleCount"].contains(&b.statistic.as_str()) {
@@ -128,7 +129,11 @@ pub async fn list_alarms(
     Extension(actor): Extension<AuthUser>,
 ) -> Result<Json<Vec<AlarmRow>>, ApiError> {
     require_operator(&actor)?;
-    Ok(Json(crate::db::query_as(&format!("{SELECT} ORDER BY name")).fetch_all(&state.pool).await?))
+    Ok(Json(
+        crate::db::query_as(&format!("{SELECT} ORDER BY name"))
+            .fetch_all(&state.pool)
+            .await?,
+    ))
 }
 
 pub async fn get_alarm(
@@ -137,8 +142,12 @@ pub async fn get_alarm(
     Path(id): Path<Uuid>,
 ) -> Result<Json<AlarmRow>, ApiError> {
     require_operator(&actor)?;
-    let row = crate::db::query_as(&format!("{SELECT} WHERE id = ?")).bind(id).fetch_optional(&state.pool).await?;
-    row.map(Json).ok_or_else(|| ApiError::not_found("alarm not found"))
+    let row = crate::db::query_as(&format!("{SELECT} WHERE id = ?"))
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?;
+    row.map(Json)
+        .ok_or_else(|| ApiError::not_found("alarm not found"))
 }
 
 pub async fn create_alarm(
@@ -150,10 +159,11 @@ pub async fn create_alarm(
     validate(&b).map_err(ApiError::bad_request)?;
     let mut conn = state.pool.acquire().await?;
     if let Some(g) = b.group_id {
-        let project: Option<Uuid> = crate::db::query_scalar("SELECT project_id FROM cloud_instance_groups WHERE id = ?")
-            .bind(g)
-            .fetch_optional(&mut *conn)
-            .await?;
+        let project: Option<Uuid> =
+            crate::db::query_scalar("SELECT project_id FROM cloud_instance_groups WHERE id = ?")
+                .bind(g)
+                .fetch_optional(&mut *conn)
+                .await?;
         let project = project.ok_or_else(|| ApiError::bad_request("no such instance group"))?;
         access(&mut conn, &actor, project, true).await?;
     }
@@ -219,7 +229,10 @@ pub async fn delete_alarm(
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_operator(&actor)?;
-    let r = crate::db::query("DELETE FROM cloud_alarms WHERE id = ?").bind(id).execute(&state.pool).await?;
+    let r = crate::db::query("DELETE FROM cloud_alarms WHERE id = ?")
+        .bind(id)
+        .execute(&state.pool)
+        .await?;
     if r.rows_affected() == 0 {
         return Err(ApiError::not_found("alarm not found"));
     }

@@ -166,9 +166,10 @@ pub async fn list_stacks(
     Extension(actor): Extension<AuthUser>,
 ) -> Result<Json<Vec<StackRow>>, ApiError> {
     require_operator(&actor)?;
-    let rows = crate::db::query_as::<_, StackRow>(&format!("{STACK_SELECT} ORDER BY created_at DESC"))
-        .fetch_all(&state.pool)
-        .await?;
+    let rows =
+        crate::db::query_as::<_, StackRow>(&format!("{STACK_SELECT} ORDER BY created_at DESC"))
+            .fetch_all(&state.pool)
+            .await?;
     Ok(Json(rows))
 }
 

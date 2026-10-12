@@ -27,7 +27,8 @@ pub enum SigError {
 }
 
 fn hmac(key: &[u8], data: &[u8]) -> Vec<u8> {
-    let mut m = <Hmac<Sha256> as KeyInit>::new_from_slice(key).expect("hmac accepts any key length");
+    let mut m =
+        <Hmac<Sha256> as KeyInit>::new_from_slice(key).expect("hmac accepts any key length");
     m.update(data);
     m.finalize().into_bytes().to_vec()
 }
@@ -56,9 +57,18 @@ pub fn parse_authorization(h: &str) -> Result<ParsedAuth, SigError> {
     let cred = cred.ok_or(SigError::Malformed("missing Credential"))?;
     let mut c = cred.splitn(5, '/');
     let access_key = c.next().unwrap_or_default().to_string();
-    let date = c.next().ok_or(SigError::Malformed("bad Credential"))?.to_string();
-    let region = c.next().ok_or(SigError::Malformed("bad Credential"))?.to_string();
-    let service = c.next().ok_or(SigError::Malformed("bad Credential"))?.to_string();
+    let date = c
+        .next()
+        .ok_or(SigError::Malformed("bad Credential"))?
+        .to_string();
+    let region = c
+        .next()
+        .ok_or(SigError::Malformed("bad Credential"))?
+        .to_string();
+    let service = c
+        .next()
+        .ok_or(SigError::Malformed("bad Credential"))?
+        .to_string();
     if c.next() != Some("aws4_request") || access_key.is_empty() {
         return Err(SigError::Malformed("bad Credential scope"));
     }
@@ -76,7 +86,9 @@ pub fn parse_authorization(h: &str) -> Result<ParsedAuth, SigError> {
         region,
         service,
         signed_headers,
-        signature: sig.ok_or(SigError::Malformed("missing Signature"))?.to_string(),
+        signature: sig
+            .ok_or(SigError::Malformed("missing Signature"))?
+            .to_string(),
     })
 }
 
@@ -84,7 +96,9 @@ fn uri_encode(s: &str, keep_slash: bool) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
         match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
             b'/' if keep_slash => out.push('/'),
             _ => out.push_str(&format!("%{b:02X}")),
         }
@@ -103,7 +117,11 @@ fn canonical_query(query: &str) -> String {
         })
         .collect();
     pairs.sort();
-    pairs.iter().map(|(k, v)| format!("{k}={v}")).collect::<Vec<_>>().join("&")
+    pairs
+        .iter()
+        .map(|(k, v)| format!("{k}={v}"))
+        .collect::<Vec<_>>()
+        .join("&")
 }
 
 /// The signature the client should have produced.
@@ -123,7 +141,9 @@ pub fn expected_signature(
             .iter()
             .find(|(k, _)| k.eq_ignore_ascii_case(name))
             .map(|(_, v)| v.split_whitespace().collect::<Vec<_>>().join(" "))
-            .ok_or(SigError::Malformed("a signed header is missing from the request"))?;
+            .ok_or(SigError::Malformed(
+                "a signed header is missing from the request",
+            ))?;
         canon_headers.push_str(&format!("{name}:{v}\n"));
     }
     let canonical = format!(
@@ -133,8 +153,14 @@ pub fn expected_signature(
         auth.signed_headers.join(";"),
         sha256_hex(payload)
     );
-    let scope = format!("{}/{}/{}/aws4_request", auth.date, auth.region, auth.service);
-    let to_sign = format!("AWS4-HMAC-SHA256\n{amz_date}\n{scope}\n{}", sha256_hex(canonical.as_bytes()));
+    let scope = format!(
+        "{}/{}/{}/aws4_request",
+        auth.date, auth.region, auth.service
+    );
+    let to_sign = format!(
+        "AWS4-HMAC-SHA256\n{amz_date}\n{scope}\n{}",
+        sha256_hex(canonical.as_bytes())
+    );
     let k = hmac(format!("AWS4{secret}").as_bytes(), auth.date.as_bytes());
     let k = hmac(&k, auth.region.as_bytes());
     let k = hmac(&k, auth.service.as_bytes());
@@ -159,9 +185,13 @@ pub fn verify(
         return Err(SigError::Skew);
     }
     if !amz_date.starts_with(&auth.date) {
-        return Err(SigError::Malformed("credential date does not match X-Amz-Date"));
+        return Err(SigError::Malformed(
+            "credential date does not match X-Amz-Date",
+        ));
     }
-    let want = expected_signature(auth, secret, method, path, query, headers, payload, amz_date)?;
+    let want = expected_signature(
+        auth, secret, method, path, query, headers, payload, amz_date,
+    )?;
     let (a, b) = (want.as_bytes(), auth.signature.as_bytes());
     let diff = a.len() ^ b.len() | a.iter().zip(b).fold(0u8, |d, (x, y)| d | (x ^ y)) as usize;
     if diff == 0 {
@@ -177,7 +207,14 @@ pub fn parse_amz_date(s: &str) -> Option<i64> {
         return None;
     }
     let n = |r: std::ops::Range<usize>| s.get(r)?.parse::<i64>().ok();
-    let (y, mo, d, h, mi, se) = (n(0..4)?, n(4..6)?, n(6..8)?, n(9..11)?, n(11..13)?, n(13..15)?);
+    let (y, mo, d, h, mi, se) = (
+        n(0..4)?,
+        n(4..6)?,
+        n(6..8)?,
+        n(9..11)?,
+        n(11..13)?,
+        n(13..15)?,
+    );
     if !(1..=12).contains(&mo) || !(1..=31).contains(&d) || h > 23 || mi > 59 || se > 60 {
         return None;
     }
@@ -200,7 +237,10 @@ mod tests {
 
     fn headers() -> Vec<(String, String)> {
         vec![
-            ("Content-Type".into(), "application/x-www-form-urlencoded; charset=utf-8".into()),
+            (
+                "Content-Type".into(),
+                "application/x-www-form-urlencoded; charset=utf-8".into(),
+            ),
             ("Host".into(), "iam.amazonaws.com".into()),
             ("X-Amz-Date".into(), "20150830T123600Z".into()),
         ]
@@ -210,8 +250,21 @@ mod tests {
     #[test]
     fn matches_the_aws_documented_example() {
         let auth = parse_authorization(AUTH).unwrap();
-        let sig = expected_signature(&auth, SECRET, "GET", "/", "Action=ListUsers&Version=2010-05-08", &headers(), b"", "20150830T123600Z").unwrap();
-        assert_eq!(sig, "5d672d79c15b13162d9279b0855cfba6789a8edb4c82c400e06b5924a6f2b5d7");
+        let sig = expected_signature(
+            &auth,
+            SECRET,
+            "GET",
+            "/",
+            "Action=ListUsers&Version=2010-05-08",
+            &headers(),
+            b"",
+            "20150830T123600Z",
+        )
+        .unwrap();
+        assert_eq!(
+            sig,
+            "5d672d79c15b13162d9279b0855cfba6789a8edb4c82c400e06b5924a6f2b5d7"
+        );
     }
 
     #[test]
@@ -219,17 +272,82 @@ mod tests {
         let auth = parse_authorization(AUTH).unwrap();
         let now = parse_amz_date("20150830T123600Z").unwrap();
         let q = "Action=ListUsers&Version=2010-05-08";
-        assert_eq!(verify(&auth, SECRET, "GET", "/", q, &headers(), b"", "20150830T123600Z", now + 60), Ok(()));
-        assert_eq!(verify(&auth, SECRET, "GET", "/", "Action=DeleteUser&Version=2010-05-08", &headers(), b"", "20150830T123600Z", now), Err(SigError::Mismatch));
-        assert_eq!(verify(&auth, "wrong", "GET", "/", q, &headers(), b"", "20150830T123600Z", now), Err(SigError::Mismatch));
-        assert_eq!(verify(&auth, SECRET, "GET", "/", q, &headers(), b"", "20150830T123600Z", now + MAX_SKEW_SECS + 1), Err(SigError::Skew));
+        assert_eq!(
+            verify(
+                &auth,
+                SECRET,
+                "GET",
+                "/",
+                q,
+                &headers(),
+                b"",
+                "20150830T123600Z",
+                now + 60
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            verify(
+                &auth,
+                SECRET,
+                "GET",
+                "/",
+                "Action=DeleteUser&Version=2010-05-08",
+                &headers(),
+                b"",
+                "20150830T123600Z",
+                now
+            ),
+            Err(SigError::Mismatch)
+        );
+        assert_eq!(
+            verify(
+                &auth,
+                "wrong",
+                "GET",
+                "/",
+                q,
+                &headers(),
+                b"",
+                "20150830T123600Z",
+                now
+            ),
+            Err(SigError::Mismatch)
+        );
+        assert_eq!(
+            verify(
+                &auth,
+                SECRET,
+                "GET",
+                "/",
+                q,
+                &headers(),
+                b"",
+                "20150830T123600Z",
+                now + MAX_SKEW_SECS + 1
+            ),
+            Err(SigError::Skew)
+        );
     }
 
     #[test]
     fn query_order_does_not_matter() {
         let auth = parse_authorization(AUTH).unwrap();
-        let a = expected_signature(&auth, SECRET, "GET", "/", "Version=2010-05-08&Action=ListUsers", &headers(), b"", "20150830T123600Z").unwrap();
-        assert_eq!(a, "5d672d79c15b13162d9279b0855cfba6789a8edb4c82c400e06b5924a6f2b5d7");
+        let a = expected_signature(
+            &auth,
+            SECRET,
+            "GET",
+            "/",
+            "Version=2010-05-08&Action=ListUsers",
+            &headers(),
+            b"",
+            "20150830T123600Z",
+        )
+        .unwrap();
+        assert_eq!(
+            a,
+            "5d672d79c15b13162d9279b0855cfba6789a8edb4c82c400e06b5924a6f2b5d7"
+        );
     }
 
     #[test]

@@ -368,11 +368,12 @@ pub async fn put_labels(
 ) -> Result<Json<Value>, ApiError> {
     require_operator(&actor)?;
     validate_labels(&b.labels)?;
-    let r = crate::db::query("UPDATE vms SET labels = ?, updated_at = datetime('now') WHERE id = ?")
-        .bind(serde_json::to_string(&b.labels).unwrap_or_else(|_| "{}".into()))
-        .bind(id)
-        .execute(&state.pool)
-        .await?;
+    let r =
+        crate::db::query("UPDATE vms SET labels = ?, updated_at = datetime('now') WHERE id = ?")
+            .bind(serde_json::to_string(&b.labels).unwrap_or_else(|_| "{}".into()))
+            .bind(id)
+            .execute(&state.pool)
+            .await?;
     if r.rows_affected() == 0 {
         return Err(ApiError::not_found("vm not found"));
     }

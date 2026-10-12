@@ -635,7 +635,12 @@ pub async fn create_from_template(
         }
     }
     vm.spec.template_ref = Some(template_ref.clone());
-    let ssh_pubkey = resolve_key_name(&state.pool, body.key_name.as_deref(), body.cloud_init_ssh_pubkey.clone()).await?;
+    let ssh_pubkey = resolve_key_name(
+        &state.pool,
+        body.key_name.as_deref(),
+        body.cloud_init_ssh_pubkey.clone(),
+    )
+    .await?;
     if body.cloud_init_user.is_some()
         || body.cloud_init_password.is_some()
         || ssh_pubkey.is_some()
@@ -771,7 +776,12 @@ pub async fn create_from_iso(
         "install_iso".into(),
         iso_path.to_string(),
     )]));
-    let ssh_pubkey = resolve_key_name(&state.pool, body.key_name.as_deref(), body.cloud_init_ssh_pubkey.clone()).await?;
+    let ssh_pubkey = resolve_key_name(
+        &state.pool,
+        body.key_name.as_deref(),
+        body.cloud_init_ssh_pubkey.clone(),
+    )
+    .await?;
     if body.cloud_init_user.is_some()
         || body.cloud_init_password.is_some()
         || ssh_pubkey.is_some()
@@ -1015,7 +1025,12 @@ pub async fn create_from_virt_install(
         vm.spec.firmware = fw.trim().to_string();
     }
     vm.metadata.labels = Some(labels);
-    let ssh_pubkey = resolve_key_name(&state.pool, body.key_name.as_deref(), body.cloud_init_ssh_pubkey.clone()).await?;
+    let ssh_pubkey = resolve_key_name(
+        &state.pool,
+        body.key_name.as_deref(),
+        body.cloud_init_ssh_pubkey.clone(),
+    )
+    .await?;
     if body.cloud_init_user.is_some()
         || body.cloud_init_password.is_some()
         || ssh_pubkey.is_some()
@@ -1326,10 +1341,11 @@ pub(crate) async fn delete_vm_inventory_row(
     pool: &crate::db::DbPool,
     vm_id: Uuid,
 ) -> Result<String, ApiError> {
-    let name: Option<String> = crate::db::query_scalar("DELETE FROM vms WHERE id = ? RETURNING name")
-        .bind(vm_id)
-        .fetch_optional(pool)
-        .await?;
+    let name: Option<String> =
+        crate::db::query_scalar("DELETE FROM vms WHERE id = ? RETURNING name")
+            .bind(vm_id)
+            .fetch_optional(pool)
+            .await?;
     name.ok_or_else(|| ApiError::not_found("vm not found"))
 }
 
@@ -1716,11 +1732,13 @@ pub async fn patch_vm(
 ) -> Result<Json<VmRow>, ApiError> {
     require_operator(&actor)?;
     if let Some(ds) = &body.desired_state {
-        crate::db::query("UPDATE vms SET desired_state = ?, updated_at = datetime('now') WHERE id = ?")
-            .bind(ds)
-            .bind(id)
-            .execute(&state.pool)
-            .await?;
+        crate::db::query(
+            "UPDATE vms SET desired_state = ?, updated_at = datetime('now') WHERE id = ?",
+        )
+        .bind(ds)
+        .bind(id)
+        .execute(&state.pool)
+        .await?;
     }
     if let Some(project) = &body.project {
         crate::db::query("UPDATE vms SET project = ?, updated_at = datetime('now') WHERE id = ?")
@@ -1954,11 +1972,12 @@ pub async fn adopt_vm(
     if managed {
         return Err(ApiError::bad_request("VM is already managed"));
     }
-    let source: String =
-        crate::db::query_scalar("SELECT COALESCE(inventory_source, 'libvirt') FROM vms WHERE id = ?")
-            .bind(id)
-            .fetch_one(&state.pool)
-            .await?;
+    let source: String = crate::db::query_scalar(
+        "SELECT COALESCE(inventory_source, 'libvirt') FROM vms WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_one(&state.pool)
+    .await?;
     let desired = if source == "kubevirt" {
         if observed == "running" {
             "running"
@@ -2661,11 +2680,12 @@ pub async fn rename_platform_vm(
     .await
     {
         // Libvirt rename failed — roll back the DB name to keep them in sync.
-        let _ = crate::db::query("UPDATE vms SET name = ?, updated_at = datetime('now') WHERE id = ?")
-            .bind(&old_name)
-            .bind(id)
-            .execute(&state.pool)
-            .await;
+        let _ =
+            crate::db::query("UPDATE vms SET name = ?, updated_at = datetime('now') WHERE id = ?")
+                .bind(&old_name)
+                .bind(id)
+                .execute(&state.pool)
+                .await;
         return Err(ApiError::internal(e.to_string()));
     }
     state.emit_event("vm.rename", format!("VM renamed to {new_name}"));
@@ -2887,14 +2907,19 @@ pub(crate) async fn resolve_key_name(
         return Ok(literal);
     };
     if literal.as_deref().is_some_and(|k| !k.trim().is_empty()) {
-        return Err(ApiError::bad_request("give either key_name or cloud_init_ssh_pubkey, not both"));
+        return Err(ApiError::bad_request(
+            "give either key_name or cloud_init_ssh_pubkey, not both",
+        ));
     }
-    let key: Option<String> = crate::db::query_scalar("SELECT public_key FROM keypairs WHERE name = ? ORDER BY created_at LIMIT 1")
-        .bind(name)
-        .fetch_optional(pool)
-        .await?;
-    key.map(Some)
-        .ok_or_else(|| ApiError::bad_request(format!("no key pair named '{name}'")).with_code("keypair_not_found"))
+    let key: Option<String> = crate::db::query_scalar(
+        "SELECT public_key FROM keypairs WHERE name = ? ORDER BY created_at LIMIT 1",
+    )
+    .bind(name)
+    .fetch_optional(pool)
+    .await?;
+    key.map(Some).ok_or_else(|| {
+        ApiError::bad_request(format!("no key pair named '{name}'")).with_code("keypair_not_found")
+    })
 }
 
 pub(crate) fn type_change_blocker(
@@ -2936,7 +2961,8 @@ pub async fn change_vm_type(
             .bind(body.flavor_id)
             .fetch_optional(&state.pool)
             .await?;
-    let (new_vcpus, new_memory) = flavor.ok_or_else(|| ApiError::bad_request("flavor not found"))?;
+    let (new_vcpus, new_memory) =
+        flavor.ok_or_else(|| ApiError::bad_request("flavor not found"))?;
     if let Some(why) = type_change_blocker(
         vcpus,
         memory_mib,
@@ -3256,7 +3282,9 @@ mod type_change_tests {
 
     #[test]
     fn the_same_flavor_at_the_same_size_is_refused() {
-        assert!(type_change_blocker(2, 4096, 2, 4096, true).unwrap().contains("already"));
+        assert!(type_change_blocker(2, 4096, 2, 4096, true)
+            .unwrap()
+            .contains("already"));
     }
 
     #[test]
@@ -3325,7 +3353,8 @@ pub async fn run_instances(
     for name in run_names(&body.base.name, body.count) {
         let mut one = body.base.clone();
         one.name = name.clone();
-        match create_from_template(State(state.clone()), Extension(actor.clone()), Json(one)).await {
+        match create_from_template(State(state.clone()), Extension(actor.clone()), Json(one)).await
+        {
             Ok(Json(t)) => created.push(serde_json::json!({ "name": name, "task_id": t.task_id })),
             Err(e) => {
                 last_error = Some(e);
@@ -3334,7 +3363,10 @@ pub async fn run_instances(
         }
     }
     if created.len() < min as usize {
-        let names: Vec<String> = created.iter().filter_map(|c| c["name"].as_str().map(String::from)).collect();
+        let names: Vec<String> = created
+            .iter()
+            .filter_map(|c| c["name"].as_str().map(String::from))
+            .collect();
         let why = last_error.map(|e| e.message).unwrap_or_default();
         return Err(ApiError::conflict(
             format!(

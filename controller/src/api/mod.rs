@@ -13,8 +13,8 @@ mod backup_targets;
 mod backups;
 mod baremetal;
 mod blueprints;
-mod chaos;
 pub mod cert;
+mod chaos;
 pub(crate) mod cloud;
 mod cloud_init;
 mod cluster;
@@ -22,9 +22,9 @@ mod content;
 pub mod cpu_compat;
 mod developer;
 mod dist;
+mod ec2;
+mod elastic_ips;
 mod enrollment;
-mod fleet_pki;
-pub(crate) mod join_events;
 mod enterprise_security;
 mod error;
 mod events;
@@ -32,6 +32,7 @@ mod fence;
 mod flavors;
 mod fleet;
 mod fleet_automation;
+mod fleet_pki;
 mod guestkit;
 mod ha;
 mod health;
@@ -39,17 +40,15 @@ mod health_check;
 mod host_cockpit;
 mod host_os;
 mod hosts;
-mod ec2;
-mod elastic_ips;
+pub(crate) mod join_events;
 mod keypairs;
-pub(crate) mod metric_stats;
 mod kubevirt;
 mod launchpad;
 mod load_balancers;
 mod maintenance;
 mod marketplace;
 mod mcp;
-mod tags;
+pub(crate) mod metric_stats;
 mod metrics;
 mod migration_jobs;
 mod network_canvas;
@@ -63,8 +62,8 @@ mod observability_middleware;
 mod oidc;
 mod operations;
 mod placement;
-mod preempt;
 mod policy;
+mod preempt;
 mod projects;
 mod proxmox;
 mod recommendations;
@@ -78,18 +77,19 @@ pub mod stacks;
 mod storage;
 mod storage_tiers;
 mod support;
-mod update_check;
+mod tags;
 mod task_failures;
 mod tasks;
 mod templates;
+mod time_travel;
 mod topology;
+mod update_check;
 mod upgrade;
 mod users;
 mod vm_libvirt;
 pub(crate) mod vm_network_policies;
 mod vm_row;
 mod vm_schedules;
-mod time_travel;
 mod vm_sleep;
 pub(crate) mod vms;
 mod vmware;
@@ -497,7 +497,10 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/ai/incidents/analyze",
             get(ai::analyze_incident).post(ai::analyze_incident_post),
         )
-        .route("/api/v1/ai/interference/noisy-neighbors", get(ai::noisy_neighbors))
+        .route(
+            "/api/v1/ai/interference/noisy-neighbors",
+            get(ai::noisy_neighbors),
+        )
         .route(
             "/api/v1/ai/incidents/blackbox",
             get(ai::analyze_blackbox_incident),
@@ -632,7 +635,9 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/tags", get(tags::list_tags))
         .route(
             "/api/v1/tags/{resource_type}/{id}",
-            get(tags::get_tags).put(tags::put_tags).delete(tags::delete_tags),
+            get(tags::get_tags)
+                .put(tags::put_tags)
+                .delete(tags::delete_tags),
         )
         .route("/api/v1/ids/{ec2_id}", get(tags::resolve_ec2_id))
         .route("/api/v1/ai/trust", get(ai::zyra_trust_list))
@@ -682,7 +687,10 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/baremetal/servers/{id}/inventory",
             get(baremetal::server_inventory),
         )
-        .route("/api/v1/baremetal/boot/dnsmasq.conf", get(baremetal::boot_dnsmasq))
+        .route(
+            "/api/v1/baremetal/boot/dnsmasq.conf",
+            get(baremetal::boot_dnsmasq),
+        )
         .route("/api/v1/baremetal/allocate", post(baremetal::allocate))
         .route(
             "/api/v1/baremetal/images",
@@ -715,7 +723,10 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/v1/ai/security", get(ai::security_sentinel))
         .route("/api/v1/ai/policy/export", get(ai::policy_export))
-        .route("/api/v1/ai/performance-autopilot", get(ai::performance_autopilot))
+        .route(
+            "/api/v1/ai/performance-autopilot",
+            get(ai::performance_autopilot),
+        )
         .route("/api/v1/ai/autopilot/propose", get(ai::autopilot_propose))
         .route("/api/v1/ai/autopilot/execute", post(ai::autopilot_execute))
         .route("/api/v1/ai/autopilot/run", post(ai::autopilot_run))
@@ -732,7 +743,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/ai/terminal/suggest", post(ai::terminal_suggest))
         .route("/api/v1/ai/network/explain", post(ai::network_explain))
         .route("/api/v1/migrations/advisor", get(ai::migration_advisor))
-        .route("/api/v1/migrations/adaptive/decision", post(vms::adaptive_migration_decision))
+        .route(
+            "/api/v1/migrations/adaptive/decision",
+            post(vms::adaptive_migration_decision),
+        )
         .route("/api/v1/guestkit/status", get(guestkit::guestkit_status))
         .route("/api/v1/guestkit/doctor", post(guestkit::guestkit_doctor))
         .route(
@@ -1313,7 +1327,10 @@ pub fn router(state: AppState) -> Router {
             get(vms::get_vm_sleep_policy).put(vms::set_vm_sleep_policy),
         )
         .route("/api/v1/sleep/summary", get(vm_sleep::summary))
-        .route("/api/v1/sleep/policies", get(vm_sleep::list_project_policies))
+        .route(
+            "/api/v1/sleep/policies",
+            get(vm_sleep::list_project_policies),
+        )
         .route(
             "/api/v1/sleep/policies/{project}",
             put(vm_sleep::put_project_policy).delete(vm_sleep::delete_project_policy),
@@ -1340,7 +1357,10 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/vms/{id}/guest-tools/install",
             post(vms::install_guest_tools),
         )
-        .route("/api/v1/migrations/adaptive/step", post(vms::adaptive_migration_step))
+        .route(
+            "/api/v1/migrations/adaptive/step",
+            post(vms::adaptive_migration_step),
+        )
         .route(
             "/api/v1/vms/{id}/migrate/precheck",
             post(vms::migrate_precheck),
@@ -1871,7 +1891,10 @@ pub fn router(state: AppState) -> Router {
                 .put(chaos::update_experiment)
                 .delete(chaos::delete_experiment),
         )
-        .route("/api/v1/chaos/experiments/{id}/run", post(chaos::run_experiment))
+        .route(
+            "/api/v1/chaos/experiments/{id}/run",
+            post(chaos::run_experiment),
+        )
         .route("/api/v1/chaos/runs", get(chaos::list_runs))
         .route("/api/v1/chaos/runs/{id}", get(chaos::get_run))
         .route("/api/v1/chaos/runs/{id}/abort", post(chaos::abort_run))
@@ -1880,7 +1903,10 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/preemption/settings", put(preempt::update_settings))
         .route("/api/v1/vms/{id}/preemptible", put(preempt::set_vm))
         .route("/api/v1/rightsizing", get(autopilot::rightsizing))
-        .route("/api/v1/rightsizing/propose", post(autopilot::propose_resize))
+        .route(
+            "/api/v1/rightsizing/propose",
+            post(autopilot::propose_resize),
+        )
         .route("/api/v1/drs/consolidation", get(autopilot::consolidation))
         .route(
             "/api/v1/drs/consolidation/propose",
@@ -1940,8 +1966,14 @@ pub fn router(state: AppState) -> Router {
             get(policy::list_project_quotas).post(policy::upsert_project_quota),
         )
         .route("/api/v1/support/bundle", get(support::support_bundle))
-        .route("/api/v1/support/bundle.zip", get(support::support_bundle_zip))
-        .route("/api/v1/system/update-check", get(update_check::update_check))
+        .route(
+            "/api/v1/support/bundle.zip",
+            get(support::support_bundle_zip),
+        )
+        .route(
+            "/api/v1/system/update-check",
+            get(update_check::update_check),
+        )
         .route("/api/v1/upgrade/matrix", get(upgrade::upgrade_matrix))
         .route(
             "/api/v1/hosts/{id}/upgrade",
@@ -2057,16 +2089,40 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/cpu-compat",
             get(cpu_compat::get_cpu_compat_matrix).patch(cpu_compat::patch_cpu_compat_matrix),
         )
-        .route("/api/v1/elastic-ip-pools", get(elastic_ips::list_pools).post(elastic_ips::create_pool))
-        .route("/api/v1/elastic-ip-pools/{id}", delete(elastic_ips::delete_pool))
-        .route("/api/v1/elastic-ips", get(elastic_ips::list).post(elastic_ips::allocate))
+        .route(
+            "/api/v1/elastic-ip-pools",
+            get(elastic_ips::list_pools).post(elastic_ips::create_pool),
+        )
+        .route(
+            "/api/v1/elastic-ip-pools/{id}",
+            delete(elastic_ips::delete_pool),
+        )
+        .route(
+            "/api/v1/elastic-ips",
+            get(elastic_ips::list).post(elastic_ips::allocate),
+        )
         .route("/api/v1/elastic-ips/{id}", delete(elastic_ips::release))
-        .route("/api/v1/elastic-ips/{id}/associate", post(elastic_ips::associate))
-        .route("/api/v1/elastic-ips/{id}/disassociate", post(elastic_ips::disassociate))
+        .route(
+            "/api/v1/elastic-ips/{id}/associate",
+            post(elastic_ips::associate),
+        )
+        .route(
+            "/api/v1/elastic-ips/{id}/disassociate",
+            post(elastic_ips::disassociate),
+        )
         .route("/api/v1/metrics/statistics", get(metric_stats::statistics))
-        .route("/api/v1/alarms", get(alarms::list_alarms).post(alarms::create_alarm))
-        .route("/api/v1/alarms/{id}", get(alarms::get_alarm).delete(alarms::delete_alarm))
-        .route("/api/v1/alarms/{id}/enabled", put(alarms::set_alarm_enabled))
+        .route(
+            "/api/v1/alarms",
+            get(alarms::list_alarms).post(alarms::create_alarm),
+        )
+        .route(
+            "/api/v1/alarms/{id}",
+            get(alarms::get_alarm).delete(alarms::delete_alarm),
+        )
+        .route(
+            "/api/v1/alarms/{id}/enabled",
+            put(alarms::set_alarm_enabled),
+        )
         .route(
             "/api/v1/ec2/access-keys",
             get(ec2::list_access_keys).post(ec2::create_access_key),
@@ -2106,6 +2162,18 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/baremetal/commissioning/{id}/report",
             post(baremetal::commissioning_report),
+        )
+        .route(
+            "/api/v1/baremetal/boot/deploy.sh",
+            get(baremetal::boot_deploy_script),
+        )
+        .route(
+            "/api/v1/baremetal/boot/plan/{id}/{token}",
+            get(baremetal::deploy_plan),
+        )
+        .route(
+            "/api/v1/baremetal/deploy/{id}/complete",
+            post(baremetal::deploy_complete),
         )
         .route("/api/v1/baremetal/boot/ipxe", get(baremetal::boot_ipxe))
         .route(
@@ -2157,6 +2225,22 @@ pub fn enrollment_router(state: AppState) -> Router {
         .route(
             "/api/v1/baremetal/commissioning/{id}/report",
             post(baremetal::commissioning_report),
+        )
+        .route(
+            "/api/v1/baremetal/boot/plan/{id}/{token}",
+            get(baremetal::deploy_plan),
+        )
+        .route(
+            "/api/v1/baremetal/deploy/{id}/complete",
+            post(baremetal::deploy_complete),
+        )
+        .route(
+            "/api/v1/baremetal/boot/deploy.sh",
+            get(baremetal::boot_deploy_script),
+        )
+        .route(
+            "/api/v1/baremetal/boot/commission.sh",
+            get(baremetal::boot_commission_script),
         )
         .route_layer(middleware::from_fn_with_state(
             rate_limiter,

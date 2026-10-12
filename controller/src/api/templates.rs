@@ -116,7 +116,8 @@ pub async fn list_templates(
 }
 
 /// `?1` is the viewing project (NULL = no filter, the operator view).
-const VISIBLE_TO_PROJECT: &str = "(?1 IS NULL OR COALESCE(visibility, 'public') = 'public' OR COALESCE(project, '') = ?1 \
+const VISIBLE_TO_PROJECT: &str =
+    "(?1 IS NULL OR COALESCE(visibility, 'public') = 'public' OR COALESCE(project, '') = ?1 \
      OR id IN (SELECT template_id FROM image_shares WHERE project = ?1))";
 
 impl TemplateRow {
@@ -149,9 +150,10 @@ pub async fn list_marketplace_templates(
     Extension(actor): Extension<AuthUser>,
 ) -> Result<Json<Vec<serde_json::Value>>, ApiError> {
     require_operator(&actor)?;
-    let count: i64 = crate::db::query_scalar("SELECT COUNT(*) FROM templates WHERE marketplace = TRUE")
-        .fetch_one(&state.pool)
-        .await?;
+    let count: i64 =
+        crate::db::query_scalar("SELECT COUNT(*) FROM templates WHERE marketplace = TRUE")
+            .fetch_one(&state.pool)
+            .await?;
     if count == 0 {
         let _ = crate::engine::template_catalog::seed_default_templates(&state.pool).await;
     } else {
@@ -262,10 +264,12 @@ pub async fn prefetch_missing_template_images(
     let host_id = if let Some(id) = body.host_id {
         id
     } else {
-        crate::db::query_scalar("SELECT id FROM hosts WHERE state = 'online' ORDER BY hostname LIMIT 1")
-            .fetch_optional(&state.pool)
-            .await?
-            .ok_or_else(|| ApiError::bad_request("no online hosts"))?
+        crate::db::query_scalar(
+            "SELECT id FROM hosts WHERE state = 'online' ORDER BY hostname LIMIT 1",
+        )
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| ApiError::bad_request("no online hosts"))?
     };
     let task_id = enqueue_task(
         &state,
@@ -446,7 +450,9 @@ pub async fn set_template_visibility(
 ) -> Result<Json<TemplateRow>, ApiError> {
     require_operator(&actor)?;
     if !valid_visibility(&body.visibility) {
-        return Err(ApiError::bad_request("visibility must be public or private"));
+        return Err(ApiError::bad_request(
+            "visibility must be public or private",
+        ));
     }
     let id = template_id(&state.pool, &name, &version).await?;
     crate::db::query("UPDATE templates SET visibility = ? WHERE id = ?")
@@ -468,11 +474,12 @@ pub async fn list_template_shares(
 ) -> Result<Json<Vec<String>>, ApiError> {
     require_operator(&actor)?;
     let id = template_id(&state.pool, &name, &version).await?;
-    let rows: Vec<String> =
-        crate::db::query_scalar("SELECT project FROM image_shares WHERE template_id = ? ORDER BY project")
-            .bind(id)
-            .fetch_all(&state.pool)
-            .await?;
+    let rows: Vec<String> = crate::db::query_scalar(
+        "SELECT project FROM image_shares WHERE template_id = ? ORDER BY project",
+    )
+    .bind(id)
+    .fetch_all(&state.pool)
+    .await?;
     Ok(Json(rows))
 }
 
@@ -495,7 +502,9 @@ pub async fn share_template(
         .bind(&project)
         .execute(&state.pool)
         .await?;
-    Ok(Json(serde_json::json!({ "image": name, "version": version, "shared_with": project })))
+    Ok(Json(
+        serde_json::json!({ "image": name, "version": version, "shared_with": project }),
+    ))
 }
 
 pub async fn unshare_template(
@@ -510,7 +519,9 @@ pub async fn unshare_template(
         .bind(&project)
         .execute(&state.pool)
         .await?;
-    Ok(Json(serde_json::json!({ "image": name, "version": version, "unshared": project })))
+    Ok(Json(
+        serde_json::json!({ "image": name, "version": version, "unshared": project }),
+    ))
 }
 
 #[cfg(test)]

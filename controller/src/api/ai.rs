@@ -1504,7 +1504,9 @@ pub async fn run_zyra_agent_stream(
             Ok(run) => serde_json::json!({"type": "done", "run": run}),
             Err(e) => serde_json::json!({"type": "error", "message": e.to_string()}),
         };
-        let _ = tx.send(Ok(Event::default().data(payload.to_string()))).await;
+        let _ = tx
+            .send(Ok(Event::default().data(payload.to_string())))
+            .await;
     });
     Ok(Sse::new(ReceiverStream::new(rx))
         .keep_alive(KeepAlive::new().interval(Duration::from_secs(15))))
@@ -1934,9 +1936,15 @@ pub async fn zyra_trust_set(
     Json(body): Json<TrustBody>,
 ) -> Result<Json<Vec<ai::trust::TrustClass>>, ApiError> {
     crate::auth::require_admin(&actor)?;
-    ai::trust::set_rule(&state.pool, &actor.username, &action_type, &body.level, body.max_per_run)
-        .await
-        .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    ai::trust::set_rule(
+        &state.pool,
+        &actor.username,
+        &action_type,
+        &body.level,
+        body.max_per_run,
+    )
+    .await
+    .map_err(|e| ApiError::bad_request(e.to_string()))?;
     crate::tasks::enqueue::write_audit(
         &state,
         &actor.username,

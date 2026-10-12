@@ -13,10 +13,14 @@ pub const MAX_MAX_RESULTS: usize = 1000;
 pub fn max_results(raw: Option<&str>) -> Result<usize, String> {
     let n = match raw {
         None => return Ok(DEFAULT_MAX_RESULTS),
-        Some(s) => s.parse::<usize>().map_err(|_| "MaxResults must be a number".to_string())?,
+        Some(s) => s
+            .parse::<usize>()
+            .map_err(|_| "MaxResults must be a number".to_string())?,
     };
     if n == 0 || n > MAX_MAX_RESULTS {
-        return Err(format!("MaxResults must be between 1 and {MAX_MAX_RESULTS}"));
+        return Err(format!(
+            "MaxResults must be between 1 and {MAX_MAX_RESULTS}"
+        ));
     }
     Ok(n)
 }
@@ -30,7 +34,8 @@ pub fn decode(token: &str) -> Result<String, String> {
         .decode(token.trim())
         .map_err(|_| "NextToken is not valid".to_string())?;
     let id = String::from_utf8(raw).map_err(|_| "NextToken is not valid".to_string())?;
-    if id.is_empty() || id.len() > 64 || !id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
+    if id.is_empty() || id.len() > 64 || !id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    {
         return Err("NextToken is not valid".to_string());
     }
     Ok(id)
@@ -38,12 +43,19 @@ pub fn decode(token: &str) -> Result<String, String> {
 
 /// `ids` must already be in the order pages walk (EC2 id ascending). Returns the page and the
 /// token to send back, if another page remains.
-pub fn page<'a>(ids: &'a [String], token: Option<&str>, limit: usize) -> Result<(&'a [String], Option<String>), String> {
+pub fn page<'a>(
+    ids: &'a [String],
+    token: Option<&str>,
+    limit: usize,
+) -> Result<(&'a [String], Option<String>), String> {
     let start = match token {
         None => 0,
         Some(t) => {
             let last = decode(t)?;
-            ids.iter().position(|id| id == &last).map(|i| i + 1).unwrap_or(0)
+            ids.iter()
+                .position(|id| id == &last)
+                .map(|i| i + 1)
+                .unwrap_or(0)
         }
     };
     let rest = &ids[start.min(ids.len())..];

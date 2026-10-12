@@ -195,9 +195,10 @@ pub async fn prune_invalid_users(
     Extension(actor): Extension<AuthUser>,
 ) -> Result<Json<PruneInvalidUsersResponse>, ApiError> {
     require_admin(&actor)?;
-    let result = crate::db::query("DELETE FROM users WHERE username IS NULL OR TRIM(username) = ''")
-        .execute(&state.pool)
-        .await?;
+    let result =
+        crate::db::query("DELETE FROM users WHERE username IS NULL OR TRIM(username) = ''")
+            .execute(&state.pool)
+            .await?;
     Ok(Json(PruneInvalidUsersResponse {
         deleted: result.rows_affected(),
     }))

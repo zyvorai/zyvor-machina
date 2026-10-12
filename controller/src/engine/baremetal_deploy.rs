@@ -17,6 +17,8 @@ use crate::engine::baremetal_lifecycle::{token_hash, transition, Lifecycle};
 pub enum InstallKind {
     Autoinstall,
     Kickstart,
+    /// A prebuilt OS image written to disk by the deploy ramdisk (see baremetal_images).
+    Image,
 }
 
 /// `ubuntu-22.04`, `ubuntu-24.04`, `rhel-9`, `rocky-9`, `almalinux-9`.
@@ -223,6 +225,91 @@ pub fn render_kickstart(i: &RenderInput<'_>, repo_url: &str) -> anyhow::Result<S
     ))
 }
 
+/// cloud-init NoCloud documents for an image deploy: user-data (login by key only, join
+/// on first boot) and meta-data. The image already contains cloud-init.
+pub fn render_cloud_init(i: &RenderInput<'_>, server_id: Uuid) -> anyhow::Result<(String, String)> {
+    validate(i)?;
+    let keys: String = i
+        .ssh_keys
+        .iter()
+        .map(|k| format!("      - \"{}\"\n", k.trim()))
+        .collect();
+    let user_data = format!(
+        "#cloud-config\n\
+         hostname: {host}\n\
+         manage_etc_hosts: true\n\
+         timezone: {tz}\n\
+         disable_root: true\n\
+         ssh_pwauth: false\n\
+         users:\n\
+         \x20 - name: machina\n\
+         \x20   sudo: ALL=(ALL) NOPASSWD:ALL\n\
+         \x20   shell: /bin/bash\n\
+         \x20   lock_passwd: true\n\
+         \x20   ssh_authorized_keys:\n\
+         {keys}\
+         write_files:\n\
+         \x20 - path: {path}\n\
+         \x20   permissions: \"0700\"\n\
+         \x20   content: |\n\
+         \x20     #!/bin/sh\n\
+         \x20     set -e\n\
+         \x20     {join}\n\
+         runcmd:\n\
+         \x20 - [ {path} ]\n",
+        host = i.hostname,
+        tz = i.timezone,
+        keys = keys,
+        path = JOIN_SCRIPT_PATH,
+        join = i.join_command,
+    );
+    let meta = format!(
+        "instance-id: machina-{id}\nlocal-hostname: {host}\n",
+        id = server_id.simple(),
+        host = i.hostname
+    );
+    Ok((user_data, meta))
+}
+
+/// `/dev/<name>` of the disk to write: the hint if it names one (by name or serial),
+/// else the smallest non-removable disk that holds `min_bytes`.
+pub fn select_target_disk(
+    report: &serde_json::Value,
+    min_bytes: u64,
+    hint: Option<&str>,
+) -> Option<String> {
+    let disks = report.get("disks")?.as_array()?;
+    let name = |d: &serde_json::Value| d.get("name").and_then(|v| v.as_str()).map(str::to_string);
+    let size = |d: &serde_json::Value| d.get("size_bytes").and_then(|v| v.as_u64()).unwrap_or(0);
+    if let Some(h) = hint.filter(|h| !h.is_empty()) {
+        let h = h.trim_start_matches("/dev/");
+        return disks
+            .iter()
+            .find(|d| {
+                name(d).as_deref() == Some(h) || d.get("serial").and_then(|v| v.as_str()) == Some(h)
+            })
+            .filter(|d| size(d) >= min_bytes)
+            .and_then(name)
+            .map(|n| format!("/dev/{n}"));
+    }
+    disks
+        .iter()
+        .filter(|d| size(d) >= min_bytes)
+        .filter(|d| {
+            !d.get("removable")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+        })
+        .filter(|d| {
+            name(d).is_some_and(|n| {
+                !(n.starts_with("zram") || n.starts_with("loop") || n.starts_with("ram"))
+            })
+        })
+        .min_by(|a, b| size(a).cmp(&size(b)).then(name(a).cmp(&name(b))))
+        .and_then(name)
+        .map(|n| format!("/dev/{n}"))
+}
+
 /// Allocated -> deploying. Issues an enrollment token, renders the document and stores it.
 /// Returns the join command (so the caller can show it) and the install kind.
 pub async fn begin_deploy(
@@ -231,7 +318,12 @@ pub async fn begin_deploy(
     req: &DeployRequest,
     controller_base: &str,
 ) -> anyhow::Result<InstallKind> {
-    let kind = install_kind(&req.os)?;
+    let image = super::baremetal_images::get(pool, &req.os).await?;
+    let kind = match &image {
+        Some(img) if img.status == "ready" => InstallKind::Image,
+        Some(img) => anyhow::bail!("image '{}' is not ready ({})", img.name, img.status),
+        None => install_kind(&req.os)?,
+    };
     let (hostname, mac, lifecycle): (String, String, String) = crate::db::query_as(
         "SELECT hostname, mac_address, lifecycle FROM baremetal_servers WHERE id = ?",
     )
@@ -261,6 +353,9 @@ pub async fn begin_deploy(
         InstallKind::Kickstart => {
             render_kickstart(&probe, &repo)?;
         }
+        InstallKind::Image => {
+            render_cloud_init(&probe, id)?;
+        }
     }
 
     let cluster_id: Uuid = crate::db::query_scalar("SELECT id FROM clusters LIMIT 1")
@@ -284,6 +379,7 @@ pub async fn begin_deploy(
     let doc = match kind {
         InstallKind::Autoinstall => render_autoinstall(&input)?,
         InstallKind::Kickstart => render_kickstart(&input, &repo)?,
+        InstallKind::Image => render_cloud_init(&input, id)?.0,
     };
 
     transition(pool, id, Lifecycle::Deploying).await?;
@@ -320,7 +416,7 @@ pub async fn deploy_boot_target(
     let row: Option<(Uuid, String)> = crate::db::query_as(
         "SELECT s.id, d.os FROM baremetal_servers s
          JOIN baremetal_deployments d ON d.server_id = s.id
-         WHERE s.mac_address = ? AND s.lifecycle = 'deploying'",
+         WHERE s.mac_address = ? AND s.lifecycle = 'deploying' AND d.written_at = ''",
     )
     .bind(&mac)
     .fetch_optional(pool)
@@ -344,6 +440,122 @@ pub async fn document(pool: &DbPool, id: Uuid, token: &str) -> anyhow::Result<Op
     .fetch_optional(pool)
     .await?;
     Ok(row.and_then(|(h, d)| (!h.is_empty() && h == token_hash(token)).then_some(d)))
+}
+
+/// A deploy token is the one minted at PXE time; compare by hash.
+async fn deploy_row(
+    pool: &DbPool,
+    id: Uuid,
+    token: &str,
+) -> anyhow::Result<Option<(String, String)>> {
+    let row: Option<(String, String, String)> = crate::db::query_as(
+        "SELECT token_hash, os, user_data FROM baremetal_deployments WHERE server_id = ?",
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.and_then(|(h, os, ud)| (!h.is_empty() && h == token_hash(token)).then_some((os, ud))))
+}
+
+/// The plan the deploy ramdisk follows: image, checksum, target disk, cloud-init seed.
+/// `None` for a bad token or an OS that is not an imported image.
+pub async fn image_plan(
+    pool: &DbPool,
+    id: Uuid,
+    token: &str,
+    controller_base: &str,
+    disk_hint: Option<&str>,
+) -> anyhow::Result<Option<serde_json::Value>> {
+    let Some((os, user_data)) = deploy_row(pool, id, token).await? else {
+        return Ok(None);
+    };
+    let Some(img) = super::baremetal_images::get(pool, &os).await? else {
+        return Ok(None);
+    };
+    if img.status != "ready" {
+        anyhow::bail!("image '{}' is not ready ({})", img.name, img.status);
+    }
+    let path: String = crate::db::query_scalar("SELECT path FROM baremetal_images WHERE name = ?")
+        .bind(&img.name)
+        .fetch_one(pool)
+        .await?;
+    let hostname: String =
+        crate::db::query_scalar("SELECT hostname FROM baremetal_servers WHERE id = ?")
+            .bind(id)
+            .fetch_one(pool)
+            .await?;
+    // 8 GiB floor: a cloud image's virtual size is larger than its download.
+    let min = (img.size_bytes.max(0) as u64).max(8 * 1024 * 1024 * 1024);
+    let report = super::baremetal_lifecycle::inventory(pool, id)
+        .await?
+        .unwrap_or_else(|| serde_json::json!({}));
+    let disk = select_target_disk(&report, min, disk_hint).ok_or_else(|| {
+        anyhow::anyhow!(
+            "no suitable disk in the commissioning inventory (commission the server first)"
+        )
+    })?;
+    let base = controller_base.trim_end_matches('/');
+    let meta = format!(
+        "instance-id: machina-{}\nlocal-hostname: {hostname}\n",
+        id.simple()
+    );
+    Ok(Some(serde_json::json!({
+        "image_url": format!("{base}/dist/images/{path}"),
+        "format": img.format,
+        "size_bytes": img.size_bytes,
+        "checksum": img.checksum,
+        "checksum_algo": img.checksum_algo,
+        "target_disk": disk,
+        "hostname": hostname,
+        "user_data": user_data,
+        "meta_data": meta,
+        "complete_url": format!("{base}/api/v1/baremetal/deploy/{id}/complete"),
+    })))
+}
+
+/// The ramdisk reports progress, completion or failure. `written` stops the machine being
+/// offered the ramdisk again; `failed` fails the server and drops the stored document.
+pub async fn report_deploy(
+    pool: &DbPool,
+    id: Uuid,
+    token: &str,
+    status: &str,
+    message: &str,
+) -> anyhow::Result<()> {
+    if deploy_row(pool, id, token).await?.is_none() {
+        anyhow::bail!("invalid or expired deploy token");
+    }
+    match status {
+        "written" => {
+            crate::db::query(
+                "UPDATE baremetal_deployments SET written_at = CURRENT_TIMESTAMP
+                 WHERE server_id = ?",
+            )
+            .bind(id)
+            .execute(pool)
+            .await?;
+        }
+        "failed" => {
+            let msg: String = message
+                .chars()
+                .filter(|c| !c.is_control())
+                .take(500)
+                .collect();
+            transition(pool, id, Lifecycle::Failed).await?;
+            crate::db::query("UPDATE baremetal_servers SET last_error = ? WHERE id = ?")
+                .bind(msg)
+                .bind(id)
+                .execute(pool)
+                .await?;
+            crate::db::query("DELETE FROM baremetal_deployments WHERE server_id = ?")
+                .bind(id)
+                .execute(pool)
+                .await?;
+        }
+        "progress" => {}
+        other => anyhow::bail!("unknown status '{other}'"),
+    }
+    Ok(())
 }
 
 /// The joining host has the registered hostname: deploying -> deployed, drop the document.
@@ -494,6 +706,144 @@ mod tests {
             "http://m/r9",
         );
         assert!(r.contains("inst.ks=") && r.contains("inst.repo=http://m/r9"));
+    }
+
+    #[test]
+    fn target_disk_is_the_smallest_non_removable_fit_or_the_hint() {
+        let r = serde_json::json!({"disks": [
+            {"name": "sda", "size_bytes": 1_000_000_000_000u64, "removable": false, "serial": "S1"},
+            {"name": "sdb", "size_bytes": 480_000_000_000u64, "removable": false, "serial": "S2"},
+            {"name": "sdc", "size_bytes": 64_000_000_000u64, "removable": true, "serial": "USB"},
+            {"name": "sdd", "size_bytes": 4_000_000_000u64, "removable": false, "serial": "TINY"},
+        ]});
+        let gib8 = 8 * 1024 * 1024 * 1024;
+        assert_eq!(
+            select_target_disk(&r, gib8, None).as_deref(),
+            Some("/dev/sdb")
+        );
+        assert_eq!(
+            select_target_disk(&r, gib8, Some("sda")).as_deref(),
+            Some("/dev/sda")
+        );
+        assert_eq!(
+            select_target_disk(&r, gib8, Some("S1")).as_deref(),
+            Some("/dev/sda")
+        );
+        assert_eq!(
+            select_target_disk(&r, gib8, Some("sdd")),
+            None,
+            "hint too small"
+        );
+        assert_eq!(select_target_disk(&serde_json::json!({}), gib8, None), None);
+    }
+
+    #[test]
+    fn cloud_init_has_key_only_login_and_join_on_first_boot() {
+        let k = keys();
+        let (u, m) = render_cloud_init(
+            &input(
+                &k,
+                "curl -fsSL https://c/install.sh | bash -s -- --token join-9",
+            ),
+            Uuid::from_u128(5),
+        )
+        .unwrap();
+        assert!(u.starts_with("#cloud-config\n"));
+        assert!(u.contains("ssh_pwauth: false"));
+        assert!(u.contains("lock_passwd: true"));
+        assert!(u.contains("--token join-9"));
+        assert!(u.contains("runcmd:"));
+        assert!(m.contains("local-hostname: rack2-u14"));
+        assert!(render_cloud_init(&input(&k, "a\nb"), Uuid::nil()).is_err());
+    }
+
+    #[tokio::test]
+    async fn image_deploy_plan_written_and_failed_paths() {
+        let pool = crate::db::testing::pool().await;
+        crate::db::query("INSERT INTO clusters (id, name) VALUES (?, 'c')")
+            .bind(Uuid::from_u128(1))
+            .execute(&pool)
+            .await
+            .unwrap();
+        crate::db::query(
+            "INSERT INTO baremetal_images (id, name, format, size_bytes, checksum, path, status)
+             VALUES (?, 'ubuntu-26.04', 'qcow2', 600000000, 'abc', 'u.img', 'ready')",
+        )
+        .bind(Uuid::new_v4())
+        .execute(&pool)
+        .await
+        .unwrap();
+        let id = Uuid::new_v4();
+        crate::db::query(
+            "INSERT INTO baremetal_servers (id, hostname, bmc_type, lifecycle, mac_address)
+             VALUES (?, 'metal-img', 'fake', 'allocated', 'aa:bb:cc:00:00:09')",
+        )
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        crate::db::query("INSERT INTO baremetal_inventory (server_id, report_json) VALUES (?, ?)")
+            .bind(id)
+            .bind(r#"{"disks":[{"name":"nvme0n1","size_bytes":960000000000,"removable":false}]}"#)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let req = DeployRequest {
+            os: "ubuntu-26.04".into(),
+            ssh_authorized_keys: keys(),
+            timezone: "UTC".into(),
+            ttl_hours: 0,
+        };
+        assert_eq!(
+            begin_deploy(&pool, id, &req, "https://c:5093")
+                .await
+                .unwrap(),
+            InstallKind::Image
+        );
+        let (_, os, token) = deploy_boot_target(&pool, "aa:bb:cc:00:00:09")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(os, "ubuntu-26.04");
+        assert!(image_plan(&pool, id, "bad", "https://c", None)
+            .await
+            .unwrap()
+            .is_none());
+        let plan = image_plan(&pool, id, &token, "https://c:5093", None)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(plan["target_disk"], "/dev/nvme0n1");
+        assert_eq!(plan["image_url"], "https://c:5093/dist/images/u.img");
+        assert_eq!(plan["checksum"], "abc");
+        assert!(plan["user_data"]
+            .as_str()
+            .unwrap()
+            .contains("--token join-"));
+
+        // Written: no longer offered the ramdisk when it PXE-boots again.
+        report_deploy(&pool, id, &token, "written", "")
+            .await
+            .unwrap();
+        assert!(deploy_boot_target(&pool, "aa:bb:cc:00:00:09")
+            .await
+            .unwrap()
+            .is_none());
+        assert!(report_deploy(&pool, id, "bad", "written", "")
+            .await
+            .is_err());
+
+        // A failure moves the server to failed and records why.
+        report_deploy(&pool, id, &token, "failed", "checksum mismatch")
+            .await
+            .unwrap();
+        let (lc, err): (String, String) =
+            crate::db::query_as("SELECT lifecycle, last_error FROM baremetal_servers WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!((lc.as_str(), err.as_str()), ("failed", "checksum mismatch"));
     }
 
     #[tokio::test]

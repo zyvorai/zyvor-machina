@@ -180,11 +180,12 @@ pub async fn upsert_vm_port_forward_template(
     if body.vm_port <= 0 || body.host_port <= 0 {
         return Err(ApiError::bad_request("Ports must be positive"));
     }
-    let mut spec: serde_json::Value = crate::db::query_scalar("SELECT spec_json FROM vms WHERE id = ?")
-        .bind(id)
-        .fetch_one(&state.pool)
-        .await
-        .map_err(|_| ApiError::not_found("VM not found"))?;
+    let mut spec: serde_json::Value =
+        crate::db::query_scalar("SELECT spec_json FROM vms WHERE id = ?")
+            .bind(id)
+            .fetch_one(&state.pool)
+            .await
+            .map_err(|_| ApiError::not_found("VM not found"))?;
     let mut templates = read_port_forward_templates(&spec);
     templates.retain(|t| t.id != body.id);
     templates.push(body);

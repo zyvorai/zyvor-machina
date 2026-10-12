@@ -5,10 +5,10 @@ pub(crate) mod elastic;
 pub(crate) mod network;
 pub(crate) use network::reserve_address;
 
+use crate::db::DbConn;
 use crate::{api::ApiError, auth::AuthUser, state::AppState};
 use axum::routing::{get, post};
 use axum::Router;
-use crate::db::DbConn;
 use uuid::Uuid;
 
 pub fn routes() -> Router<AppState> {
@@ -94,10 +94,11 @@ pub(crate) async fn access(
     project: Uuid,
     write: bool,
 ) -> Result<(), ApiError> {
-    let enabled: Option<bool> = crate::db::query_scalar("SELECT enabled FROM projects WHERE id = ?")
-        .bind(project)
-        .fetch_optional(&mut *conn)
-        .await?;
+    let enabled: Option<bool> =
+        crate::db::query_scalar("SELECT enabled FROM projects WHERE id = ?")
+            .bind(project)
+            .fetch_optional(&mut *conn)
+            .await?;
     if enabled != Some(true) {
         return Err(ApiError::not_found("enabled project not found"));
     }
@@ -110,10 +111,17 @@ pub(crate) async fn access(
     // A project-scoped API key may use exactly the projects it was issued for (its own role still caps write access).
     let scope = crate::api::apikeys::scope_of_conn(conn, &actor.username).await;
     if !scope.is_empty() {
-        let name: Option<String> = crate::db::query_scalar("SELECT name FROM projects WHERE id = ?").bind(project).fetch_optional(&mut *conn).await?;
+        let name: Option<String> =
+            crate::db::query_scalar("SELECT name FROM projects WHERE id = ?")
+                .bind(project)
+                .fetch_optional(&mut *conn)
+                .await?;
         return match name {
             Some(n) if scope.contains(&n) => Ok(()),
-            _ => Err(ApiError::forbidden("this API key is not scoped to that project").with_code("key_scope_forbidden")),
+            _ => Err(
+                ApiError::forbidden("this API key is not scoped to that project")
+                    .with_code("key_scope_forbidden"),
+            ),
         };
     }
     let roles: Vec<String> = crate::db::query_scalar("SELECT a.role FROM project_role_assignments a JOIN users u ON u.id = a.user_id WHERE u.username = ? AND a.project_id = ?")

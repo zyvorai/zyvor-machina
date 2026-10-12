@@ -9,10 +9,10 @@
 
 use std::collections::BTreeMap;
 
+use crate::db::DbConn;
 use axum::extract::{Path, Query, State};
 use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
-use crate::db::DbConn;
 use uuid::Uuid;
 
 use super::cloud;
@@ -73,11 +73,7 @@ fn rid(id: Uuid) -> String {
     id.simple().to_string()
 }
 
-pub async fn get_tag_map(
-    conn: &mut DbConn,
-    kind: Kind,
-    id: Uuid,
-) -> Result<TagMap, sqlx::Error> {
+pub async fn get_tag_map(conn: &mut DbConn, kind: Kind, id: Uuid) -> Result<TagMap, sqlx::Error> {
     let rows: Vec<(String, String)> =
         crate::db::query_as("SELECT key, value FROM resource_tags WHERE resource_type = ? AND resource_id = ? ORDER BY key")
             .bind(kind.type_name())
@@ -143,11 +139,7 @@ pub async fn delete_tag_keys(
 }
 
 /// The owning cloud project of a resource, if it has one.
-async fn project_of(
-    conn: &mut DbConn,
-    kind: Kind,
-    id: Uuid,
-) -> Result<Option<Uuid>, sqlx::Error> {
+async fn project_of(conn: &mut DbConn, kind: Kind, id: Uuid) -> Result<Option<Uuid>, sqlx::Error> {
     let sql = match kind {
         Kind::Vm => "SELECT p.id FROM vms v JOIN projects p ON p.name = COALESCE(v.project, 'default') WHERE v.id = ?",
         Kind::Subnet => "SELECT v.project_id FROM cloud_subnets s JOIN cloud_vpcs v ON v.id = s.vpc_id WHERE s.id = ?",

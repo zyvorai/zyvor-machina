@@ -161,8 +161,30 @@ own servers). The download happens in the controller, in the background
 - Files live in `$MACHINA_DIST_DIR/images/` and are served at `/dist/images/NAME` with
   `Range` support, so a machine can resume a download. Limit per image:
   `MACHINA_METAL_IMAGE_MAX_BYTES` (default 20 GiB).
-- Writing an image to a disk (stage 3) is not implemented yet; today's deploy still
-  uses the installer media above.
+
+### Deploy an image to disk
+
+`POST .../servers/{id}/deploy` with `"os": "<image name>"` (an imported, `ready` image)
+deploys without any installer media. The server must be allocated, have a `mac_address`
+and have been commissioned (the inventory picks the disk).
+
+1. The machine PXE-boots the Machina ramdisk (built by `scripts/metal/build-image.sh`,
+   published with `machinactl dist publish-metal`).
+2. `contrib/metal/deploy.sh` fetches the plan
+   (`/api/v1/baremetal/boot/plan/{id}/{token}`), downloads the image **into RAM**,
+   verifies the checksum, and only then `qemu-img convert`s it to the target disk.
+   The machine needs free RAM of about the image size plus 768 MiB; it fails with a clear
+   message otherwise.
+3. Target disk: the smallest non-removable disk that holds the image (8 GiB floor).
+   `?disk=sdb` (or a serial) on the plan URL overrides.
+4. It writes a cloud-init NoCloud seed (`/var/lib/cloud/seed/nocloud`) onto the image's
+   root filesystem: key-only login for `machina`, hostname, timezone, and a first-boot
+   script running the normal join command. cloud-init also grows the root partition.
+5. It reports `written`; from then on `/boot/ipxe` answers `exit` for that machine, so a
+   reboot falls through to the disk. The host joining marks the server `deployed`.
+   A failure is reported as `failed` (server -> `failed`, reason in `last_error`).
+
+The image must contain cloud-init (all catalog images do).
 
 ## CLI and UI
 

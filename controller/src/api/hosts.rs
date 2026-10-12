@@ -161,10 +161,11 @@ pub async fn get_host_gpus(
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_operator(&actor)?;
-    let agent_addr: String = crate::db::query_scalar("SELECT agent_grpc_addr FROM hosts WHERE id = ?")
-        .bind(id)
-        .fetch_one(&state.pool)
-        .await?;
+    let agent_addr: String =
+        crate::db::query_scalar("SELECT agent_grpc_addr FROM hosts WHERE id = ?")
+            .bind(id)
+            .fetch_one(&state.pool)
+            .await?;
     let mut client = crate::agent_client::connect(&agent_addr)
         .await
         .map_err(|e| ApiError::internal(e.to_string()))?;
@@ -474,12 +475,11 @@ pub async fn join_host(
             .fetch_one(&mut *tx)
             .await?;
     // The address the fleet really uses for this host (an existing routable one is preserved).
-    let (used_addr, used_console): (String, Option<String>) = crate::db::query_as(
-        "SELECT agent_grpc_addr, agent_console_addr FROM hosts WHERE id = ?",
-    )
-    .bind(host_id)
-    .fetch_one(&mut *tx)
-    .await?;
+    let (used_addr, used_console): (String, Option<String>) =
+        crate::db::query_as("SELECT agent_grpc_addr, agent_console_addr FROM hosts WHERE id = ?")
+            .bind(host_id)
+            .fetch_one(&mut *tx)
+            .await?;
     // Sign before committing: a bad CSR rolls the whole join back and the token stays usable.
     let (agent_cert_pem, ca_pem) = match req.csr_pem.as_deref().filter(|c| !c.trim().is_empty()) {
         Some(csr) => {
@@ -509,8 +509,18 @@ pub async fn join_host(
         let token = req.token.clone();
         async move { super::join_events::record(&pool, &token, Some(host_id), level, step, &msg).await }
     };
-    ev("ok", "token", "enrollment token accepted (single use, now spent)".into()).await;
-    ev("ok", "register", format!("host record created: {} ({})", req.hostname, host_id)).await;
+    ev(
+        "ok",
+        "token",
+        "enrollment token accepted (single use, now spent)".into(),
+    )
+    .await;
+    ev(
+        "ok",
+        "register",
+        format!("host record created: {} ({})", req.hostname, host_id),
+    )
+    .await;
     ev(
         "ok",
         "credentials",
@@ -534,7 +544,11 @@ pub async fn join_host(
     link_baremetal_firewall_on_join(&state.pool, host_id, &req.hostname).await;
 
     // With TLS the agent first has to restart with its certificate: give it a moment.
-    let delay = if tls { std::time::Duration::from_secs(12) } else { std::time::Duration::ZERO };
+    let delay = if tls {
+        std::time::Duration::from_secs(12)
+    } else {
+        std::time::Duration::ZERO
+    };
     let queue = {
         let state = state.clone();
         move || async move {
@@ -555,17 +569,43 @@ pub async fn join_host(
         tokio::spawn(async move {
             if let Err(e) = queue().await {
                 tracing::warn!(host_id = %host_id, "host.validate enqueue failed after join: {}", e.message);
-                super::join_events::record(&pool, &token, Some(host_id), "error", "validate", &format!("could not queue validation: {}", e.message)).await;
+                super::join_events::record(
+                    &pool,
+                    &token,
+                    Some(host_id),
+                    "error",
+                    "validate",
+                    &format!("could not queue validation: {}", e.message),
+                )
+                .await;
             } else {
-                super::join_events::record(&pool, &token, Some(host_id), "info", "validate", "validation queued: the controller now contacts the agent over TLS").await;
+                super::join_events::record(
+                    &pool,
+                    &token,
+                    Some(host_id),
+                    "info",
+                    "validate",
+                    "validation queued: the controller now contacts the agent over TLS",
+                )
+                .await;
             }
         });
         ev("info", "validate", "validation will start in a few seconds, once the agent has restarted with its certificate".into()).await;
     } else if let Err(e) = queue().await {
         tracing::warn!(host_id = %host_id, "host.validate enqueue failed after join: {}", e.message);
-        ev("error", "validate", format!("could not queue validation: {}", e.message)).await;
+        ev(
+            "error",
+            "validate",
+            format!("could not queue validation: {}", e.message),
+        )
+        .await;
     } else {
-        ev("info", "validate", "validation queued: the controller will now contact the agent".into()).await;
+        ev(
+            "info",
+            "validate",
+            "validation queued: the controller will now contact the agent".into(),
+        )
+        .await;
     }
 
     let host = fetch_host_row(&state, host_id).await?;
@@ -578,11 +618,12 @@ pub async fn join_host(
 }
 
 async fn link_baremetal_firewall_on_join(pool: &crate::db::DbPool, host_id: Uuid, hostname: &str) {
-    if let Ok(Some(metal_id)) =
-        crate::db::query_scalar::<_, Uuid>("SELECT id FROM baremetal_servers WHERE hostname = ? LIMIT 1")
-            .bind(hostname)
-            .fetch_optional(pool)
-            .await
+    if let Ok(Some(metal_id)) = crate::db::query_scalar::<_, Uuid>(
+        "SELECT id FROM baremetal_servers WHERE hostname = ? LIMIT 1",
+    )
+    .bind(hostname)
+    .fetch_optional(pool)
+    .await
     {
         let _ = crate::engine::baremetal::link_host_firewall_profile(pool, metal_id, host_id).await;
     }
@@ -683,9 +724,10 @@ pub async fn sync_all_hosts(
     Extension(actor): Extension<AuthUser>,
 ) -> Result<Json<Vec<TaskResponse>>, ApiError> {
     require_operator(&actor)?;
-    let ids: Vec<Uuid> = crate::db::query_scalar("SELECT id FROM hosts ORDER BY hostname LIMIT 500")
-        .fetch_all(&state.pool)
-        .await?;
+    let ids: Vec<Uuid> =
+        crate::db::query_scalar("SELECT id FROM hosts ORDER BY hostname LIMIT 500")
+            .fetch_all(&state.pool)
+            .await?;
     let mut out = Vec::new();
     for id in ids {
         let task_id = enqueue_task(
@@ -943,11 +985,13 @@ pub async fn delete_host(
     .bind(id)
     .execute(&mut *tx)
     .await?;
-    crate::db::query("DELETE FROM placement_recommendations WHERE from_host_id = ? OR to_host_id = ?")
-        .bind(id)
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
+    crate::db::query(
+        "DELETE FROM placement_recommendations WHERE from_host_id = ? OR to_host_id = ?",
+    )
+    .bind(id)
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
     for stmt in [
         "DELETE FROM fence_events WHERE host_id = ?",
         "DELETE FROM maintenance_windows WHERE host_id = ?",
@@ -1087,12 +1131,21 @@ mod transport_tests {
             .execute(&state.pool)
             .await
             .unwrap();
-        assert_eq!(fetch_host_row(&state, plain).await.unwrap().transport, "plaintext");
-        assert_eq!(fetch_host_row(&state, token).await.unwrap().transport, "token");
+        assert_eq!(
+            fetch_host_row(&state, plain).await.unwrap().transport,
+            "plaintext"
+        );
+        assert_eq!(
+            fetch_host_row(&state, token).await.unwrap().transport,
+            "token"
+        );
         let m = fetch_host_row(&state, mtls).await.unwrap();
         assert_eq!(m.transport, "mtls");
         assert_eq!(m.agent_version, "0.1.0");
         let json = serde_json::to_string(&m).unwrap();
-        assert!(!json.contains("mat-y"), "the token never appears in the list");
+        assert!(
+            !json.contains("mat-y"),
+            "the token never appears in the list"
+        );
     }
 }

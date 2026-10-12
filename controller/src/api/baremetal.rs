@@ -218,6 +218,21 @@ pub async fn boot_ipxe(
                 .await
                 .map_err(|e| ApiError::internal(e.to_string()))?
             {
+                // An imported image: boot the ramdisk, which writes it to disk.
+                if baremetal_images::get(&state.pool, &os)
+                    .await
+                    .map_err(|e| ApiError::internal(e.to_string()))?
+                    .is_some()
+                {
+                    let ca = crate::pki::ca_info().ok().map(|(_, fp)| fp);
+                    return Ok(text(baremetal_boot::ipxe_image_deploy_script(
+                        &base,
+                        id,
+                        &token,
+                        &format!("{base}/dist"),
+                        ca.as_deref(),
+                    )));
+                }
                 let kind = baremetal_deploy::install_kind(&os)
                     .map_err(|e| ApiError::internal(e.to_string()))?;
                 let repo = std::env::var("MACHINA_METAL_RHEL_REPO").unwrap_or_default();
@@ -431,4 +446,57 @@ pub async fn delete_image(
         .await
         .map_err(|e| ApiError::not_found(e.to_string()))?;
     Ok(Json(serde_json::json!({ "deleted": name })))
+}
+
+pub async fn boot_deploy_script() -> axum::response::Response {
+    text(baremetal_boot::DEPLOY_SCRIPT.to_string())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DiskQuery {
+    #[serde(default)]
+    pub disk: String,
+}
+
+/// The deploy plan, for the ramdisk. The token in the path is the one minted at PXE time.
+pub async fn deploy_plan(
+    State(state): State<AppState>,
+    Path((id, token)): Path<(uuid::Uuid, String)>,
+    axum::extract::Query(q): axum::extract::Query<DiskQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let base = state
+        .config
+        .public_base_url
+        .trim_end_matches('/')
+        .to_string();
+    let hint = (!q.disk.is_empty()).then_some(q.disk.as_str());
+    match baremetal_deploy::image_plan(&state.pool, id, &token, &base, hint).await {
+        Ok(Some(v)) => Ok(Json(v)),
+        Ok(None) => Err(ApiError::not_found("no deploy plan")),
+        Err(e) => Err(ApiError::bad_request(e.to_string())),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DeployReport {
+    pub status: String,
+    #[serde(default)]
+    pub message: String,
+}
+
+pub async fn deploy_complete(
+    State(state): State<AppState>,
+    Path(id): Path<uuid::Uuid>,
+    headers: axum::http::HeaderMap,
+    Json(body): Json<DeployReport>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let token = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .unwrap_or("");
+    baremetal_deploy::report_deploy(&state.pool, id, token, &body.status, &body.message)
+        .await
+        .map_err(|e| ApiError::forbidden(e.to_string()))?;
+    Ok(Json(serde_json::json!({ "ok": true })))
 }

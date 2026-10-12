@@ -478,7 +478,14 @@ pub(crate) async fn delete_pool_volume_file(
     vol_name: &str,
 ) -> Result<(), ApiError> {
     let name = storage_pool_name(&state.pool, pool_id).await?;
-    invoke_pool_action(state, host_id, "storage.volume.delete", &name, serde_json::json!({ "name": vol_name })).await?;
+    invoke_pool_action(
+        state,
+        host_id,
+        "storage.volume.delete",
+        &name,
+        serde_json::json!({ "name": vol_name }),
+    )
+    .await?;
     Ok(())
 }
 

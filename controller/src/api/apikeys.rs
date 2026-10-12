@@ -91,28 +91,42 @@ pub async fn create_api_key(
     validate_scope(&body.role, &body.projects).map_err(ApiError::bad_request)?;
     if !body.projects.is_empty() {
         // The key's name is its identity in audit logs and in the scope lookup, so a scoped key's name must be unique.
-        let dup: i64 = crate::db::query_scalar("SELECT COUNT(*) FROM api_keys WHERE name = ?").bind(&body.name).fetch_one(&state.pool).await?;
+        let dup: i64 = crate::db::query_scalar("SELECT COUNT(*) FROM api_keys WHERE name = ?")
+            .bind(&body.name)
+            .fetch_one(&state.pool)
+            .await?;
         if dup > 0 {
-            return Err(ApiError::conflict("an API key with that name exists", "scoped keys need a unique name"));
+            return Err(ApiError::conflict(
+                "an API key with that name exists",
+                "scoped keys need a unique name",
+            ));
         }
         for p in &body.projects {
-            let known: Option<i64> = crate::db::query_scalar("SELECT 1 FROM projects WHERE name = ? AND enabled = TRUE").bind(p).fetch_optional(&state.pool).await?;
+            let known: Option<i64> =
+                crate::db::query_scalar("SELECT 1 FROM projects WHERE name = ? AND enabled = TRUE")
+                    .bind(p)
+                    .fetch_optional(&state.pool)
+                    .await?;
             if known.is_none() {
-                return Err(ApiError::bad_request(format!("no enabled project named '{p}'")));
+                return Err(ApiError::bad_request(format!(
+                    "no enabled project named '{p}'"
+                )));
             }
         }
     }
     let id = Uuid::new_v4();
     let token = format!("machina_{}", Uuid::new_v4());
     let hash = hash_token(&token);
-    crate::db::query("INSERT INTO api_keys (id, name, key_hash, role, projects) VALUES (?, ?, ?, ?, ?)")
-        .bind(id)
-        .bind(&body.name)
-        .bind(hash)
-        .bind(&body.role)
-        .bind(serde_json::to_string(&body.projects).unwrap_or_else(|_| "[]".into()))
-        .execute(&state.pool)
-        .await?;
+    crate::db::query(
+        "INSERT INTO api_keys (id, name, key_hash, role, projects) VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(id)
+    .bind(&body.name)
+    .bind(hash)
+    .bind(&body.role)
+    .bind(serde_json::to_string(&body.projects).unwrap_or_else(|_| "[]".into()))
+    .execute(&state.pool)
+    .await?;
     Ok(Json(CreateApiKeyResponse {
         id: id.to_string(),
         name: body.name,
@@ -181,26 +195,32 @@ pub async fn scope_of(pool: &crate::db::DbPool, username: &str) -> Vec<String> {
     let Some(name) = username.strip_prefix("apikey:") else {
         return Vec::new();
     };
-    let raw: Option<String> = crate::db::query_scalar("SELECT projects FROM api_keys WHERE name = ? AND projects <> '[]' LIMIT 1")
-        .bind(name)
-        .fetch_optional(pool)
-        .await
-        .ok()
-        .flatten();
-    raw.and_then(|r| serde_json::from_str(&r).ok()).unwrap_or_default()
+    let raw: Option<String> = crate::db::query_scalar(
+        "SELECT projects FROM api_keys WHERE name = ? AND projects <> '[]' LIMIT 1",
+    )
+    .bind(name)
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten();
+    raw.and_then(|r| serde_json::from_str(&r).ok())
+        .unwrap_or_default()
 }
 
 pub(crate) async fn scope_of_conn(conn: &mut crate::db::DbConn, username: &str) -> Vec<String> {
     let Some(name) = username.strip_prefix("apikey:") else {
         return Vec::new();
     };
-    let raw: Option<String> = crate::db::query_scalar("SELECT projects FROM api_keys WHERE name = ? AND projects <> '[]' LIMIT 1")
-        .bind(name)
-        .fetch_optional(&mut *conn)
-        .await
-        .ok()
-        .flatten();
-    raw.and_then(|r| serde_json::from_str(&r).ok()).unwrap_or_default()
+    let raw: Option<String> = crate::db::query_scalar(
+        "SELECT projects FROM api_keys WHERE name = ? AND projects <> '[]' LIMIT 1",
+    )
+    .bind(name)
+    .fetch_optional(&mut *conn)
+    .await
+    .ok()
+    .flatten();
+    raw.and_then(|r| serde_json::from_str(&r).ok())
+        .unwrap_or_default()
 }
 
 pub async fn delete_api_key(
@@ -227,7 +247,11 @@ pub fn hash_token(token: &str) -> String {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
     hasher.update(token.as_bytes());
-    hasher.finalize().iter().map(|b| format!("{b:02x}")).collect::<String>()
+    hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect::<String>()
 }
 
 pub async fn authenticate_api_key(
@@ -241,11 +265,12 @@ pub async fn authenticate_api_key(
             .fetch_optional(pool)
             .await?;
     if let Some((name, role)) = row {
-        let _ =
-            crate::db::query("UPDATE api_keys SET last_used_at = datetime('now') WHERE key_hash = ?")
-                .bind(&hash)
-                .execute(pool)
-                .await;
+        let _ = crate::db::query(
+            "UPDATE api_keys SET last_used_at = datetime('now') WHERE key_hash = ?",
+        )
+        .bind(&hash)
+        .execute(pool)
+        .await;
         Ok(Some(AuthUser {
             username: format!("apikey:{name}"),
             role,
@@ -262,7 +287,10 @@ mod scope_tests {
 
     #[test]
     fn scope_rules() {
-        assert!(validate_scope("admin", &[]).is_ok(), "unscoped admin keys are as before");
+        assert!(
+            validate_scope("admin", &[]).is_ok(),
+            "unscoped admin keys are as before"
+        );
         assert!(validate_scope("operator", &["lab".into()]).is_ok());
         assert!(validate_scope("viewer", &["lab".into()]).is_ok());
         assert!(validate_scope("admin", &["lab".into()]).is_err());

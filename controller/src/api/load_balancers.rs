@@ -388,6 +388,9 @@ pub async fn set_health_check(
         .await?;
     // Members that were out of rotation are back in until the new check says otherwise.
     let _ = crate::engine::load_balancer::apply(&state.pool, &state.config, lb_id).await;
-    let row = crate::db::query_as::<_, LoadBalancerRow>(&format!("{LB_SELECT} WHERE id = ?")).bind(lb_id).fetch_one(&state.pool).await?;
+    let row = crate::db::query_as::<_, LoadBalancerRow>(&format!("{LB_SELECT} WHERE id = ?"))
+        .bind(lb_id)
+        .fetch_one(&state.pool)
+        .await?;
     Ok(Json(row))
 }

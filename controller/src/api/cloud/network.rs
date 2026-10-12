@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
 
 use super::{access, audit, conflict, invalid};
+use crate::db::DbConn;
 use crate::{api::ApiError, auth::AuthUser, state::AppState};
 use axum::{
     extract::{Path, State},
@@ -10,7 +11,6 @@ use axum::{
 use machina_spec::CloudCidr;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use crate::db::DbConn;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -81,18 +81,20 @@ pub async fn create_vpc(
     cidr.validate_private(false).map_err(invalid)?;
     let mut tx = crate::db::begin_write(&state.pool).await?;
     access(&mut tx, &actor, project, true).await?;
-    let online: bool =
-        crate::db::query_scalar("SELECT EXISTS(SELECT 1 FROM hosts WHERE id = ? AND state = 'online')")
-            .bind(body.host_id)
-            .fetch_one(&mut *tx)
-            .await?;
+    let online: bool = crate::db::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM hosts WHERE id = ? AND state = 'online')",
+    )
+    .bind(body.host_id)
+    .fetch_one(&mut *tx)
+    .await?;
     if !online {
         return Err(invalid("online host required"));
     }
-    let others: Vec<String> = crate::db::query_scalar("SELECT cidr FROM cloud_vpcs WHERE host_id = ?")
-        .bind(body.host_id)
-        .fetch_all(&mut *tx)
-        .await?;
+    let others: Vec<String> =
+        crate::db::query_scalar("SELECT cidr FROM cloud_vpcs WHERE host_id = ?")
+            .bind(body.host_id)
+            .fetch_all(&mut *tx)
+            .await?;
     if others
         .iter()
         .any(|c| c.parse::<CloudCidr>().is_ok_and(|c| c.overlaps(cidr)))
@@ -218,14 +220,16 @@ pub async fn create_subnet(
     let network = Uuid::new_v4();
     let compact = sid.simple().to_string();
     crate::db::query("INSERT INTO networks (id, cluster_id, name, backend, bridge) VALUES (?, ?, ?, 'cloud-isolated', ?)").bind(network).bind(cluster).bind(format!("mc-{sid}")).bind(format!("mc{}",&compact[..12])).execute(&mut *tx).await?;
-    crate::db::query("INSERT INTO cloud_subnets (id,vpc_id,network_id,name,cidr) VALUES (?,?,?,?,?)")
-        .bind(sid)
-        .bind(id)
-        .bind(network)
-        .bind(&body.name)
-        .bind(&body.cidr)
-        .execute(&mut *tx)
-        .await?;
+    crate::db::query(
+        "INSERT INTO cloud_subnets (id,vpc_id,network_id,name,cidr) VALUES (?,?,?,?,?)",
+    )
+    .bind(sid)
+    .bind(id)
+    .bind(network)
+    .bind(&body.name)
+    .bind(&body.cidr)
+    .execute(&mut *tx)
+    .await?;
     // Durable outbox: insertion shares the resource transaction. The cloud loop
     // republishes pending jobs through the existing worker after a bus outage.
     let task = Uuid::new_v4();
@@ -284,18 +288,40 @@ pub async fn set_subnet_nat(
     if body.enabled && sub.status != "ready" {
         return Err(conflict("the subnet is not ready yet"));
     }
-    crate::db::query("UPDATE cloud_subnets SET nat_enabled = ? WHERE id = ?").bind(body.enabled).bind(id).execute(&mut *tx).await?;
-    audit(&mut tx, &actor, if body.enabled { "cloud.subnet.nat.enable" } else { "cloud.subnet.nat.disable" }, id).await?;
+    crate::db::query("UPDATE cloud_subnets SET nat_enabled = ? WHERE id = ?")
+        .bind(body.enabled)
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    audit(
+        &mut tx,
+        &actor,
+        if body.enabled {
+            "cloud.subnet.nat.enable"
+        } else {
+            "cloud.subnet.nat.disable"
+        },
+        id,
+    )
+    .await?;
     tx.commit().await?;
-    let (applied, error) = match crate::engine::natgw::push_host(&state.pool, parent.host_id).await {
+    let (applied, error) = match crate::engine::natgw::push_host(&state.pool, parent.host_id).await
+    {
         Ok(()) => (true, None),
         Err(e) => (false, Some(format!("{e:#}"))),
     };
-    Ok(Json(json!({ "subnet_id": id, "nat_enabled": body.enabled, "applied": applied, "apply_error": error })))
+    Ok(Json(
+        json!({ "subnet_id": id, "nat_enabled": body.enabled, "applied": applied, "apply_error": error }),
+    ))
 }
 
 /// What still depends on a subnet (None = it can be deleted).
-pub(crate) fn subnet_delete_blocker(addresses: i64, ports: i64, groups: i64, instances: i64) -> Option<String> {
+pub(crate) fn subnet_delete_blocker(
+    addresses: i64,
+    ports: i64,
+    groups: i64,
+    instances: i64,
+) -> Option<String> {
     let mut parts = Vec::new();
     if addresses > 0 {
         parts.push(format!("{addresses} reserved address(es)"));
@@ -309,13 +335,34 @@ pub(crate) fn subnet_delete_blocker(addresses: i64, ports: i64, groups: i64, ins
     if instances > 0 {
         parts.push(format!("{instances} instance(s)"));
     }
-    (!parts.is_empty()).then(|| format!("the subnet still has {}; remove them first", parts.join(", ")))
+    (!parts.is_empty()).then(|| {
+        format!(
+            "the subnet still has {}; remove them first",
+            parts.join(", ")
+        )
+    })
 }
 
-async fn subnet_dependents(conn: &mut DbConn, id: Uuid, network_id: Uuid, network_name: &str) -> Result<(i64, i64, i64, i64), ApiError> {
-    let addresses: i64 = crate::db::query_scalar("SELECT COUNT(*) FROM cloud_ip_allocations WHERE subnet_id = ?").bind(id).fetch_one(&mut *conn).await?;
-    let ports: i64 = crate::db::query_scalar("SELECT COUNT(*) FROM ports WHERE network_id = ?").bind(network_id).fetch_one(&mut *conn).await?;
-    let groups: i64 = crate::db::query_scalar("SELECT COUNT(*) FROM cloud_instance_groups WHERE subnet_id = ?").bind(id).fetch_one(&mut *conn).await?;
+async fn subnet_dependents(
+    conn: &mut DbConn,
+    id: Uuid,
+    network_id: Uuid,
+    network_name: &str,
+) -> Result<(i64, i64, i64, i64), ApiError> {
+    let addresses: i64 =
+        crate::db::query_scalar("SELECT COUNT(*) FROM cloud_ip_allocations WHERE subnet_id = ?")
+            .bind(id)
+            .fetch_one(&mut *conn)
+            .await?;
+    let ports: i64 = crate::db::query_scalar("SELECT COUNT(*) FROM ports WHERE network_id = ?")
+        .bind(network_id)
+        .fetch_one(&mut *conn)
+        .await?;
+    let groups: i64 =
+        crate::db::query_scalar("SELECT COUNT(*) FROM cloud_instance_groups WHERE subnet_id = ?")
+            .bind(id)
+            .fetch_one(&mut *conn)
+            .await?;
     // Instances whose spec names the libvirt network (created on the subnet directly or through a group).
     let instances: i64 = crate::db::query_scalar("SELECT COUNT(*) FROM vms WHERE spec_json LIKE ?")
         .bind(format!("%\"network\":\"{network_name}\"%"))
@@ -348,11 +395,21 @@ pub async fn delete_subnet(
     let mut client = crate::agent_client::connect(&agent_addr)
         .await
         .map_err(|e| ApiError::internal(format!("the subnet's host is not reachable: {e:#}")))?;
-    if let Err(e) = crate::agent_client::host_libvirt_invoke(&mut client, "network.delete", &json!({ "name": network_name })).await {
+    if let Err(e) = crate::agent_client::host_libvirt_invoke(
+        &mut client,
+        "network.delete",
+        &json!({ "name": network_name }),
+    )
+    .await
+    {
         let msg = format!("{e:#}");
         // A network that is already gone is fine; anything else keeps the subnet so the operator can retry.
-        if !msg.to_ascii_lowercase().contains("not found") && !msg.to_ascii_lowercase().contains("no network") {
-            return Err(ApiError::internal(format!("could not remove the libvirt network: {msg}")));
+        if !msg.to_ascii_lowercase().contains("not found")
+            && !msg.to_ascii_lowercase().contains("no network")
+        {
+            return Err(ApiError::internal(format!(
+                "could not remove the libvirt network: {msg}"
+            )));
         }
     }
     let mut tx = crate::db::begin_write(&state.pool).await?;
@@ -360,8 +417,14 @@ pub async fn delete_subnet(
     if let Some(why) = subnet_delete_blocker(a, p, g, i) {
         return Err(conflict(why));
     }
-    crate::db::query("DELETE FROM cloud_subnets WHERE id = ?").bind(id).execute(&mut *tx).await?;
-    crate::db::query("DELETE FROM networks WHERE id = ?").bind(sub.network_id).execute(&mut *tx).await?;
+    crate::db::query("DELETE FROM cloud_subnets WHERE id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    crate::db::query("DELETE FROM networks WHERE id = ?")
+        .bind(sub.network_id)
+        .execute(&mut *tx)
+        .await?;
     audit(&mut tx, &actor, "cloud.subnet.delete", id).await?;
     tx.commit().await?;
     Ok(Json(json!({"deleted":true})))
@@ -375,7 +438,11 @@ mod subnet_delete_tests {
     fn lists_what_still_uses_the_subnet() {
         assert!(subnet_delete_blocker(0, 0, 0, 0).is_none());
         let m = subnet_delete_blocker(2, 0, 1, 3).unwrap();
-        assert!(m.contains("2 reserved address") && m.contains("1 instance group") && m.contains("3 instance(s)"));
+        assert!(
+            m.contains("2 reserved address")
+                && m.contains("1 instance group")
+                && m.contains("3 instance(s)")
+        );
         assert!(!m.contains("network interface"));
     }
 }
@@ -468,7 +535,10 @@ pub(crate) fn pick_address(
 ) -> Result<String, String> {
     let managed = || (4..=cidr.ipam_end_offset()).filter_map(|n| cidr.address(n).ok());
     if let Some(w) = wanted {
-        let ip: std::net::Ipv4Addr = w.trim().parse().map_err(|_| format!("'{w}' is not an IPv4 address"))?;
+        let ip: std::net::Ipv4Addr = w
+            .trim()
+            .parse()
+            .map_err(|_| format!("'{w}' is not an IPv4 address"))?;
         let w = ip.to_string();
         if !managed().any(|a| a == w) {
             return Err(format!("{w} is not in the subnet's managed address range"));
@@ -514,13 +584,15 @@ pub(crate) async fn reserve_address(
             .into_iter()
             .collect();
     let address = pick_address(&cidr, &used, wanted).map_err(conflict)?;
-    crate::db::query("INSERT INTO cloud_ip_allocations (id,subnet_id,request_key,address) VALUES (?,?,?,?)")
-        .bind(Uuid::new_v4())
-        .bind(subnet_id)
-        .bind(request_key)
-        .bind(&address)
-        .execute(&mut *tx)
-        .await?;
+    crate::db::query(
+        "INSERT INTO cloud_ip_allocations (id,subnet_id,request_key,address) VALUES (?,?,?,?)",
+    )
+    .bind(Uuid::new_v4())
+    .bind(subnet_id)
+    .bind(request_key)
+    .bind(&address)
+    .execute(&mut *tx)
+    .await?;
     tx.commit().await?;
     Ok(address)
 }
@@ -544,11 +616,22 @@ mod pick_address_tests {
     #[test]
     fn a_wanted_address_must_be_managed_and_free() {
         let mut used = std::collections::HashSet::new();
-        assert_eq!(pick_address(&cidr(), &used, Some("10.9.0.20")).unwrap(), "10.9.0.20");
+        assert_eq!(
+            pick_address(&cidr(), &used, Some("10.9.0.20")).unwrap(),
+            "10.9.0.20"
+        );
         used.insert("10.9.0.20".to_string());
-        assert!(pick_address(&cidr(), &used, Some("10.9.0.20")).unwrap_err().contains("already reserved"));
-        assert!(pick_address(&cidr(), &used, Some("10.9.0.2")).is_err(), "gateway/reserved offsets are not managed");
-        assert!(pick_address(&cidr(), &used, Some("10.9.0.250")).is_err(), "DHCP half is not managed");
+        assert!(pick_address(&cidr(), &used, Some("10.9.0.20"))
+            .unwrap_err()
+            .contains("already reserved"));
+        assert!(
+            pick_address(&cidr(), &used, Some("10.9.0.2")).is_err(),
+            "gateway/reserved offsets are not managed"
+        );
+        assert!(
+            pick_address(&cidr(), &used, Some("10.9.0.250")).is_err(),
+            "DHCP half is not managed"
+        );
         assert!(pick_address(&cidr(), &used, Some("not-an-ip")).is_err());
     }
 }
@@ -640,10 +723,11 @@ pub async fn accept_peering(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, ApiError> {
     let mut tx = crate::db::begin_write(&state.pool).await?;
-    let accepter: Uuid = crate::db::query_scalar("SELECT accepter_id FROM cloud_peerings WHERE id=?")
-        .bind(id)
-        .fetch_one(&mut *tx)
-        .await?;
+    let accepter: Uuid =
+        crate::db::query_scalar("SELECT accepter_id FROM cloud_peerings WHERE id=?")
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await?;
     vpc(&mut tx, &actor, accepter, true).await?;
     crate::db::query("UPDATE cloud_peerings SET status='planned' WHERE id=?")
         .bind(id)

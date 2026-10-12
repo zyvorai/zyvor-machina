@@ -45,7 +45,8 @@ pub struct SecurityGroupRow {
 }
 
 async fn with_enforcement(pool: &crate::db::DbPool, mut r: SecurityGroupRow) -> SecurityGroupRow {
-    r.enforcement = Some(crate::engine::sg_enforce::enforcement(pool, &r.id.simple().to_string()).await);
+    r.enforcement =
+        Some(crate::engine::sg_enforce::enforcement(pool, &r.id.simple().to_string()).await);
     r.ec2_id = crate::resource_ids::ec2_id(crate::resource_ids::Kind::SecurityGroup, r.id);
     r
 }
@@ -206,32 +207,53 @@ fn validate_rule(b: &CreateSecurityGroupRuleBody) -> Result<(), ApiError> {
         return Err(ApiError::bad_request("direction must be ingress or egress"));
     }
     if let Some(p) = b.protocol.as_deref() {
-        if !matches!(p.to_ascii_lowercase().as_str(), "tcp" | "udp" | "icmp" | "icmpv6" | "all" | "-1" | "any") {
-            return Err(ApiError::bad_request("protocol must be tcp, udp, icmp, icmpv6 or all"));
+        if !matches!(
+            p.to_ascii_lowercase().as_str(),
+            "tcp" | "udp" | "icmp" | "icmpv6" | "all" | "-1" | "any"
+        ) {
+            return Err(ApiError::bad_request(
+                "protocol must be tcp, udp, icmp, icmpv6 or all",
+            ));
         }
     }
-    let tcp_udp = matches!(b.protocol.as_deref().map(str::to_ascii_lowercase).as_deref(), Some("tcp") | Some("udp"));
+    let tcp_udp = matches!(
+        b.protocol
+            .as_deref()
+            .map(str::to_ascii_lowercase)
+            .as_deref(),
+        Some("tcp") | Some("udp")
+    );
     if let (Some(lo), hi) = (b.port_min, b.port_max) {
         if tcp_udp && !(1..=65535).contains(&lo) {
             return Err(ApiError::bad_request("port_min must be 1-65535"));
         }
         if tcp_udp && hi.is_some_and(|h| h < lo || h > 65535) {
-            return Err(ApiError::bad_request("port_max must be between port_min and 65535"));
+            return Err(ApiError::bad_request(
+                "port_max must be between port_min and 65535",
+            ));
         }
     }
     if b.remote_cidr.is_some() && b.remote_sg_id.as_deref().is_some_and(|s| !s.is_empty()) {
-        return Err(ApiError::bad_request("use remote_cidr or remote_sg_id, not both"));
+        return Err(ApiError::bad_request(
+            "use remote_cidr or remote_sg_id, not both",
+        ));
     }
     if let Some(c) = b.remote_cidr.as_deref() {
-        let (ip, bits) = c.split_once('/').unwrap_or((c, if c.contains(':') { "128" } else { "32" }));
+        let (ip, bits) = c
+            .split_once('/')
+            .unwrap_or((c, if c.contains(':') { "128" } else { "32" }));
         let ok = ip.parse::<std::net::IpAddr>().is_ok()
-            && bits.parse::<u8>().is_ok_and(|n| n <= if ip.contains(':') { 128 } else { 32 });
+            && bits
+                .parse::<u8>()
+                .is_ok_and(|n| n <= if ip.contains(':') { 128 } else { 32 });
         if !ok {
             return Err(ApiError::bad_request("remote_cidr is not a valid CIDR"));
         }
     }
     if b.description.len() > 255 {
-        return Err(ApiError::bad_request("description is limited to 255 characters"));
+        return Err(ApiError::bad_request(
+            "description is limited to 255 characters",
+        ));
     }
     Ok(())
 }
@@ -249,13 +271,17 @@ pub async fn create_security_group_rule(
     require_operator(&actor)?;
     validate_rule(&body)?;
     if let Some(r) = body.remote_sg_id.as_deref().filter(|s| !s.is_empty()) {
-        let rid = Uuid::parse_str(r).map_err(|_| ApiError::bad_request("remote_sg_id must be a security group id"))?;
-        let known: Option<i64> = crate::db::query_scalar("SELECT 1 FROM security_groups WHERE id = ?")
-            .bind(rid)
-            .fetch_optional(&state.pool)
-            .await?;
+        let rid = Uuid::parse_str(r)
+            .map_err(|_| ApiError::bad_request("remote_sg_id must be a security group id"))?;
+        let known: Option<i64> =
+            crate::db::query_scalar("SELECT 1 FROM security_groups WHERE id = ?")
+                .bind(rid)
+                .fetch_optional(&state.pool)
+                .await?;
         if known.is_none() {
-            return Err(ApiError::bad_request("remote_sg_id is not a security group"));
+            return Err(ApiError::bad_request(
+                "remote_sg_id is not a security group",
+            ));
         }
         body.remote_sg_id = Some(rid.simple().to_string());
     }
@@ -333,7 +359,8 @@ impl PortRow {
     }
 }
 
-const PORT_SELECT: &str = "SELECT id, network_id, project_id, vm_id, mac_address, security_group_id, status, \
+const PORT_SELECT: &str =
+    "SELECT id, network_id, project_id, vm_id, mac_address, security_group_id, status, \
     subnet_id, private_ip, COALESCE(description, '') AS description, dhcp_pinned FROM ports";
 
 #[derive(Debug, Deserialize)]
@@ -423,20 +450,30 @@ pub async fn create_port(
     let mut mac_address: Option<String> = None;
     let mut status = "DOWN";
     if body.description.len() > 255 {
-        return Err(ApiError::bad_request("description is limited to 255 characters"));
+        return Err(ApiError::bad_request(
+            "description is limited to 255 characters",
+        ));
     }
     // A port on a cloud subnet owns a managed address, reserved before anything is attached.
-    let subnet: Option<Uuid> = crate::db::query_scalar("SELECT id FROM cloud_subnets WHERE network_id = ?")
-        .bind(body.network_id)
-        .fetch_optional(&state.pool)
-        .await?;
+    let subnet: Option<Uuid> =
+        crate::db::query_scalar("SELECT id FROM cloud_subnets WHERE network_id = ?")
+            .bind(body.network_id)
+            .fetch_optional(&state.pool)
+            .await?;
     if subnet.is_none() && body.private_ip.is_some() {
-        return Err(ApiError::bad_request("private_ip needs a port on a cloud subnet"));
+        return Err(ApiError::bad_request(
+            "private_ip needs a port on a cloud subnet",
+        ));
     }
     let private_ip = match subnet {
         Some(sid) => Some(
-            crate::api::cloud::reserve_address(&state.pool, sid, &format!("eni-{id}"), body.private_ip.as_deref())
-                .await?,
+            crate::api::cloud::reserve_address(
+                &state.pool,
+                sid,
+                &format!("eni-{id}"),
+                body.private_ip.as_deref(),
+            )
+            .await?,
         ),
         None => None,
     };
@@ -521,11 +558,12 @@ pub async fn delete_port(
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_operator(&actor)?;
-    let pinned: Option<(Uuid, Option<String>, Option<String>, bool)> =
-        crate::db::query_as("SELECT network_id, mac_address, private_ip, dhcp_pinned FROM ports WHERE id = ?")
-            .bind(id)
-            .fetch_optional(&state.pool)
-            .await?;
+    let pinned: Option<(Uuid, Option<String>, Option<String>, bool)> = crate::db::query_as(
+        "SELECT network_id, mac_address, private_ip, dhcp_pinned FROM ports WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await?;
     if let Some((net, Some(mac), Some(ip), true)) = pinned {
         if let Err(e) = pin_dhcp(&state, net, &mac, &ip, false).await {
             tracing::warn!(port = %id, "could not unpin the reserved address: {e}");
@@ -554,7 +592,6 @@ pub async fn delete_port(
         .await?;
     Ok(Json(serde_json::json!({ "deleted": true })))
 }
-
 
 // ---------------------------------------------------------------------------
 // Enforcement mode and instance attachment
@@ -640,10 +677,11 @@ pub async fn attach_instance_security_group(
     if vm.is_none() {
         return Err(ApiError::not_found("instance not found"));
     }
-    let sg: Option<String> = crate::db::query_scalar("SELECT name FROM security_groups WHERE id = ?")
-        .bind(sg_id)
-        .fetch_optional(&state.pool)
-        .await?;
+    let sg: Option<String> =
+        crate::db::query_scalar("SELECT name FROM security_groups WHERE id = ?")
+            .bind(sg_id)
+            .fetch_optional(&state.pool)
+            .await?;
     if sg.is_none() {
         return Err(ApiError::not_found("security group not found"));
     }
@@ -653,7 +691,9 @@ pub async fn attach_instance_security_group(
         .execute(&state.pool)
         .await?;
     resync(&state);
-    Ok(Json(serde_json::json!({ "vm_id": vm_id, "security_group_id": sg_id, "attached": true })))
+    Ok(Json(
+        serde_json::json!({ "vm_id": vm_id, "security_group_id": sg_id, "attached": true }),
+    ))
 }
 
 pub async fn detach_instance_security_group(
@@ -668,7 +708,9 @@ pub async fn detach_instance_security_group(
         .execute(&state.pool)
         .await?;
     resync(&state);
-    Ok(Json(serde_json::json!({ "vm_id": vm_id, "security_group_id": sg_id, "attached": false })))
+    Ok(Json(
+        serde_json::json!({ "vm_id": vm_id, "security_group_id": sg_id, "attached": false }),
+    ))
 }
 
 /// Dry run of switching a group to enforce: per attached instance, the rules it would end up with and warnings.
@@ -678,21 +720,30 @@ pub async fn preview_security_group_enforcement(
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_operator(&actor)?;
-    let known: Option<String> = crate::db::query_scalar("SELECT name FROM security_groups WHERE id = ?")
-        .bind(id)
-        .fetch_optional(&state.pool)
-        .await?;
+    let known: Option<String> =
+        crate::db::query_scalar("SELECT name FROM security_groups WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&state.pool)
+            .await?;
     if known.is_none() {
         return Err(ApiError::not_found("security group not found"));
     }
     let model = crate::engine::sg_enforce::load(&state.pool).await;
     let items = crate::engine::sg_enforce::preview(&model, &id.simple().to_string());
     let warnings: usize = items.iter().map(|i| i.warnings.len()).sum();
-    Ok(Json(serde_json::json!({ "instances": items, "warning_count": warnings })))
+    Ok(Json(
+        serde_json::json!({ "instances": items, "warning_count": warnings }),
+    ))
 }
 
 /// Pin (or unpin) `ip` for `mac` on the libvirt network behind a cloud subnet, on the host that owns it.
-pub(crate) async fn pin_dhcp(state: &AppState, network_id: Uuid, mac: &str, ip: &str, enabled: bool) -> Result<(), String> {
+pub(crate) async fn pin_dhcp(
+    state: &AppState,
+    network_id: Uuid,
+    mac: &str,
+    ip: &str,
+    enabled: bool,
+) -> Result<(), String> {
     let row: Option<(String, String)> = crate::db::query_as(
         "SELECT h.agent_grpc_addr, n.name FROM cloud_subnets s JOIN cloud_vpcs v ON v.id = s.vpc_id \
          JOIN hosts h ON h.id = v.host_id JOIN networks n ON n.id = s.network_id WHERE s.network_id = ?",
@@ -704,7 +755,9 @@ pub(crate) async fn pin_dhcp(state: &AppState, network_id: Uuid, mac: &str, ip: 
     let Some((addr, name)) = row else {
         return Err("the network is not a cloud subnet".into());
     };
-    let mut client = crate::agent_client::connect(&addr).await.map_err(|e| format!("{e:#}"))?;
+    let mut client = crate::agent_client::connect(&addr)
+        .await
+        .map_err(|e| format!("{e:#}"))?;
     crate::agent_client::host_libvirt_invoke(
         &mut client,
         "network.dhcp_host",
@@ -721,7 +774,11 @@ mod rule_tests {
     use crate::engine::test_support::test_state;
 
     fn admin() -> AuthUser {
-        AuthUser { username: "admin".into(), role: "admin".into(), auth_source: None }
+        AuthUser {
+            username: "admin".into(),
+            role: "admin".into(),
+            auth_source: None,
+        }
     }
 
     /// A rule whose peer is another security group stores that group's id as hex text. PostgreSQL once rejected the insert
@@ -729,10 +786,30 @@ mod rule_tests {
     #[tokio::test]
     async fn a_rule_can_name_another_group_as_its_peer() {
         let (state, _rx) = test_state().await;
-        crate::db::ensure_bootstrap(&state.pool, "admin", "pw").await.unwrap();
-        let group = |name: &str| CreateSecurityGroupBody { name: name.into(), description: String::new(), project_id: None };
-        let a = create_security_group(State(state.clone()), Extension(admin()), Json(group("rule-a"))).await.unwrap().0;
-        let b = create_security_group(State(state.clone()), Extension(admin()), Json(group("rule-b"))).await.unwrap().0;
+        crate::db::ensure_bootstrap(&state.pool, "admin", "pw")
+            .await
+            .unwrap();
+        let group = |name: &str| CreateSecurityGroupBody {
+            name: name.into(),
+            description: String::new(),
+            project_id: None,
+        };
+        let a = create_security_group(
+            State(state.clone()),
+            Extension(admin()),
+            Json(group("rule-a")),
+        )
+        .await
+        .unwrap()
+        .0;
+        let b = create_security_group(
+            State(state.clone()),
+            Extension(admin()),
+            Json(group("rule-b")),
+        )
+        .await
+        .unwrap()
+        .0;
         let body = CreateSecurityGroupRuleBody {
             direction: "ingress".into(),
             protocol: Some("tcp".into()),
@@ -742,9 +819,25 @@ mod rule_tests {
             remote_sg_id: Some(b.id.to_string()),
             description: String::new(),
         };
-        let rule = create_security_group_rule(State(state.clone()), Extension(admin()), Path(a.id), Json(body)).await.unwrap().0;
-        assert_eq!(rule.remote_sg_id.as_deref(), Some(b.id.simple().to_string().as_str()));
-        let stored: String = crate::db::query_scalar("SELECT remote_sg_id FROM security_group_rules WHERE id = ?").bind(rule.id).fetch_one(&state.pool).await.unwrap();
+        let rule = create_security_group_rule(
+            State(state.clone()),
+            Extension(admin()),
+            Path(a.id),
+            Json(body),
+        )
+        .await
+        .unwrap()
+        .0;
+        assert_eq!(
+            rule.remote_sg_id.as_deref(),
+            Some(b.id.simple().to_string().as_str())
+        );
+        let stored: String =
+            crate::db::query_scalar("SELECT remote_sg_id FROM security_group_rules WHERE id = ?")
+                .bind(rule.id)
+                .fetch_one(&state.pool)
+                .await
+                .unwrap();
         assert_eq!(stored, b.id.simple().to_string());
     }
 }

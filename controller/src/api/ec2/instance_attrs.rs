@@ -35,7 +35,12 @@ fn unsupported(msg: impl Into<String>) -> Ec2Error {
 }
 
 fn need(p: &Params, k: &str) -> Result<String, Ec2Error> {
-    p.get(k).cloned().ok_or_else(|| bad("MissingParameter", format!("The request must contain the parameter {k}")))
+    p.get(k).cloned().ok_or_else(|| {
+        bad(
+            "MissingParameter",
+            format!("The request must contain the parameter {k}"),
+        )
+    })
 }
 
 /// The attributes kept in `ec2_instance_attrs`.
@@ -51,7 +56,14 @@ pub struct Attrs {
 
 impl Default for Attrs {
     fn default() -> Self {
-        Self { disable_api_termination: false, ebs_optimized: false, monitoring: false, metadata_endpoint: true, metadata_hop_limit: 1, placement_group: None }
+        Self {
+            disable_api_termination: false,
+            ebs_optimized: false,
+            monitoring: false,
+            metadata_endpoint: true,
+            metadata_hop_limit: 1,
+            placement_group: None,
+        }
     }
 }
 
@@ -65,7 +77,14 @@ pub async fn load(state: &AppState, vm: Uuid) -> Result<Attrs, Ec2Error> {
     .fetch_optional(&state.pool)
     .await?;
     Ok(row
-        .map(|(d, e, m, me, h, g)| Attrs { disable_api_termination: d, ebs_optimized: e, monitoring: m, metadata_endpoint: me, metadata_hop_limit: h, placement_group: g })
+        .map(|(d, e, m, me, h, g)| Attrs {
+            disable_api_termination: d,
+            ebs_optimized: e,
+            monitoring: m,
+            metadata_endpoint: me,
+            metadata_hop_limit: h,
+            placement_group: g,
+        })
         .unwrap_or_default())
 }
 
@@ -108,14 +127,19 @@ pub fn attr_value(p: &Params, pascal: &str, camel: &str) -> Option<String> {
     if let Some(v) = p.get(&format!("{pascal}.Value")) {
         return Some(v.clone());
     }
-    (p.get("Attribute").map(String::as_str) == Some(camel)).then(|| p.get("Value").cloned()).flatten()
+    (p.get("Attribute").map(String::as_str) == Some(camel))
+        .then(|| p.get("Value").cloned())
+        .flatten()
 }
 
 fn parse_bool(name: &str, v: &str) -> Result<bool, Ec2Error> {
     match v {
         "true" => Ok(true),
         "false" => Ok(false),
-        _ => Err(bad("InvalidParameterValue", format!("{name} must be true or false"))),
+        _ => Err(bad(
+            "InvalidParameterValue",
+            format!("{name} must be true or false"),
+        )),
     }
 }
 
@@ -152,7 +176,11 @@ pub fn parse_modify(p: &Params, groups: bool) -> Result<Modify, Ec2Error> {
             return Err(unsupported("SourceDestCheck=false is not supported: the instance's network edge always drops frames that do not carry its own address"));
         }
     }
-    if let Some(v) = attr_value(p, "InstanceInitiatedShutdownBehavior", "instanceInitiatedShutdownBehavior") {
+    if let Some(v) = attr_value(
+        p,
+        "InstanceInitiatedShutdownBehavior",
+        "instanceInitiatedShutdownBehavior",
+    ) {
         match v.as_str() {
             "stop" => any = true,
             "terminate" => return Err(unsupported("InstanceInitiatedShutdownBehavior=terminate is not supported: a guest shutdown always leaves the instance stopped")),
@@ -164,11 +192,21 @@ pub fn parse_modify(p: &Params, groups: bool) -> Result<Modify, Ec2Error> {
     }
     // Machina-specific resize attributes (not in AWS): `VCpus.Value` and `MemoryMiB.Value`.
     if let Some(v) = attr_value(p, "VCpus", "vcpus") {
-        m.vcpus = Some(v.parse().ok().filter(|n| *n >= 1).ok_or_else(|| bad("InvalidParameterValue", "VCpus must be a positive number"))?);
+        m.vcpus = Some(
+            v.parse()
+                .ok()
+                .filter(|n| *n >= 1)
+                .ok_or_else(|| bad("InvalidParameterValue", "VCpus must be a positive number"))?,
+        );
         any = true;
     }
     if let Some(v) = attr_value(p, "MemoryMiB", "memoryMiB") {
-        m.memory_mib = Some(v.parse().ok().filter(|n| *n >= 128).ok_or_else(|| bad("InvalidParameterValue", "MemoryMiB must be a number of at least 128"))?);
+        m.memory_mib = Some(v.parse().ok().filter(|n| *n >= 128).ok_or_else(|| {
+            bad(
+                "InvalidParameterValue",
+                "MemoryMiB must be a number of at least 128",
+            )
+        })?);
         any = true;
     }
     if !any && !groups {
@@ -180,9 +218,19 @@ pub fn parse_modify(p: &Params, groups: bool) -> Result<Modify, Ec2Error> {
     Ok(m)
 }
 
-pub async fn modify_instance_attribute(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
+pub async fn modify_instance_attribute(
+    state: &AppState,
+    actor: &AuthUser,
+    p: &Params,
+) -> Result<String, Ec2Error> {
     require_operator(actor)?;
-    let id = resolve(state, Kind::Vm, &need(p, "InstanceId")?, "InvalidInstanceID.NotFound").await?;
+    let id = resolve(
+        state,
+        Kind::Vm,
+        &need(p, "InstanceId")?,
+        "InvalidInstanceID.NotFound",
+    )
+    .await?;
     let groups = p.keys().any(|k| k.starts_with("GroupId."));
     let m = parse_modify(p, groups)?;
     // resolve the flavor before changing anything
@@ -192,7 +240,12 @@ pub async fn modify_instance_attribute(state: &AppState, actor: &AuthUser, p: &P
                 .bind(t)
                 .fetch_optional(&state.pool)
                 .await?
-                .ok_or_else(|| bad("InvalidParameterValue", format!("Unknown instance type '{t}'")))?,
+                .ok_or_else(|| {
+                    bad(
+                        "InvalidParameterValue",
+                        format!("Unknown instance type '{t}'"),
+                    )
+                })?,
         ),
         None => None,
     };
@@ -217,14 +270,24 @@ pub async fn modify_instance_attribute(state: &AppState, actor: &AuthUser, p: &P
         .map_err(api_err)?;
     }
     if let Some(count) = m.vcpus {
-        let _ = crate::api::vms::set_vm_vcpus(State(state.clone()), Extension(actor.clone()), Path(id), Json(crate::api::vms::SetVcpusBody { count }))
-            .await
-            .map_err(api_err)?;
+        let _ = crate::api::vms::set_vm_vcpus(
+            State(state.clone()),
+            Extension(actor.clone()),
+            Path(id),
+            Json(crate::api::vms::SetVcpusBody { count }),
+        )
+        .await
+        .map_err(api_err)?;
     }
     if let Some(memory_mb) = m.memory_mib {
-        let _ = crate::api::vms::set_vm_memory(State(state.clone()), Extension(actor.clone()), Path(id), Json(crate::api::vms::SetMemoryBody { memory_mb }))
-            .await
-            .map_err(api_err)?;
+        let _ = crate::api::vms::set_vm_memory(
+            State(state.clone()),
+            Extension(actor.clone()),
+            Path(id),
+            Json(crate::api::vms::SetMemoryBody { memory_mb }),
+        )
+        .await
+        .map_err(api_err)?;
     }
     if groups {
         super::groups::modify_group_set(state, actor, p).await?;
@@ -244,11 +307,13 @@ pub async fn describe_instance_attribute(state: &AppState, p: &Params) -> Result
     let attribute = need(p, "Attribute")?;
     let body = match attribute.as_str() {
         "instanceType" => {
-            let flavor: Option<String> = crate::db::query_scalar("SELECT f.name FROM vms v LEFT JOIN flavors f ON f.id = v.flavor_id WHERE v.id = ?")
-                .bind(id)
-                .fetch_optional(&state.pool)
-                .await?
-                .flatten();
+            let flavor: Option<String> = crate::db::query_scalar(
+                "SELECT f.name FROM vms v LEFT JOIN flavors f ON f.id = v.flavor_id WHERE v.id = ?",
+            )
+            .bind(id)
+            .fetch_optional(&state.pool)
+            .await?
+            .flatten();
             value_el("instanceType", flavor.as_deref().unwrap_or(""))
         }
         "groupSet" => {
@@ -260,21 +325,39 @@ pub async fn describe_instance_attribute(state: &AppState, p: &Params) -> Result
             .await?;
             let items: String = groups
                 .iter()
-                .map(|(gid, name)| format!("<item><groupId>{}</groupId><groupName>{}</groupName></item>", ec2_id(Kind::SecurityGroup, *gid), xml_escape(name)))
+                .map(|(gid, name)| {
+                    format!(
+                        "<item><groupId>{}</groupId><groupName>{}</groupName></item>",
+                        ec2_id(Kind::SecurityGroup, *gid),
+                        xml_escape(name)
+                    )
+                })
                 .collect();
             format!("<groupSet>{items}</groupSet>")
         }
-        "disableApiTermination" => value_el("disableApiTermination", &load(state, id).await?.disable_api_termination.to_string()),
-        "ebsOptimized" => value_el("ebsOptimized", &load(state, id).await?.ebs_optimized.to_string()),
+        "disableApiTermination" => value_el(
+            "disableApiTermination",
+            &load(state, id).await?.disable_api_termination.to_string(),
+        ),
+        "ebsOptimized" => value_el(
+            "ebsOptimized",
+            &load(state, id).await?.ebs_optimized.to_string(),
+        ),
         "sourceDestCheck" => value_el("sourceDestCheck", "true"),
-        "instanceInitiatedShutdownBehavior" => value_el("instanceInitiatedShutdownBehavior", "stop"),
+        "instanceInitiatedShutdownBehavior" => {
+            value_el("instanceInitiatedShutdownBehavior", "stop")
+        }
         "userData" => {
             let ud: Option<String> = crate::db::query_scalar("SELECT json_extract(spec_json, '$.spec.cloud_init.user_data') FROM vms WHERE id = ?")
                 .bind(id)
                 .fetch_optional(&state.pool)
                 .await?
                 .flatten();
-            value_el("userData", &ud.map(|u| base64::engine::general_purpose::STANDARD.encode(u)).unwrap_or_default())
+            value_el(
+                "userData",
+                &ud.map(|u| base64::engine::general_purpose::STANDARD.encode(u))
+                    .unwrap_or_default(),
+            )
         }
         "rootDeviceName" => value_el("rootDeviceName", "/dev/vda"),
         "blockDeviceMapping" => {
@@ -298,7 +381,12 @@ pub async fn describe_instance_attribute(state: &AppState, p: &Params) -> Result
         "kernel" | "ramdisk" | "sriovNetSupport" => value_el(&attribute, ""),
         "enaSupport" => value_el("enaSupport", "false"),
         "productCodes" => "<productCodes/>".to_string(),
-        other => return Err(bad("InvalidParameterValue", format!("Attribute '{other}' is not a valid instance attribute"))),
+        other => {
+            return Err(bad(
+                "InvalidParameterValue",
+                format!("Attribute '{other}' is not a valid instance attribute"),
+            ))
+        }
     };
     Ok(format!("<instanceId>{want}</instanceId>{body}"))
 }
@@ -307,22 +395,36 @@ pub async fn describe_instance_attribute(state: &AppState, p: &Params) -> Result
 
 /// `MonitorInstances` / `UnmonitorInstances`. Machina always collects the same metrics at one granularity; the flag is
 /// recorded so the instance reports the state the client asked for.
-pub async fn set_monitoring(state: &AppState, actor: &AuthUser, p: &Params, on: bool) -> Result<String, Ec2Error> {
+pub async fn set_monitoring(
+    state: &AppState,
+    actor: &AuthUser,
+    p: &Params,
+    on: bool,
+) -> Result<String, Ec2Error> {
     require_operator(actor)?;
     let ids = indexed(p, "InstanceId");
     if ids.is_empty() {
-        return Err(bad("MissingParameter", "The request must contain the parameter InstanceId"));
+        return Err(bad(
+            "MissingParameter",
+            "The request must contain the parameter InstanceId",
+        ));
     }
     let mut vms = Vec::new();
     for s in &ids {
-        vms.push((s.clone(), resolve(state, Kind::Vm, s, "InvalidInstanceID.NotFound").await?));
+        vms.push((
+            s.clone(),
+            resolve(state, Kind::Vm, s, "InvalidInstanceID.NotFound").await?,
+        ));
     }
     let mut items = String::new();
     for (s, id) in vms {
         let mut a = load(state, id).await?;
         a.monitoring = on;
         save(state, id, &a).await?;
-        items.push_str(&format!("<item><instanceId>{s}</instanceId><monitoring><state>{}</state></monitoring></item>", if on { "enabled" } else { "disabled" }));
+        items.push_str(&format!(
+            "<item><instanceId>{s}</instanceId><monitoring><state>{}</state></monitoring></item>",
+            if on { "enabled" } else { "disabled" }
+        ));
     }
     Ok(format!("<instancesSet>{items}</instancesSet>"))
 }
@@ -347,17 +449,35 @@ pub fn parse_metadata(p: &Params) -> Result<MetadataChange, Ec2Error> {
         None => {}
         Some("enabled") => c.endpoint = Some(true),
         Some("disabled") => c.endpoint = Some(false),
-        Some(_) => return Err(bad("InvalidParameterValue", "HttpEndpoint must be enabled or disabled")),
+        Some(_) => {
+            return Err(bad(
+                "InvalidParameterValue",
+                "HttpEndpoint must be enabled or disabled",
+            ))
+        }
     }
     if let Some(v) = p.get("HttpPutResponseHopLimit") {
-        let n: i64 = v.parse().map_err(|_| bad("InvalidParameterValue", "HttpPutResponseHopLimit must be a number"))?;
+        let n: i64 = v.parse().map_err(|_| {
+            bad(
+                "InvalidParameterValue",
+                "HttpPutResponseHopLimit must be a number",
+            )
+        })?;
         if !(1..=64).contains(&n) {
-            return Err(bad("InvalidParameterValue", "HttpPutResponseHopLimit must be between 1 and 64"));
+            return Err(bad(
+                "InvalidParameterValue",
+                "HttpPutResponseHopLimit must be between 1 and 64",
+            ));
         }
         c.hop_limit = Some(n);
     }
-    if p.get("HttpProtocolIpv6").is_some_and(|v| v != "disabled") || p.get("InstanceMetadataTags").is_some_and(|v| v != "disabled") {
-        return Err(unsupported("HttpProtocolIpv6 and InstanceMetadataTags are not supported"));
+    if p.get("HttpProtocolIpv6").is_some_and(|v| v != "disabled")
+        || p.get("InstanceMetadataTags")
+            .is_some_and(|v| v != "disabled")
+    {
+        return Err(unsupported(
+            "HttpProtocolIpv6 and InstanceMetadataTags are not supported",
+        ));
     }
     Ok(c)
 }
@@ -372,7 +492,11 @@ pub fn metadata_xml(a: &Attrs) -> String {
 
 /// Switches the metadata endpoint for one instance. The agent's table is refreshed every 30 s, so the change reaches the
 /// guest within that time.
-pub async fn modify_instance_metadata_options(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
+pub async fn modify_instance_metadata_options(
+    state: &AppState,
+    actor: &AuthUser,
+    p: &Params,
+) -> Result<String, Ec2Error> {
     require_operator(actor)?;
     let want = need(p, "InstanceId")?;
     let id = resolve(state, Kind::Vm, &want, "InvalidInstanceID.NotFound").await?;
@@ -385,14 +509,21 @@ pub async fn modify_instance_metadata_options(state: &AppState, actor: &AuthUser
         a.metadata_hop_limit = h;
     }
     save(state, id, &a).await?;
-    Ok(format!("<instanceId>{want}</instanceId>{}", metadata_xml(&a)))
+    Ok(format!(
+        "<instanceId>{want}</instanceId>{}",
+        metadata_xml(&a)
+    ))
 }
 
 // ---- console and stubs -------------------------------------------------------------------------------------------
 
 /// `GetConsoleOutput`: the instance's QEMU log (the only console-side log Machina keeps; the guest's serial output is
 /// not captured). Base64 as the API requires.
-pub async fn get_console_output(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
+pub async fn get_console_output(
+    state: &AppState,
+    actor: &AuthUser,
+    p: &Params,
+) -> Result<String, Ec2Error> {
     require_operator(actor)?;
     let want = need(p, "InstanceId")?;
     let id = resolve(state, Kind::Vm, &want, "InvalidInstanceID.NotFound").await?;
@@ -420,27 +551,40 @@ pub fn get_console_screenshot() -> Result<String, Ec2Error> {
 pub async fn get_password_data(state: &AppState, p: &Params) -> Result<String, Ec2Error> {
     let want = need(p, "InstanceId")?;
     let _ = resolve(state, Kind::Vm, &want, "InvalidInstanceID.NotFound").await?;
-    Ok(format!("<instanceId>{want}</instanceId><timestamp>{}</timestamp><passwordData/>", chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S.000Z")))
+    Ok(format!(
+        "<instanceId>{want}</instanceId><timestamp>{}</timestamp><passwordData/>",
+        chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S.000Z")
+    ))
 }
 
 /// `DescribeInstanceCreditSpecifications`: every instance runs at standard credits (there is no burst-credit model).
-pub async fn describe_instance_credit_specifications(state: &AppState, p: &Params) -> Result<String, Ec2Error> {
+pub async fn describe_instance_credit_specifications(
+    state: &AppState,
+    p: &Params,
+) -> Result<String, Ec2Error> {
     let wanted = indexed(p, "InstanceId");
     let rows: Vec<Uuid> = crate::db::query_scalar("SELECT id FROM vms WHERE COALESCE(inventory_source, 'libvirt') != 'kubevirt' ORDER BY name")
         .fetch_all(&state.pool)
         .await?;
     for w in &wanted {
         if !rows.iter().any(|r| &ec2_id(Kind::Vm, *r) == w) {
-            return Err(bad("InvalidInstanceID.NotFound", format!("The instance ID '{w}' does not exist")));
+            return Err(bad(
+                "InvalidInstanceID.NotFound",
+                format!("The instance ID '{w}' does not exist"),
+            ));
         }
     }
     let items: String = rows
         .iter()
         .map(|r| ec2_id(Kind::Vm, *r))
         .filter(|e| wanted.is_empty() || wanted.contains(e))
-        .map(|e| format!("<item><instanceId>{e}</instanceId><cpuCredits>standard</cpuCredits></item>"))
+        .map(|e| {
+            format!("<item><instanceId>{e}</instanceId><cpuCredits>standard</cpuCredits></item>")
+        })
         .collect();
-    Ok(format!("<instanceCreditSpecificationSet>{items}</instanceCreditSpecificationSet>"))
+    Ok(format!(
+        "<instanceCreditSpecificationSet>{items}</instanceCreditSpecificationSet>"
+    ))
 }
 
 #[cfg(test)]
@@ -448,30 +592,65 @@ mod tests {
     use super::*;
 
     fn p(pairs: &[(&str, &str)]) -> Params {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     #[test]
     fn both_wire_forms_of_an_attribute_are_read() {
         let sdk = p(&[("DisableApiTermination.Value", "true")]);
-        assert_eq!(attr_value(&sdk, "DisableApiTermination", "disableApiTermination").as_deref(), Some("true"));
+        assert_eq!(
+            attr_value(&sdk, "DisableApiTermination", "disableApiTermination").as_deref(),
+            Some("true")
+        );
         let cli = p(&[("Attribute", "disableApiTermination"), ("Value", "true")]);
-        assert_eq!(attr_value(&cli, "DisableApiTermination", "disableApiTermination").as_deref(), Some("true"));
+        assert_eq!(
+            attr_value(&cli, "DisableApiTermination", "disableApiTermination").as_deref(),
+            Some("true")
+        );
         // a Value meant for another attribute is not picked up
         let other = p(&[("Attribute", "instanceType"), ("Value", "m1.small")]);
-        assert_eq!(attr_value(&other, "DisableApiTermination", "disableApiTermination"), None);
+        assert_eq!(
+            attr_value(&other, "DisableApiTermination", "disableApiTermination"),
+            None
+        );
     }
 
     #[test]
     fn modify_accepts_what_it_enforces_and_records() {
-        let m = parse_modify(&p(&[("DisableApiTermination.Value", "true"), ("EbsOptimized.Value", "false"), ("SourceDestCheck.Value", "true")]), false).unwrap();
+        let m = parse_modify(
+            &p(&[
+                ("DisableApiTermination.Value", "true"),
+                ("EbsOptimized.Value", "false"),
+                ("SourceDestCheck.Value", "true"),
+            ]),
+            false,
+        )
+        .unwrap();
         assert_eq!(m.disable_api_termination, Some(true));
         assert_eq!(m.ebs_optimized, Some(false));
-        let m = parse_modify(&p(&[("Attribute", "instanceType"), ("Value", "m1.small")]), false).unwrap();
+        let m = parse_modify(
+            &p(&[("Attribute", "instanceType"), ("Value", "m1.small")]),
+            false,
+        )
+        .unwrap();
         assert_eq!(m.instance_type.as_deref(), Some("m1.small"));
-        let m = parse_modify(&p(&[("VCpus.Value", "4"), ("MemoryMiB.Value", "4096")]), false).unwrap();
+        let m = parse_modify(
+            &p(&[("VCpus.Value", "4"), ("MemoryMiB.Value", "4096")]),
+            false,
+        )
+        .unwrap();
         assert_eq!((m.vcpus, m.memory_mib), (Some(4), Some(4096)));
-        assert_eq!(parse_modify(&p(&[("InstanceInitiatedShutdownBehavior.Value", "stop")]), false).unwrap(), Modify::default());
+        assert_eq!(
+            parse_modify(
+                &p(&[("InstanceInitiatedShutdownBehavior.Value", "stop")]),
+                false
+            )
+            .unwrap(),
+            Modify::default()
+        );
     }
 
     #[test]
@@ -481,40 +660,101 @@ mod tests {
             ("InstanceInitiatedShutdownBehavior.Value", "terminate"),
             ("UserData.Value", "aGVsbG8="),
         ] {
-            assert_eq!(parse_modify(&p(&[(k, v)]), false).unwrap_err().code, "UnsupportedOperation", "{k}");
+            assert_eq!(
+                parse_modify(&p(&[(k, v)]), false).unwrap_err().code,
+                "UnsupportedOperation",
+                "{k}"
+            );
         }
-        assert_eq!(parse_modify(&p(&[("DisableApiTermination.Value", "maybe")]), false).unwrap_err().code, "InvalidParameterValue");
-        assert_eq!(parse_modify(&p(&[("VCpus.Value", "0")]), false).unwrap_err().code, "InvalidParameterValue");
-        assert_eq!(parse_modify(&p(&[]), false).unwrap_err().code, "InvalidParameterValue");
+        assert_eq!(
+            parse_modify(&p(&[("DisableApiTermination.Value", "maybe")]), false)
+                .unwrap_err()
+                .code,
+            "InvalidParameterValue"
+        );
+        assert_eq!(
+            parse_modify(&p(&[("VCpus.Value", "0")]), false)
+                .unwrap_err()
+                .code,
+            "InvalidParameterValue"
+        );
+        assert_eq!(
+            parse_modify(&p(&[]), false).unwrap_err().code,
+            "InvalidParameterValue"
+        );
     }
 
     #[test]
     fn metadata_options_validate() {
-        let c = parse_metadata(&p(&[("HttpEndpoint", "disabled"), ("HttpPutResponseHopLimit", "2"), ("HttpTokens", "optional")])).unwrap();
-        assert_eq!(c, MetadataChange { endpoint: Some(false), hop_limit: Some(2) });
-        assert_eq!(parse_metadata(&p(&[("HttpTokens", "required")])).unwrap_err().code, "UnsupportedOperation");
-        assert_eq!(parse_metadata(&p(&[("HttpPutResponseHopLimit", "65")])).unwrap_err().code, "InvalidParameterValue");
-        assert_eq!(parse_metadata(&p(&[("HttpEndpoint", "off")])).unwrap_err().code, "InvalidParameterValue");
-        assert_eq!(parse_metadata(&p(&[("InstanceMetadataTags", "enabled")])).unwrap_err().code, "UnsupportedOperation");
+        let c = parse_metadata(&p(&[
+            ("HttpEndpoint", "disabled"),
+            ("HttpPutResponseHopLimit", "2"),
+            ("HttpTokens", "optional"),
+        ]))
+        .unwrap();
+        assert_eq!(
+            c,
+            MetadataChange {
+                endpoint: Some(false),
+                hop_limit: Some(2)
+            }
+        );
+        assert_eq!(
+            parse_metadata(&p(&[("HttpTokens", "required")]))
+                .unwrap_err()
+                .code,
+            "UnsupportedOperation"
+        );
+        assert_eq!(
+            parse_metadata(&p(&[("HttpPutResponseHopLimit", "65")]))
+                .unwrap_err()
+                .code,
+            "InvalidParameterValue"
+        );
+        assert_eq!(
+            parse_metadata(&p(&[("HttpEndpoint", "off")]))
+                .unwrap_err()
+                .code,
+            "InvalidParameterValue"
+        );
+        assert_eq!(
+            parse_metadata(&p(&[("InstanceMetadataTags", "enabled")]))
+                .unwrap_err()
+                .code,
+            "UnsupportedOperation"
+        );
     }
 
     #[test]
     fn metadata_xml_reports_the_stored_values() {
-        let a = Attrs { metadata_endpoint: false, metadata_hop_limit: 3, ..Attrs::default() };
+        let a = Attrs {
+            metadata_endpoint: false,
+            metadata_hop_limit: 3,
+            ..Attrs::default()
+        };
         let x = metadata_xml(&a);
-        assert!(x.contains("<httpEndpoint>disabled</httpEndpoint>") && x.contains("<httpPutResponseHopLimit>3</httpPutResponseHopLimit>"));
+        assert!(
+            x.contains("<httpEndpoint>disabled</httpEndpoint>")
+                && x.contains("<httpPutResponseHopLimit>3</httpPutResponseHopLimit>")
+        );
     }
 
     async fn insert_vm(state: &AppState) -> Uuid {
         let id = Uuid::new_v4();
         let cluster = Uuid::new_v4();
-        crate::db::query("INSERT INTO clusters (id, name) VALUES (?, 'c')").bind(cluster).execute(&state.pool).await.unwrap();
-        crate::db::query("INSERT INTO vms (id, cluster_id, name, spec_json) VALUES (?, ?, 'web', '{}')")
-            .bind(id)
+        crate::db::query("INSERT INTO clusters (id, name) VALUES (?, 'c')")
             .bind(cluster)
             .execute(&state.pool)
             .await
             .unwrap();
+        crate::db::query(
+            "INSERT INTO vms (id, cluster_id, name, spec_json) VALUES (?, ?, 'web', '{}')",
+        )
+        .bind(id)
+        .bind(cluster)
+        .execute(&state.pool)
+        .await
+        .unwrap();
         id
     }
 
@@ -524,10 +764,20 @@ mod tests {
         let vm = insert_vm(&state).await;
         assert_eq!(load(&state, vm).await.unwrap(), Attrs::default());
         assert!(terminate_guard(&state, vm, "i-1").await.is_ok());
-        let a = Attrs { disable_api_termination: true, ebs_optimized: true, monitoring: true, metadata_endpoint: false, metadata_hop_limit: 2, placement_group: Some("pg1".into()) };
+        let a = Attrs {
+            disable_api_termination: true,
+            ebs_optimized: true,
+            monitoring: true,
+            metadata_endpoint: false,
+            metadata_hop_limit: 2,
+            placement_group: Some("pg1".into()),
+        };
         save(&state, vm, &a).await.unwrap();
         assert_eq!(load(&state, vm).await.unwrap(), a);
-        assert_eq!(terminate_guard(&state, vm, "i-1").await.unwrap_err().code, "OperationNotPermitted");
+        assert_eq!(
+            terminate_guard(&state, vm, "i-1").await.unwrap_err().code,
+            "OperationNotPermitted"
+        );
         // saving again replaces the row
         save(&state, vm, &Attrs::default()).await.unwrap();
         assert_eq!(load(&state, vm).await.unwrap(), Attrs::default());
@@ -543,16 +793,49 @@ mod tests {
             .execute(&state.pool)
             .await
             .unwrap();
-        save(&state, vm, &Attrs { disable_api_termination: true, ..Attrs::default() }).await.unwrap();
+        save(
+            &state,
+            vm,
+            &Attrs {
+                disable_api_termination: true,
+                ..Attrs::default()
+            },
+        )
+        .await
+        .unwrap();
         let eid = ec2_id(Kind::Vm, vm);
-        let x = describe_instance_attribute(&state, &p(&[("InstanceId", &eid), ("Attribute", "disableApiTermination")])).await.unwrap();
-        assert!(x.contains("<disableApiTermination><value>true</value>"), "{x}");
-        let x = describe_instance_attribute(&state, &p(&[("InstanceId", &eid), ("Attribute", "userData")])).await.unwrap();
+        let x = describe_instance_attribute(
+            &state,
+            &p(&[("InstanceId", &eid), ("Attribute", "disableApiTermination")]),
+        )
+        .await
+        .unwrap();
+        assert!(
+            x.contains("<disableApiTermination><value>true</value>"),
+            "{x}"
+        );
+        let x = describe_instance_attribute(
+            &state,
+            &p(&[("InstanceId", &eid), ("Attribute", "userData")]),
+        )
+        .await
+        .unwrap();
         let b64 = base64::engine::general_purpose::STANDARD.encode("#!/bin/sh\necho hi");
-        assert!(x.contains(&format!("<userData><value>{b64}</value>")), "{x}");
-        let x = describe_instance_attribute(&state, &p(&[("InstanceId", &eid), ("Attribute", "sourceDestCheck")])).await.unwrap();
+        assert!(
+            x.contains(&format!("<userData><value>{b64}</value>")),
+            "{x}"
+        );
+        let x = describe_instance_attribute(
+            &state,
+            &p(&[("InstanceId", &eid), ("Attribute", "sourceDestCheck")]),
+        )
+        .await
+        .unwrap();
         assert!(x.contains("<sourceDestCheck><value>true</value>"));
-        let e = describe_instance_attribute(&state, &p(&[("InstanceId", &eid), ("Attribute", "nope")])).await.unwrap_err();
+        let e =
+            describe_instance_attribute(&state, &p(&[("InstanceId", &eid), ("Attribute", "nope")]))
+                .await
+                .unwrap_err();
         assert_eq!(e.code, "InvalidParameterValue");
     }
 
@@ -561,11 +844,29 @@ mod tests {
         let (state, _rx) = crate::engine::test_support::test_state().await;
         let vm = insert_vm(&state).await;
         let eid = ec2_id(Kind::Vm, vm);
-        let x = describe_instance_credit_specifications(&state, &p(&[("InstanceId.1", &eid)])).await.unwrap();
-        assert!(x.contains(&format!("<instanceId>{eid}</instanceId><cpuCredits>standard</cpuCredits>")));
-        assert_eq!(describe_instance_credit_specifications(&state, &p(&[("InstanceId.1", "i-00000000000000000")])).await.unwrap_err().code, "InvalidInstanceID.NotFound");
-        let x = get_password_data(&state, &p(&[("InstanceId", &eid)])).await.unwrap();
+        let x = describe_instance_credit_specifications(&state, &p(&[("InstanceId.1", &eid)]))
+            .await
+            .unwrap();
+        assert!(x.contains(&format!(
+            "<instanceId>{eid}</instanceId><cpuCredits>standard</cpuCredits>"
+        )));
+        assert_eq!(
+            describe_instance_credit_specifications(
+                &state,
+                &p(&[("InstanceId.1", "i-00000000000000000")])
+            )
+            .await
+            .unwrap_err()
+            .code,
+            "InvalidInstanceID.NotFound"
+        );
+        let x = get_password_data(&state, &p(&[("InstanceId", &eid)]))
+            .await
+            .unwrap();
         assert!(x.contains("<passwordData/>"));
-        assert_eq!(get_console_screenshot().unwrap_err().code, "UnsupportedOperation");
+        assert_eq!(
+            get_console_screenshot().unwrap_err().code,
+            "UnsupportedOperation"
+        );
     }
 }

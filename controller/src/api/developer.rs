@@ -28,10 +28,11 @@ pub async fn export_vm_iac(
     Path(vm_id): Path<Uuid>,
 ) -> Result<Json<developer::VmExportBundle>, ApiError> {
     require_operator(&actor)?;
-    let row: (String, Option<Uuid>) = crate::db::query_as("SELECT name, host_id FROM vms WHERE id = ?")
-        .bind(vm_id)
-        .fetch_one(&state.pool)
-        .await?;
+    let row: (String, Option<Uuid>) =
+        crate::db::query_as("SELECT name, host_id FROM vms WHERE id = ?")
+            .bind(vm_id)
+            .fetch_one(&state.pool)
+            .await?;
     let host_id = row
         .1
         .ok_or_else(|| ApiError::bad_request("VM has no host"))?;
@@ -51,10 +52,11 @@ pub async fn export_vm_iac_zip(
     Path(vm_id): Path<Uuid>,
 ) -> Result<Response, ApiError> {
     require_operator(&actor)?;
-    let row: (String, Option<Uuid>) = crate::db::query_as("SELECT name, host_id FROM vms WHERE id = ?")
-        .bind(vm_id)
-        .fetch_one(&state.pool)
-        .await?;
+    let row: (String, Option<Uuid>) =
+        crate::db::query_as("SELECT name, host_id FROM vms WHERE id = ?")
+            .bind(vm_id)
+            .fetch_one(&state.pool)
+            .await?;
     let host_id = row
         .1
         .ok_or_else(|| ApiError::bad_request("VM has no host"))?;

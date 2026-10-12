@@ -55,10 +55,11 @@ pub async fn finops_report(
         crate::db::query_scalar("SELECT COUNT(*) FROM vms WHERE observed_state = 'running'")
             .fetch_one(&state.pool)
             .await?;
-    let totals: (i64, i64) =
-        crate::db::query_as("SELECT COALESCE(SUM(vcpus), 0), COALESCE(SUM(memory_mib), 0) FROM vms")
-            .fetch_one(&state.pool)
-            .await?;
+    let totals: (i64, i64) = crate::db::query_as(
+        "SELECT COALESCE(SUM(vcpus), 0), COALESCE(SUM(memory_mib), 0) FROM vms",
+    )
+    .fetch_one(&state.pool)
+    .await?;
     let memory_gib = totals.1 as f64 / 1024.0;
     let hourly = totals.0 as f64 * rates.0 + memory_gib * rates.1;
     Ok(Json(FinOpsReport {
@@ -77,9 +78,10 @@ pub async fn capacity_report(
     Extension(actor): Extension<AuthUser>,
 ) -> Result<Json<CapacityReport>, ApiError> {
     require_operator(&actor)?;
-    let hosts_online: i64 = crate::db::query_scalar("SELECT COUNT(*) FROM hosts WHERE state = 'online'")
-        .fetch_one(&state.pool)
-        .await?;
+    let hosts_online: i64 =
+        crate::db::query_scalar("SELECT COUNT(*) FROM hosts WHERE state = 'online'")
+            .fetch_one(&state.pool)
+            .await?;
     let hosts_offline: i64 =
         crate::db::query_scalar("SELECT COUNT(*) FROM hosts WHERE state = 'offline'")
             .fetch_one(&state.pool)
