@@ -87,11 +87,10 @@ pub struct ExperimentBody {
 
 async fn check_targets(state: &AppState, spec: &ExperimentSpec) -> Result<(), ApiError> {
     for id in &spec.targets {
-        let tags: Option<Option<String>> =
-            crate::db::query_scalar("SELECT tags FROM vms WHERE id = ?")
-                .bind(id)
-                .fetch_optional(&state.pool)
-                .await?;
+        let tags: Option<Option<String>> = crate::db::query_scalar("SELECT tags FROM vms WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&state.pool)
+            .await?;
         let Some(tags) = tags else {
             return Err(ApiError::not_found(format!("target VM {id} not found")));
         };
@@ -138,10 +137,9 @@ async fn running(state: &AppState, id: Uuid) -> Result<bool, ApiError> {
 pub async fn list_experiments(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Experiment>>, ApiError> {
-    let rows: Vec<Experiment> =
-        crate::db::query_as(&format!("{EXPERIMENTS} ORDER BY e.name LIMIT 500"))
-            .fetch_all(&state.pool)
-            .await?;
+    let rows: Vec<Experiment> = crate::db::query_as(&format!("{EXPERIMENTS} ORDER BY e.name LIMIT 500"))
+        .fetch_all(&state.pool)
+        .await?;
     Ok(Json(rows.into_iter().map(Experiment::parsed).collect()))
 }
 

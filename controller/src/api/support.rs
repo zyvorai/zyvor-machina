@@ -26,11 +26,7 @@ pub struct SupportBundleMeta {
 /// A JSON array with one object per row of `from` (object keys are the column names), as text: SQLite builds it with
 /// `json_group_array(json_object(..))`, PostgreSQL with `json_agg(json_build_object(..))`.
 fn json_rows(columns: &[&str], from: &str) -> String {
-    let pairs = columns
-        .iter()
-        .map(|c| format!("'{c}', {c}"))
-        .collect::<Vec<_>>()
-        .join(", ");
+    let pairs = columns.iter().map(|c| format!("'{c}', {c}")).collect::<Vec<_>>().join(", ");
     if cfg!(feature = "postgres") {
         format!("SELECT COALESCE(json_agg(json_build_object({pairs}))::text, '[]') FROM ({from}) AS rows")
     } else {
@@ -97,15 +93,7 @@ async fn collect(state: &AppState) -> Result<SupportBundleMeta, ApiError> {
 
 /// Words that name a secret: the value that follows (`key=value`, `key: value`) is never written to a bundle.
 const SECRET_WORDS: [&str; 9] = [
-    "password",
-    "passwd",
-    "secret",
-    "token",
-    "apikey",
-    "api_key",
-    "private",
-    "credential",
-    "authorization",
+    "password", "passwd", "secret", "token", "apikey", "api_key", "private", "credential", "authorization",
 ];
 
 fn is_secret_key(key: &str) -> bool {
@@ -158,12 +146,7 @@ fn redact_url(word: &str) -> String {
         let rest = &word[i + 3..];
         if let Some(at) = rest.find('@') {
             if let Some(colon) = rest[..at].find(':') {
-                return format!(
-                    "{}{}:<redacted>{}",
-                    &word[..i + 3],
-                    &rest[..colon],
-                    &rest[at..]
-                );
+                return format!("{}{}:<redacted>{}", &word[..i + 3], &rest[..colon], &rest[at..]);
             }
         }
     }
@@ -177,12 +160,7 @@ fn redact_text(text: &str) -> String {
 /// The controller's own MACHINA_* / DATABASE_URL / NATS_URL settings, names always, values only when not secret.
 fn config_report() -> String {
     let mut vars: Vec<(String, String)> = std::env::vars()
-        .filter(|(k, _)| {
-            k.starts_with("MACHINA_")
-                || k == "DATABASE_URL"
-                || k == "NATS_URL"
-                || k.starts_with("ATLAS_")
-        })
+        .filter(|(k, _)| k.starts_with("MACHINA_") || k == "DATABASE_URL" || k == "NATS_URL" || k.starts_with("ATLAS_"))
         .collect();
     vars.sort();
     vars.into_iter()
@@ -203,9 +181,7 @@ async fn journal_tail(unit: &str) -> String {
         .args(["-u", unit, "-n", "1000", "--no-pager", "-o", "short-iso"])
         .output();
     match tokio::time::timeout(std::time::Duration::from_secs(10), run).await {
-        Ok(Ok(o)) if o.status.success() && !o.stdout.is_empty() => {
-            redact_text(&String::from_utf8_lossy(&o.stdout))
-        }
+        Ok(Ok(o)) if o.status.success() && !o.stdout.is_empty() => redact_text(&String::from_utf8_lossy(&o.stdout)),
         _ => format!("(no journal available for {unit} from this controller process)"),
     }
 }
@@ -218,19 +194,12 @@ pub async fn support_bundle_zip(
 ) -> Result<impl IntoResponse, ApiError> {
     require_admin(&actor)?;
     let meta = collect(&state).await?;
-    let summary = redact_text(
-        &serde_json::to_string_pretty(&meta).map_err(|e| ApiError::internal(e.to_string()))?,
-    );
+    let summary = redact_text(&serde_json::to_string_pretty(&meta).map_err(|e| ApiError::internal(e.to_string()))?);
     let mut files: Vec<(String, String)> = vec![
         ("summary.json".into(), summary),
         ("config.env".into(), config_report()),
     ];
-    for unit in [
-        "machina-controller",
-        "machina-daemon",
-        "machina-agent",
-        "machina-bpfd",
-    ] {
+    for unit in ["machina-controller", "machina-daemon", "machina-agent", "machina-bpfd"] {
         files.push((format!("logs/{unit}.log"), journal_tail(unit).await));
     }
     files.push((
@@ -243,31 +212,18 @@ pub async fn support_bundle_zip(
     {
         use std::io::Write;
         let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
-        let opts = zip::write::SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated);
+        let opts = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
         for (path, content) in files {
-            zip.start_file(path, opts)
-                .map_err(|e| ApiError::internal(e.to_string()))?;
-            zip.write_all(content.as_bytes())
-                .map_err(|e| ApiError::internal(e.to_string()))?;
+            zip.start_file(path, opts).map_err(|e| ApiError::internal(e.to_string()))?;
+            zip.write_all(content.as_bytes()).map_err(|e| ApiError::internal(e.to_string()))?;
         }
-        zip.finish()
-            .map_err(|e| ApiError::internal(e.to_string()))?;
+        zip.finish().map_err(|e| ApiError::internal(e.to_string()))?;
     }
-    let name = format!(
-        "machina-support-{}.zip",
-        chrono::Utc::now().format("%Y%m%d-%H%M%S")
-    );
+    let name = format!("machina-support-{}.zip", chrono::Utc::now().format("%Y%m%d-%H%M%S"));
     Ok((
         [
-            (
-                axum::http::header::CONTENT_TYPE,
-                "application/zip".to_string(),
-            ),
-            (
-                axum::http::header::CONTENT_DISPOSITION,
-                format!("attachment; filename=\"{name}\""),
-            ),
+            (axum::http::header::CONTENT_TYPE, "application/zip".to_string()),
+            (axum::http::header::CONTENT_DISPOSITION, format!("attachment; filename=\"{name}\"")),
         ],
         buf,
     ))
@@ -289,24 +245,12 @@ mod tests {
             "join join-0123 now".to_string(),
         ] {
             let r = redact_line(&line);
-            for bad in [
-                "hunter2",
-                tok.as_str(),
-                "abc.def.ghi",
-                "s3cret",
-                "eyJhbGci",
-                "join-0123",
-            ] {
+            for bad in ["hunter2", tok.as_str(), "abc.def.ghi", "s3cret", "eyJhbGci", "join-0123"] {
                 assert!(!r.contains(bad), "{bad} leaked in {r}");
             }
         }
-        assert_eq!(
-            redact_line("task failed host.sync"),
-            "task failed host.sync"
-        );
-        assert!(
-            redact_line("postgres://machina:s3cret@db:5432/x").contains("machina:<redacted>@db")
-        );
+        assert_eq!(redact_line("task failed host.sync"), "task failed host.sync");
+        assert!(redact_line("postgres://machina:s3cret@db:5432/x").contains("machina:<redacted>@db"));
     }
 
     #[test]

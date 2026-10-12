@@ -168,18 +168,16 @@ pub async fn verify_vm_backup(
     Path((vm_id, backup_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_operator(&actor)?;
-    let owns: Option<Uuid> =
-        crate::db::query_scalar("SELECT vm_id FROM backup_records WHERE id = ?")
-            .bind(backup_id)
-            .fetch_optional(&state.pool)
-            .await?;
+    let owns: Option<Uuid> = crate::db::query_scalar("SELECT vm_id FROM backup_records WHERE id = ?")
+        .bind(backup_id)
+        .fetch_optional(&state.pool)
+        .await?;
     if owns != Some(vm_id) {
         return Err(ApiError::not_found("backup not found for this machine"));
     }
-    let (ok, message) =
-        crate::engine::backup_verifier::verify_one(&state, backup_id, &actor.username)
-            .await
-            .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    let (ok, message) = crate::engine::backup_verifier::verify_one(&state, backup_id, &actor.username)
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))?;
     Ok(Json(serde_json::json!({ "ok": ok, "message": message })))
 }
 
@@ -385,14 +383,12 @@ mod tests {
 
         let good = Uuid::new_v4(); // completed backup of vm_a
         let pending = Uuid::new_v4(); // pending backup of vm_a
-        crate::db::query(
-            "INSERT INTO backup_records (id, vm_id, status) VALUES (?, ?, 'completed')",
-        )
-        .bind(good)
-        .bind(vm_a)
-        .execute(&pool)
-        .await
-        .unwrap();
+        crate::db::query("INSERT INTO backup_records (id, vm_id, status) VALUES (?, ?, 'completed')")
+            .bind(good)
+            .bind(vm_a)
+            .execute(&pool)
+            .await
+            .unwrap();
         crate::db::query("INSERT INTO backup_records (id, vm_id, status) VALUES (?, ?, 'pending')")
             .bind(pending)
             .bind(vm_a)

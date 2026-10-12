@@ -24,22 +24,11 @@ fn bad(code: &'static str, msg: impl Into<String>) -> Ec2Error {
 }
 
 fn need(p: &Params, k: &str) -> Result<String, Ec2Error> {
-    p.get(k).cloned().ok_or_else(|| {
-        bad(
-            "MissingParameter",
-            format!("The request must contain the parameter {k}"),
-        )
-    })
+    p.get(k).cloned().ok_or_else(|| bad("MissingParameter", format!("The request must contain the parameter {k}")))
 }
 
-pub async fn describe_experiments(
-    state: &AppState,
-    _actor: &AuthUser,
-    _p: &Params,
-) -> Result<String, Ec2Error> {
-    let Json(rows) = crate::api::chaos::list_experiments(State(state.clone()))
-        .await
-        .map_err(api_err)?;
+pub async fn describe_experiments(state: &AppState, _actor: &AuthUser, _p: &Params) -> Result<String, Ec2Error> {
+    let Json(rows) = crate::api::chaos::list_experiments(State(state.clone())).await.map_err(api_err)?;
     let items: String = rows
         .iter()
         .map(|e| {
@@ -55,41 +44,16 @@ pub async fn describe_experiments(
     Ok(format!("<experimentSet>{items}</experimentSet>"))
 }
 
-pub async fn run_experiment(
-    state: &AppState,
-    actor: &AuthUser,
-    p: &Params,
-) -> Result<String, Ec2Error> {
-    let id: Uuid = need(p, "ExperimentId")?
-        .parse()
-        .map_err(|_| bad("InvalidParameterValue", "ExperimentId must be a UUID"))?;
-    let body: crate::api::chaos::RunBody =
-        serde_json::from_value(serde_json::json!({ "confirm": need(p, "Confirm")? }))
-            .map_err(|e| bad("InvalidParameterValue", e.to_string()))?;
-    let Json(row) = crate::api::chaos::run_experiment(
-        State(state.clone()),
-        Extension(actor.clone()),
-        Path(id),
-        Json(body),
-    )
-    .await
-    .map_err(api_err)?;
-    Ok(format!(
-        "<experimentId>{id}</experimentId><run>{}</run>",
-        xml_escape(&row.to_string())
-    ))
+pub async fn run_experiment(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
+    let id: Uuid = need(p, "ExperimentId")?.parse().map_err(|_| bad("InvalidParameterValue", "ExperimentId must be a UUID"))?;
+    let body: crate::api::chaos::RunBody = serde_json::from_value(serde_json::json!({ "confirm": need(p, "Confirm")? }))
+        .map_err(|e| bad("InvalidParameterValue", e.to_string()))?;
+    let Json(row) = crate::api::chaos::run_experiment(State(state.clone()), Extension(actor.clone()), Path(id), Json(body)).await.map_err(api_err)?;
+    Ok(format!("<experimentId>{id}</experimentId><run>{}</run>", xml_escape(&row.to_string())))
 }
 
-pub async fn abort_experiment(
-    state: &AppState,
-    actor: &AuthUser,
-    p: &Params,
-) -> Result<String, Ec2Error> {
-    let id: Uuid = need(p, "RunId")?
-        .parse()
-        .map_err(|_| bad("InvalidParameterValue", "RunId must be a UUID"))?;
-    let _ = crate::api::chaos::abort_run(State(state.clone()), Extension(actor.clone()), Path(id))
-        .await
-        .map_err(api_err)?;
+pub async fn abort_experiment(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
+    let id: Uuid = need(p, "RunId")?.parse().map_err(|_| bad("InvalidParameterValue", "RunId must be a UUID"))?;
+    let _ = crate::api::chaos::abort_run(State(state.clone()), Extension(actor.clone()), Path(id)).await.map_err(api_err)?;
     Ok("<return>true</return>".into())
 }

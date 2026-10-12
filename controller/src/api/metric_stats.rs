@@ -61,14 +61,7 @@ pub(crate) enum SubjectKey {
 }
 
 /// The candidates that need no database lookup, plus the machine name / EC2 id hex / group hex still to resolve.
-pub(crate) fn classify(
-    subject: &str,
-) -> (
-    Vec<SubjectKey>,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-) {
+pub(crate) fn classify(subject: &str) -> (Vec<SubjectKey>, Option<String>, Option<String>, Option<String>) {
     let mut keys = vec![SubjectKey::Text(subject.to_string())];
     if let Ok(u) = Uuid::parse_str(subject) {
         keys.push(SubjectKey::Id(u));
@@ -87,22 +80,12 @@ pub(crate) fn classify(
 pub(crate) async fn subject_keys(pool: &DbPool, subject: &str) -> Vec<SubjectKey> {
     let (mut keys, name, ec2_hex, group_hex) = classify(subject);
     if let Some(n) = name {
-        if let Ok(Some(id)) =
-            crate::db::query_scalar::<_, Uuid>("SELECT id FROM vms WHERE name = ?")
-                .bind(n)
-                .fetch_optional(pool)
-                .await
-        {
+        if let Ok(Some(id)) = crate::db::query_scalar::<_, Uuid>("SELECT id FROM vms WHERE name = ?").bind(n).fetch_optional(pool).await {
             keys.push(SubjectKey::Id(id));
         }
     }
     if let Some(hex) = ec2_hex {
-        if let Ok(ids) =
-            crate::db::query_scalar::<_, Uuid>("SELECT id FROM vms WHERE lower(hex(id)) LIKE ?")
-                .bind(format!("{hex}%"))
-                .fetch_all(pool)
-                .await
-        {
+        if let Ok(ids) = crate::db::query_scalar::<_, Uuid>("SELECT id FROM vms WHERE lower(hex(id)) LIKE ?").bind(format!("{hex}%")).fetch_all(pool).await {
             keys.extend(ids.into_iter().take(1).map(SubjectKey::Id));
         }
     }
@@ -120,13 +103,7 @@ pub(crate) async fn subject_keys(pool: &DbPool, subject: &str) -> Vec<SubjectKey
 }
 
 /// `(ts, value)` samples of `metric` for all `keys` in `[start, end)`.
-pub(crate) async fn fetch_samples(
-    pool: &DbPool,
-    keys: &[SubjectKey],
-    metric: &str,
-    start: i64,
-    end: i64,
-) -> Result<Vec<(i64, f64)>, sqlx::Error> {
+pub(crate) async fn fetch_samples(pool: &DbPool, keys: &[SubjectKey], metric: &str, start: i64, end: i64) -> Result<Vec<(i64, f64)>, sqlx::Error> {
     let sql = "SELECT ts, value FROM metric_samples WHERE subject = ? AND metric = ? AND ts >= ? AND ts < ? ORDER BY ts";
     let mut out = Vec::new();
     // On PostgreSQL a machine's id and its canonical text are the same subject; query it once.
@@ -156,12 +133,7 @@ pub(crate) async fn fetch_samples(
 
 pub(crate) fn parse_statistics(s: Option<&str>) -> Result<Vec<&'static str>, String> {
     let mut out = Vec::new();
-    for part in s
-        .unwrap_or("Average")
-        .split(',')
-        .map(str::trim)
-        .filter(|p| !p.is_empty())
-    {
+    for part in s.unwrap_or("Average").split(',').map(str::trim).filter(|p| !p.is_empty()) {
         let name = match part {
             "Average" => "Average",
             "Minimum" => "Minimum",
@@ -184,10 +156,7 @@ pub(crate) fn parse_statistics(s: Option<&str>) -> Result<Vec<&'static str>, Str
 pub(crate) fn aggregate(samples: &[(i64, f64)], period: i64, stats: &[&str]) -> Vec<Datapoint> {
     let mut buckets: BTreeMap<i64, Vec<f64>> = BTreeMap::new();
     for (ts, v) in samples {
-        buckets
-            .entry(ts - ts.rem_euclid(period))
-            .or_default()
-            .push(*v);
+        buckets.entry(ts - ts.rem_euclid(period)).or_default().push(*v);
     }
     let want = |n: &str| stats.contains(&n);
     buckets
@@ -197,10 +166,8 @@ pub(crate) fn aggregate(samples: &[(i64, f64)], period: i64, stats: &[&str]) -> 
             Datapoint {
                 timestamp,
                 average: want("Average").then(|| sum / vals.len() as f64),
-                minimum: want("Minimum")
-                    .then(|| vals.iter().copied().fold(f64::INFINITY, f64::min)),
-                maximum: want("Maximum")
-                    .then(|| vals.iter().copied().fold(f64::NEG_INFINITY, f64::max)),
+                minimum: want("Minimum").then(|| vals.iter().copied().fold(f64::INFINITY, f64::min)),
+                maximum: want("Maximum").then(|| vals.iter().copied().fold(f64::NEG_INFINITY, f64::max)),
                 sum: want("Sum").then_some(sum),
                 sample_count: want("SampleCount").then_some(vals.len() as u64),
             }
@@ -219,9 +186,7 @@ pub(crate) fn validate_window(period: i64, start: i64, end: i64) -> Result<(), S
         return Err("the range is limited to 15 days".into());
     }
     if (end - start) / period > MAX_POINTS {
-        return Err(format!(
-            "that would return more than {MAX_POINTS} datapoints; use a longer period"
-        ));
+        return Err(format!("that would return more than {MAX_POINTS} datapoints; use a longer period"));
     }
     Ok(())
 }
@@ -232,16 +197,10 @@ pub async fn statistics(
     Query(q): Query<StatsQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_operator(&actor)?;
-    if q.subject.is_empty() || q.subject.len() > 128 || q.metric.is_empty() || q.metric.len() > 128
-    {
-        return Err(ApiError::bad_request(
-            "subject and metric are required (at most 128 characters)",
-        ));
+    if q.subject.is_empty() || q.subject.len() > 128 || q.metric.is_empty() || q.metric.len() > 128 {
+        return Err(ApiError::bad_request("subject and metric are required (at most 128 characters)"));
     }
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
     let end = q.end.unwrap_or(now);
     let start = q.start.unwrap_or(end - 3600);
     let period = q.period.unwrap_or(300);
@@ -264,11 +223,7 @@ mod tests {
     #[test]
     fn buckets_are_epoch_aligned_and_summarised() {
         let s = [(0, 1.0), (30, 3.0), (60, 10.0), (119, 20.0), (120, 5.0)];
-        let d = aggregate(
-            &s,
-            60,
-            &["Average", "Maximum", "Minimum", "Sum", "SampleCount"],
-        );
+        let d = aggregate(&s, 60, &["Average", "Maximum", "Minimum", "Sum", "SampleCount"]);
         assert_eq!(d.len(), 3);
         assert_eq!(d[0].timestamp, 0);
         assert_eq!(d[0].average, Some(2.0));
@@ -291,10 +246,7 @@ mod tests {
     #[test]
     fn statistics_names_are_validated_and_deduplicated() {
         assert_eq!(parse_statistics(None).unwrap(), ["Average"]);
-        assert_eq!(
-            parse_statistics(Some("Sum, Sum,Maximum")).unwrap(),
-            ["Sum", "Maximum"]
-        );
+        assert_eq!(parse_statistics(Some("Sum, Sum,Maximum")).unwrap(), ["Sum", "Maximum"]);
         assert!(parse_statistics(Some("P99")).is_err());
         assert!(parse_statistics(Some(" , ")).is_err());
     }
@@ -317,33 +269,20 @@ mod tests {
     async fn samples_stored_under_the_machine_id_are_found_by_name_ec2_id_and_uuid() {
         let (state, _rx) = crate::engine::test_support::test_state().await;
         let id = Uuid::parse_str("0123456789abcdef0123456789abcdef").unwrap();
-        crate::db::query("INSERT INTO vms (id, name) VALUES (?, 'web-1')")
-            .bind(id)
-            .execute(&state.pool)
-            .await
-            .unwrap();
+        crate::db::query("INSERT INTO vms (id, name) VALUES (?, 'web-1')").bind(id).execute(&state.pool).await.unwrap();
         // the sampler stores a machine's samples under its 16-byte id
         crate::db::query("INSERT INTO metric_samples (subject, metric, ts, value) VALUES (?, 'cpu_percent', 100, 42.0)")
             .bind(crate::db::subject_id(id))
             .execute(&state.pool)
             .await
             .unwrap();
-        for subject in [
-            "web-1",
-            "i-0123456789abcdef0",
-            "01234567-89ab-cdef-0123-456789abcdef",
-        ] {
+        for subject in ["web-1", "i-0123456789abcdef0", "01234567-89ab-cdef-0123-456789abcdef"] {
             let keys = subject_keys(&state.pool, subject).await;
-            let s = fetch_samples(&state.pool, &keys, "cpu_percent", 0, 1000)
-                .await
-                .unwrap();
+            let s = fetch_samples(&state.pool, &keys, "cpu_percent", 0, 1000).await.unwrap();
             assert_eq!(s, vec![(100, 42.0)], "subject {subject}");
         }
         let none = subject_keys(&state.pool, "other").await;
-        assert!(fetch_samples(&state.pool, &none, "cpu_percent", 0, 1000)
-            .await
-            .unwrap()
-            .is_empty());
+        assert!(fetch_samples(&state.pool, &none, "cpu_percent", 0, 1000).await.unwrap().is_empty());
     }
 
     #[test]

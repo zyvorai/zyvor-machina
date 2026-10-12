@@ -65,11 +65,7 @@ fn short(lb_type: &str) -> &'static str {
 }
 
 pub fn lb_arn(lb_type: &str, name: &str, id: Uuid) -> String {
-    format!(
-        "{ARN_PREFIX}loadbalancer/{}/{name}/{}",
-        short(lb_type),
-        id16(id)
-    )
+    format!("{ARN_PREFIX}loadbalancer/{}/{name}/{}", short(lb_type), id16(id))
 }
 
 pub fn tg_arn(name: &str, id: Uuid) -> String {
@@ -77,23 +73,12 @@ pub fn tg_arn(name: &str, id: Uuid) -> String {
 }
 
 pub fn listener_arn(lb_type: &str, lb_name: &str, lb_id: Uuid, id: Uuid) -> String {
-    format!(
-        "{ARN_PREFIX}listener/{}/{lb_name}/{}/{}",
-        short(lb_type),
-        id16(lb_id),
-        id16(id)
-    )
+    format!("{ARN_PREFIX}listener/{}/{lb_name}/{}/{}", short(lb_type), id16(lb_id), id16(id))
 }
 
 /// Every listener has exactly one rule, the default one; its id is the listener's.
 pub fn rule_arn(lb_type: &str, lb_name: &str, lb_id: Uuid, listener: Uuid) -> String {
-    format!(
-        "{ARN_PREFIX}listener-rule/{}/{lb_name}/{}/{}/{}",
-        short(lb_type),
-        id16(lb_id),
-        id16(listener),
-        id16(listener)
-    )
+    format!("{ARN_PREFIX}listener-rule/{}/{lb_name}/{}/{}/{}", short(lb_type), id16(lb_id), id16(listener), id16(listener))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -108,18 +93,12 @@ pub enum ArnKind {
 pub fn parse_arn(arn: &str) -> Option<(ArnKind, String)> {
     let rest = arn.strip_prefix(ARN_PREFIX)?;
     let segs: Vec<&str> = rest.split('/').collect();
-    let hex = |s: &str| {
-        s.len() == 16
-            && s.bytes()
-                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-    };
+    let hex = |s: &str| s.len() == 16 && s.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
     match segs.as_slice() {
         ["loadbalancer", _, _, id] if hex(id) => Some((ArnKind::LoadBalancer, id.to_string())),
         ["targetgroup", _, id] if hex(id) => Some((ArnKind::TargetGroup, id.to_string())),
         ["listener", _, _, _, id] if hex(id) => Some((ArnKind::Listener, id.to_string())),
-        ["listener-rule", _, _, _, listener, rule] if hex(listener) && hex(rule) => {
-            Some((ArnKind::Rule, listener.to_string()))
-        }
+        ["listener-rule", _, _, _, listener, rule] if hex(listener) && hex(rule) => Some((ArnKind::Rule, listener.to_string())),
         _ => None,
     }
 }
@@ -152,26 +131,17 @@ pub fn indices(p: &Params, prefix: &str) -> Vec<u32> {
 
 /// Values of `{prefix}.member.N`.
 pub fn list(p: &Params, prefix: &str) -> Vec<String> {
-    indices(p, prefix)
-        .into_iter()
-        .filter_map(|i| p.get(&format!("{prefix}.member.{i}")).cloned())
-        .collect()
+    indices(p, prefix).into_iter().filter_map(|i| p.get(&format!("{prefix}.member.{i}")).cloned()).collect()
 }
 
 pub fn tags(p: &Params, prefix: &str) -> Result<Vec<(String, String)>, Ec2Error> {
     let mut out: Vec<(String, String)> = Vec::new();
     for i in indices(p, prefix) {
-        let key = p
-            .get(&format!("{prefix}.member.{i}.Key"))
-            .cloned()
-            .unwrap_or_default();
+        let key = p.get(&format!("{prefix}.member.{i}.Key")).cloned().unwrap_or_default();
         if key.is_empty() || key.chars().count() > 128 {
             return Err(validation("a tag key must be 1-128 characters"));
         }
-        let value = p
-            .get(&format!("{prefix}.member.{i}.Value"))
-            .cloned()
-            .unwrap_or_default();
+        let value = p.get(&format!("{prefix}.member.{i}.Value")).cloned().unwrap_or_default();
         if value.chars().count() > 256 {
             return Err(validation("a tag value is at most 256 characters"));
         }
@@ -182,30 +152,18 @@ pub fn tags(p: &Params, prefix: &str) -> Result<Vec<(String, String)>, Ec2Error>
         }
     }
     if out.len() > 50 {
-        return Err(Ec2Error::bad(
-            "TooManyTags",
-            "a resource has at most 50 tags",
-        ));
+        return Err(Ec2Error::bad("TooManyTags", "a resource has at most 50 tags"));
     }
     Ok(out)
 }
 
 /// `Targets.member.N.{Id,Port}`; `default_port` fills a missing Port.
-pub fn targets(
-    p: &Params,
-    prefix: &str,
-    default_port: Option<i64>,
-) -> Result<Vec<(String, i64)>, Ec2Error> {
+pub fn targets(p: &Params, prefix: &str, default_port: Option<i64>) -> Result<Vec<(String, i64)>, Ec2Error> {
     let mut out = Vec::new();
     for i in indices(p, prefix) {
-        let id = p
-            .get(&format!("{prefix}.member.{i}.Id"))
-            .cloned()
-            .ok_or_else(|| validation("every target needs an Id"))?;
+        let id = p.get(&format!("{prefix}.member.{i}.Id")).cloned().ok_or_else(|| validation("every target needs an Id"))?;
         let port = match p.get(&format!("{prefix}.member.{i}.Port")) {
-            Some(v) => v
-                .parse::<i64>()
-                .map_err(|_| validation("a target Port must be a number"))?,
+            Some(v) => v.parse::<i64>().map_err(|_| validation("a target Port must be a number"))?,
             None => default_port.ok_or_else(|| validation("every target needs a Port"))?,
         };
         if !(1..=65535).contains(&port) {
@@ -226,15 +184,10 @@ pub fn forward_target_group(p: &Params, prefix: &str) -> Result<String, Ec2Error
         return Err(validation(format!("{prefix} is required")));
     }
     if idx.len() > 1 {
-        return Err(unsupported(
-            "a listener has one action; chains such as authenticate-then-forward are not supported",
-        ));
+        return Err(unsupported("a listener has one action; chains such as authenticate-then-forward are not supported"));
     }
     let a = format!("{prefix}.member.{}", idx[0]);
-    let kind = p
-        .get(&format!("{a}.Type"))
-        .map(String::as_str)
-        .unwrap_or("");
+    let kind = p.get(&format!("{a}.Type")).map(String::as_str).unwrap_or("");
     if kind != "forward" {
         return Err(unsupported(format!(
             "action type '{kind}' is not supported: Machina's balancer is a layer-4 forwarder, so only 'forward' to a target group works"
@@ -243,28 +196,14 @@ pub fn forward_target_group(p: &Params, prefix: &str) -> Result<String, Ec2Error
     let direct = p.get(&format!("{a}.TargetGroupArn")).cloned();
     let groups = indices(p, &format!("{a}.ForwardConfig.TargetGroups"));
     if groups.len() > 1 {
-        return Err(unsupported(
-            "weighted forwarding to several target groups is not supported; forward to one",
-        ));
+        return Err(unsupported("weighted forwarding to several target groups is not supported; forward to one"));
     }
-    if p.get(&format!(
-        "{a}.ForwardConfig.TargetGroupStickinessConfig.Enabled"
-    ))
-    .map(String::as_str)
-        == Some("true")
-    {
+    if p.get(&format!("{a}.ForwardConfig.TargetGroupStickinessConfig.Enabled")).map(String::as_str) == Some("true") {
         return Err(unsupported("target group stickiness is not supported"));
     }
-    let nested = groups.first().and_then(|g| {
-        p.get(&format!(
-            "{a}.ForwardConfig.TargetGroups.member.{g}.TargetGroupArn"
-        ))
-        .cloned()
-    });
+    let nested = groups.first().and_then(|g| p.get(&format!("{a}.ForwardConfig.TargetGroups.member.{g}.TargetGroupArn")).cloned());
     match (direct, nested) {
-        (Some(d), Some(n)) if d != n => Err(validation(
-            "TargetGroupArn and ForwardConfig name different target groups",
-        )),
+        (Some(d), Some(n)) if d != n => Err(validation("TargetGroupArn and ForwardConfig name different target groups")),
         (Some(t), _) | (None, Some(t)) => Ok(t),
         _ => Err(validation("a forward action needs a TargetGroupArn")),
     }
@@ -305,12 +244,7 @@ impl Health {
     /// Applies the `HealthCheck*` / `Matcher.HttpCode` parameters on top of `self`.
     pub fn with_params(mut self, p: &Params) -> Result<Health, Ec2Error> {
         let num = |k: &str| -> Result<Option<i64>, Ec2Error> {
-            p.get(k)
-                .map(|v| {
-                    v.parse::<i64>()
-                        .map_err(|_| validation(format!("{k} must be a number")))
-                })
-                .transpose()
+            p.get(k).map(|v| v.parse::<i64>().map_err(|_| validation(format!("{k} must be a number")))).transpose()
         };
         if let Some(v) = p.get("HealthCheckEnabled") {
             self.enabled = match v.as_str() {
@@ -322,22 +256,13 @@ impl Health {
         if let Some(v) = p.get("HealthCheckProtocol") {
             let v = v.to_ascii_uppercase();
             if !matches!(v.as_str(), "TCP" | "HTTP") {
-                return Err(unsupported(format!(
-                    "health check protocol {v} is not supported; use TCP or HTTP"
-                )));
+                return Err(unsupported(format!("health check protocol {v} is not supported; use TCP or HTTP")));
             }
             self.protocol = v;
         }
         if let Some(v) = p.get("HealthCheckPort") {
-            if v != "traffic-port"
-                && !v
-                    .parse::<i64>()
-                    .map(|n| (1..=65535).contains(&n))
-                    .unwrap_or(false)
-            {
-                return Err(validation(
-                    "HealthCheckPort must be 'traffic-port' or 1-65535",
-                ));
+            if v != "traffic-port" && !v.parse::<i64>().map(|n| (1..=65535).contains(&n)).unwrap_or(false) {
+                return Err(validation("HealthCheckPort must be 'traffic-port' or 1-65535"));
             }
             self.port = v.clone();
         }
@@ -378,18 +303,13 @@ impl Health {
             return Ok(());
         }
         let native = self.native();
-        crate::engine::lb_health::validate(&native)
-            .map_err(|e| validation(format!("health check: {e}")))
+        crate::engine::lb_health::validate(&native).map_err(|e| validation(format!("health check: {e}")))
     }
 
     /// The native balancer's check: `none` when disabled.
     pub fn native(&self) -> crate::engine::lb_health::Check {
         crate::engine::lb_health::Check {
-            protocol: if self.enabled {
-                self.protocol.to_ascii_lowercase()
-            } else {
-                "none".into()
-            },
+            protocol: if self.enabled { self.protocol.to_ascii_lowercase() } else { "none".into() },
             port: self.port.parse().ok(),
             path: self.path.clone(),
             interval_secs: self.interval,
@@ -441,59 +361,29 @@ pub fn attribute_defaults(kind: AttrKind, lb_type: &str) -> Vec<(&'static str, &
             ("proxy_protocol_v2.enabled", "false"),
             ("preserve_client_ip.enabled", "true"),
         ],
-        AttrKind::Listener => vec![
-            ("tcp.idle_timeout.seconds", "350"),
-            ("routing.http.response.server.enabled", "true"),
-        ],
+        AttrKind::Listener => vec![("tcp.idle_timeout.seconds", "350"), ("routing.http.response.server.enabled", "true")],
     }
 }
 
 /// Validates one `Attributes.member.N` pair before it is stored.
-pub fn check_attribute(
-    kind: AttrKind,
-    lb_type: &str,
-    key: &str,
-    value: &str,
-) -> Result<(), Ec2Error> {
+pub fn check_attribute(kind: AttrKind, lb_type: &str, key: &str, value: &str) -> Result<(), Ec2Error> {
     let defaults = attribute_defaults(kind, lb_type);
     let Some((_, default)) = defaults.iter().find(|(k, _)| *k == key) else {
-        return Err(validation(format!(
-            "'{key}' is not an attribute of this resource"
-        )));
+        return Err(validation(format!("'{key}' is not an attribute of this resource")));
     };
-    let refuse = |what: &str| -> Result<(), Ec2Error> {
-        Err(unsupported(format!(
-            "{key}={value} is not supported: {what}"
-        )))
-    };
+    let refuse = |what: &str| -> Result<(), Ec2Error> { Err(unsupported(format!("{key}={value} is not supported: {what}"))) };
     match key {
         "access_logs.s3.enabled" if value == "true" => refuse("access logs are not written"),
-        "stickiness.enabled" if value == "true" => {
-            refuse("the balancer does not pin clients to targets")
-        }
-        "load_balancing.algorithm.type" if value != "round_robin" => {
-            refuse("the balancer is weighted round robin only")
-        }
+        "stickiness.enabled" if value == "true" => refuse("the balancer does not pin clients to targets"),
+        "load_balancing.algorithm.type" if value != "round_robin" => refuse("the balancer is weighted round robin only"),
         "slow_start.duration_seconds" if value != "0" => refuse("targets are not ramped up"),
         "proxy_protocol_v2.enabled" if value == "true" => refuse("the PROXY protocol is not added"),
-        "routing.http.desync_mitigation_mode" if value != *default => {
-            refuse("HTTP is forwarded as TCP without inspection")
-        }
-        "routing.http.drop_invalid_header_fields.enabled" if value == "true" => {
-            refuse("HTTP is forwarded as TCP without inspection")
-        }
-        "deletion_protection.enabled"
-        | "load_balancing.cross_zone.enabled"
-        | "routing.http2.enabled"
-            if !matches!(value, "true" | "false") =>
-        {
+        "routing.http.desync_mitigation_mode" if value != *default => refuse("HTTP is forwarded as TCP without inspection"),
+        "routing.http.drop_invalid_header_fields.enabled" if value == "true" => refuse("HTTP is forwarded as TCP without inspection"),
+        "deletion_protection.enabled" | "load_balancing.cross_zone.enabled" | "routing.http2.enabled" if !matches!(value, "true" | "false") => {
             Err(validation(format!("{key} must be true or false")))
         }
-        "idle_timeout.timeout_seconds"
-        | "tcp.idle_timeout.seconds"
-        | "deregistration_delay.timeout_seconds"
-            if value.parse::<u32>().is_err() =>
-        {
+        "idle_timeout.timeout_seconds" | "tcp.idle_timeout.seconds" | "deregistration_delay.timeout_seconds" if value.parse::<u32>().is_err() => {
             Err(validation(format!("{key} must be a number")))
         }
         _ => Ok(()),
@@ -503,13 +393,7 @@ pub fn check_attribute(
 pub fn attributes_xml(rows: &[(String, String)]) -> String {
     let items: String = rows
         .iter()
-        .map(|(k, v)| {
-            format!(
-                "<member><Key>{}</Key><Value>{}</Value></member>",
-                xml_escape(k),
-                xml_escape(v)
-            )
-        })
+        .map(|(k, v)| format!("<member><Key>{}</Key><Value>{}</Value></member>", xml_escape(k), xml_escape(v)))
         .collect();
     format!("<Attributes>{items}</Attributes>")
 }
@@ -517,13 +401,7 @@ pub fn attributes_xml(rows: &[(String, String)]) -> String {
 pub fn tags_xml(tags: &[(String, String)]) -> String {
     let items: String = tags
         .iter()
-        .map(|(k, v)| {
-            format!(
-                "<member><Key>{}</Key><Value>{}</Value></member>",
-                xml_escape(k),
-                xml_escape(v)
-            )
-        })
+        .map(|(k, v)| format!("<member><Key>{}</Key><Value>{}</Value></member>", xml_escape(k), xml_escape(v)))
         .collect();
     format!("<Tags>{items}</Tags>")
 }
@@ -544,27 +422,14 @@ pub struct LbView<'a> {
 
 pub fn lb_xml(v: &LbView) -> String {
     let zones: String = if v.subnets.is_empty() {
-        format!(
-            "<member><ZoneName>{}</ZoneName></member>",
-            xml_escape(v.zone)
-        )
+        format!("<member><ZoneName>{}</ZoneName></member>", xml_escape(v.zone))
     } else {
         v.subnets
             .iter()
-            .map(|s| {
-                format!(
-                    "<member><ZoneName>{}</ZoneName><SubnetId>{}</SubnetId></member>",
-                    xml_escape(v.zone),
-                    xml_escape(s)
-                )
-            })
+            .map(|s| format!("<member><ZoneName>{}</ZoneName><SubnetId>{}</SubnetId></member>", xml_escape(v.zone), xml_escape(s)))
             .collect()
     };
-    let reason = if v.state.1.is_empty() {
-        String::new()
-    } else {
-        format!("<Reason>{}</Reason>", xml_escape(v.state.1))
-    };
+    let reason = if v.state.1.is_empty() { String::new() } else { format!("<Reason>{}</Reason>", xml_escape(v.state.1)) };
     format!(
         "<member><LoadBalancerArn>{}</LoadBalancerArn><DNSName>{}-{}.elb.machina</DNSName><CanonicalHostedZoneId>Z00000000MACHINA</CanonicalHostedZoneId>\
          <CreatedTime>{}</CreatedTime><LoadBalancerName>{}</LoadBalancerName><Scheme>{}</Scheme><Type>{}</Type>\
@@ -592,37 +457,11 @@ pub struct TgView<'a> {
 }
 
 pub fn tg_xml(v: &TgView) -> String {
-    let lbs: String = v
-        .lb_arns
-        .iter()
-        .map(|a| format!("<member>{}</member>", xml_escape(a)))
-        .collect();
-    let vpc = if v.vpc_id.is_empty() {
-        String::new()
-    } else {
-        format!("<VpcId>{}</VpcId>", xml_escape(v.vpc_id))
-    };
-    let path = if v.health.protocol == "HTTP" {
-        format!(
-            "<HealthCheckPath>{}</HealthCheckPath>",
-            xml_escape(&v.health.path)
-        )
-    } else {
-        String::new()
-    };
-    let matcher = if v.health.protocol == "HTTP" {
-        format!(
-            "<Matcher><HttpCode>{}</HttpCode></Matcher>",
-            xml_escape(&v.health.matcher)
-        )
-    } else {
-        String::new()
-    };
-    let version = if v.protocol == "HTTP" {
-        "<ProtocolVersion>HTTP1</ProtocolVersion>"
-    } else {
-        ""
-    };
+    let lbs: String = v.lb_arns.iter().map(|a| format!("<member>{}</member>", xml_escape(a))).collect();
+    let vpc = if v.vpc_id.is_empty() { String::new() } else { format!("<VpcId>{}</VpcId>", xml_escape(v.vpc_id)) };
+    let path = if v.health.protocol == "HTTP" { format!("<HealthCheckPath>{}</HealthCheckPath>", xml_escape(&v.health.path)) } else { String::new() };
+    let matcher = if v.health.protocol == "HTTP" { format!("<Matcher><HttpCode>{}</HttpCode></Matcher>", xml_escape(&v.health.matcher)) } else { String::new() };
+    let version = if v.protocol == "HTTP" { "<ProtocolVersion>HTTP1</ProtocolVersion>" } else { "" };
     format!(
         "<member><TargetGroupArn>{}</TargetGroupArn><TargetGroupName>{}</TargetGroupName><Protocol>{}</Protocol><Port>{}</Port>{vpc}\
          <HealthCheckProtocol>{}</HealthCheckProtocol><HealthCheckPort>{}</HealthCheckPort><HealthCheckEnabled>{}</HealthCheckEnabled>\
@@ -653,15 +492,7 @@ pub fn actions_xml(tg_arn: &str) -> String {
     )
 }
 
-pub fn listener_xml(
-    lb_type: &str,
-    lb_name: &str,
-    lb_id: Uuid,
-    id: Uuid,
-    protocol: &str,
-    port: i64,
-    tg: &str,
-) -> String {
+pub fn listener_xml(lb_type: &str, lb_name: &str, lb_id: Uuid, id: Uuid, protocol: &str, port: i64, tg: &str) -> String {
     format!(
         "<member><ListenerArn>{}</ListenerArn><LoadBalancerArn>{}</LoadBalancerArn><Port>{port}</Port><Protocol>{}</Protocol>\
          <DefaultActions>{}</DefaultActions></member>",
@@ -681,24 +512,9 @@ pub fn rule_xml(lb_type: &str, lb_name: &str, lb_id: Uuid, listener: Uuid, tg: &
 }
 
 /// `(state, reason, description)` of a target in `DescribeTargetHealth`.
-pub fn target_health_xml(
-    id: &str,
-    port: i64,
-    health_port: &str,
-    state: &str,
-    reason: &str,
-    description: &str,
-) -> String {
-    let reason = if reason.is_empty() {
-        String::new()
-    } else {
-        format!("<Reason>{reason}</Reason>")
-    };
-    let description = if description.is_empty() {
-        String::new()
-    } else {
-        format!("<Description>{}</Description>", xml_escape(description))
-    };
+pub fn target_health_xml(id: &str, port: i64, health_port: &str, state: &str, reason: &str, description: &str) -> String {
+    let reason = if reason.is_empty() { String::new() } else { format!("<Reason>{reason}</Reason>") };
+    let description = if description.is_empty() { String::new() } else { format!("<Description>{}</Description>", xml_escape(description)) };
     format!(
         "<member><Target><Id>{}</Id><Port>{port}</Port></Target><HealthCheckPort>{}</HealthCheckPort>\
          <TargetHealth><State>{state}</State>{reason}{description}</TargetHealth></member>",
@@ -708,22 +524,14 @@ pub fn target_health_xml(
 }
 
 /// Maps a native member's health onto ELBv2's states: `(state, reason, description)`.
-pub fn target_state(
-    native: &str,
-    health_checks_on: bool,
-    detail: &str,
-) -> (&'static str, &'static str, String) {
+pub fn target_state(native: &str, health_checks_on: bool, detail: &str) -> (&'static str, &'static str, String) {
     if !health_checks_on {
         return ("healthy", "", String::new());
     }
     match native {
         "healthy" => ("healthy", "", String::new()),
         "unhealthy" => ("unhealthy", "Target.FailedHealthChecks", detail.to_string()),
-        _ => (
-            "initial",
-            "Elb.InitialHealthChecking",
-            "Initial health checking in progress".into(),
-        ),
+        _ => ("initial", "Elb.InitialHealthChecking", "Initial health checking in progress".into()),
     }
 }
 
@@ -732,10 +540,7 @@ mod tests {
     use super::*;
 
     fn params(pairs: &[(&str, &str)]) -> Params {
-        pairs
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect()
+        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
     }
 
     #[test]
@@ -743,36 +548,14 @@ mod tests {
         let lb = Uuid::new_v4();
         let l = Uuid::new_v4();
         let tg = Uuid::new_v4();
-        assert_eq!(
-            parse_arn(&lb_arn("network", "web", lb)),
-            Some((ArnKind::LoadBalancer, id16(lb)))
-        );
-        assert_eq!(
-            parse_arn(&lb_arn("application", "web", lb)),
-            Some((ArnKind::LoadBalancer, id16(lb)))
-        );
-        assert_eq!(
-            parse_arn(&tg_arn("pool", tg)),
-            Some((ArnKind::TargetGroup, id16(tg)))
-        );
-        assert_eq!(
-            parse_arn(&listener_arn("network", "web", lb, l)),
-            Some((ArnKind::Listener, id16(l)))
-        );
-        assert_eq!(
-            parse_arn(&rule_arn("network", "web", lb, l)),
-            Some((ArnKind::Rule, id16(l)))
-        );
+        assert_eq!(parse_arn(&lb_arn("network", "web", lb)), Some((ArnKind::LoadBalancer, id16(lb))));
+        assert_eq!(parse_arn(&lb_arn("application", "web", lb)), Some((ArnKind::LoadBalancer, id16(lb))));
+        assert_eq!(parse_arn(&tg_arn("pool", tg)), Some((ArnKind::TargetGroup, id16(tg))));
+        assert_eq!(parse_arn(&listener_arn("network", "web", lb, l)), Some((ArnKind::Listener, id16(l))));
+        assert_eq!(parse_arn(&rule_arn("network", "web", lb, l)), Some((ArnKind::Rule, id16(l))));
         assert!(lb_arn("application", "web", lb).contains("loadbalancer/app/web/"));
-        assert!(lb_arn("network", "web", lb).starts_with(
-            "arn:aws:elasticloadbalancing:machina:000000000000:loadbalancer/net/web/"
-        ));
-        for bad in [
-            "",
-            "arn:aws:s3:::x",
-            "arn:aws:elasticloadbalancing:machina:000000000000:loadbalancer/net/web/zz",
-            "arn:aws:elasticloadbalancing:us-east-1:123:loadbalancer/net/web/0123456789abcdef",
-        ] {
+        assert!(lb_arn("network", "web", lb).starts_with("arn:aws:elasticloadbalancing:machina:000000000000:loadbalancer/net/web/"));
+        for bad in ["", "arn:aws:s3:::x", "arn:aws:elasticloadbalancing:machina:000000000000:loadbalancer/net/web/zz", "arn:aws:elasticloadbalancing:us-east-1:123:loadbalancer/net/web/0123456789abcdef"] {
             assert_eq!(parse_arn(bad), None, "{bad}");
         }
     }
@@ -783,11 +566,7 @@ mod tests {
             assert!(check_name(ok).is_ok(), "{ok}");
         }
         for bad in ["", "-a", "a-", "a_b", "a b", &"x".repeat(33), "ü"] {
-            assert_eq!(
-                check_name(bad).unwrap_err().code,
-                "ValidationError",
-                "{bad}"
-            );
+            assert_eq!(check_name(bad).unwrap_err().code, "ValidationError", "{bad}");
         }
     }
 
@@ -806,177 +585,69 @@ mod tests {
             ("Targets.member.2.Id", "i-0123456789abcdef1"),
         ]);
         assert_eq!(list(&p, "Names"), ["a", "b", "c"]);
-        assert_eq!(
-            tags(&p, "Tags").unwrap(),
-            [("env".to_string(), "dev".to_string())]
-        );
-        assert_eq!(
-            targets(&p, "Targets", Some(80)).unwrap(),
-            [
-                ("i-0123456789abcdef0".to_string(), 8080),
-                ("i-0123456789abcdef1".to_string(), 80)
-            ]
-        );
-        assert_eq!(
-            targets(&p, "Targets", None).unwrap_err().code,
-            "ValidationError"
-        );
-        assert_eq!(
-            targets(&params(&[]), "Targets", Some(80)).unwrap_err().code,
-            "ValidationError"
-        );
-        assert_eq!(
-            targets(
-                &params(&[
-                    ("Targets.member.1.Id", "i-1"),
-                    ("Targets.member.1.Port", "70000")
-                ]),
-                "Targets",
-                None
-            )
-            .unwrap_err()
-            .code,
-            "ValidationError"
-        );
+        assert_eq!(tags(&p, "Tags").unwrap(), [("env".to_string(), "dev".to_string())]);
+        assert_eq!(targets(&p, "Targets", Some(80)).unwrap(), [("i-0123456789abcdef0".to_string(), 8080), ("i-0123456789abcdef1".to_string(), 80)]);
+        assert_eq!(targets(&p, "Targets", None).unwrap_err().code, "ValidationError");
+        assert_eq!(targets(&params(&[]), "Targets", Some(80)).unwrap_err().code, "ValidationError");
+        assert_eq!(targets(&params(&[("Targets.member.1.Id", "i-1"), ("Targets.member.1.Port", "70000")]), "Targets", None).unwrap_err().code, "ValidationError");
         let long = params(&[("Tags.member.1.Key", &"k".repeat(129))]);
         assert_eq!(tags(&long, "Tags").unwrap_err().code, "ValidationError");
     }
 
     #[test]
     fn only_a_plain_forward_action_is_accepted() {
-        let direct = params(&[
-            ("DefaultActions.member.1.Type", "forward"),
-            ("DefaultActions.member.1.TargetGroupArn", "arn-x"),
-        ]);
-        assert_eq!(
-            forward_target_group(&direct, "DefaultActions").unwrap(),
-            "arn-x"
-        );
+        let direct = params(&[("DefaultActions.member.1.Type", "forward"), ("DefaultActions.member.1.TargetGroupArn", "arn-x")]);
+        assert_eq!(forward_target_group(&direct, "DefaultActions").unwrap(), "arn-x");
         let nested = params(&[
             ("DefaultActions.member.1.Type", "forward"),
-            (
-                "DefaultActions.member.1.ForwardConfig.TargetGroups.member.1.TargetGroupArn",
-                "arn-y",
-            ),
-            (
-                "DefaultActions.member.1.ForwardConfig.TargetGroups.member.1.Weight",
-                "1",
-            ),
+            ("DefaultActions.member.1.ForwardConfig.TargetGroups.member.1.TargetGroupArn", "arn-y"),
+            ("DefaultActions.member.1.ForwardConfig.TargetGroups.member.1.Weight", "1"),
         ]);
-        assert_eq!(
-            forward_target_group(&nested, "DefaultActions").unwrap(),
-            "arn-y"
-        );
+        assert_eq!(forward_target_group(&nested, "DefaultActions").unwrap(), "arn-y");
         let both = params(&[
             ("DefaultActions.member.1.Type", "forward"),
             ("DefaultActions.member.1.TargetGroupArn", "arn-x"),
-            (
-                "DefaultActions.member.1.ForwardConfig.TargetGroups.member.1.TargetGroupArn",
-                "arn-y",
-            ),
+            ("DefaultActions.member.1.ForwardConfig.TargetGroups.member.1.TargetGroupArn", "arn-y"),
         ]);
-        assert_eq!(
-            forward_target_group(&both, "DefaultActions")
-                .unwrap_err()
-                .code,
-            "ValidationError"
-        );
+        assert_eq!(forward_target_group(&both, "DefaultActions").unwrap_err().code, "ValidationError");
         let weighted = params(&[
             ("DefaultActions.member.1.Type", "forward"),
-            (
-                "DefaultActions.member.1.ForwardConfig.TargetGroups.member.1.TargetGroupArn",
-                "a",
-            ),
-            (
-                "DefaultActions.member.1.ForwardConfig.TargetGroups.member.2.TargetGroupArn",
-                "b",
-            ),
+            ("DefaultActions.member.1.ForwardConfig.TargetGroups.member.1.TargetGroupArn", "a"),
+            ("DefaultActions.member.1.ForwardConfig.TargetGroups.member.2.TargetGroupArn", "b"),
         ]);
-        assert_eq!(
-            forward_target_group(&weighted, "DefaultActions")
-                .unwrap_err()
-                .code,
-            "UnsupportedOperation"
-        );
+        assert_eq!(forward_target_group(&weighted, "DefaultActions").unwrap_err().code, "UnsupportedOperation");
         for kind in ["redirect", "fixed-response", "authenticate-oidc"] {
             let p = params(&[("DefaultActions.member.1.Type", kind)]);
             let e = forward_target_group(&p, "DefaultActions").unwrap_err();
             assert_eq!(e.code, "UnsupportedOperation", "{kind}");
             assert!(e.message.contains(kind));
         }
-        let two = params(&[
-            ("DefaultActions.member.1.Type", "forward"),
-            ("DefaultActions.member.2.Type", "forward"),
-        ]);
-        assert_eq!(
-            forward_target_group(&two, "DefaultActions")
-                .unwrap_err()
-                .code,
-            "UnsupportedOperation"
-        );
+        let two = params(&[("DefaultActions.member.1.Type", "forward"), ("DefaultActions.member.2.Type", "forward")]);
+        assert_eq!(forward_target_group(&two, "DefaultActions").unwrap_err().code, "UnsupportedOperation");
         let sticky = params(&[
             ("DefaultActions.member.1.Type", "forward"),
             ("DefaultActions.member.1.TargetGroupArn", "a"),
-            (
-                "DefaultActions.member.1.ForwardConfig.TargetGroupStickinessConfig.Enabled",
-                "true",
-            ),
+            ("DefaultActions.member.1.ForwardConfig.TargetGroupStickinessConfig.Enabled", "true"),
         ]);
-        assert_eq!(
-            forward_target_group(&sticky, "DefaultActions")
-                .unwrap_err()
-                .code,
-            "UnsupportedOperation"
-        );
-        assert_eq!(
-            forward_target_group(&params(&[]), "DefaultActions")
-                .unwrap_err()
-                .code,
-            "ValidationError"
-        );
+        assert_eq!(forward_target_group(&sticky, "DefaultActions").unwrap_err().code, "UnsupportedOperation");
+        assert_eq!(forward_target_group(&params(&[]), "DefaultActions").unwrap_err().code, "ValidationError");
     }
 
     #[test]
     fn health_check_defaults_and_overrides_map_onto_the_native_check() {
         let tcp = Health::defaults("TCP");
-        assert_eq!(
-            (
-                tcp.protocol.as_str(),
-                tcp.interval,
-                tcp.timeout,
-                tcp.healthy,
-                tcp.unhealthy
-            ),
-            ("TCP", 30, 10, 3, 3)
-        );
+        assert_eq!((tcp.protocol.as_str(), tcp.interval, tcp.timeout, tcp.healthy, tcp.unhealthy), ("TCP", 30, 10, 3, 3));
         tcp.check().unwrap();
         let n = tcp.native();
         assert_eq!((n.protocol.as_str(), n.port), ("tcp", None));
         let http = Health::defaults("HTTP");
         http.check().unwrap();
         let over = http
-            .with_params(&params(&[
-                ("HealthCheckPort", "8081"),
-                ("HealthCheckPath", "/up"),
-                ("HealthCheckIntervalSeconds", "10"),
-                ("HealthCheckTimeoutSeconds", "4"),
-                ("Matcher.HttpCode", "200-399"),
-            ]))
+            .with_params(&params(&[("HealthCheckPort", "8081"), ("HealthCheckPath", "/up"), ("HealthCheckIntervalSeconds", "10"), ("HealthCheckTimeoutSeconds", "4"), ("Matcher.HttpCode", "200-399")]))
             .unwrap();
         let n = over.native();
-        assert_eq!(
-            (
-                n.protocol.as_str(),
-                n.port,
-                n.path.as_str(),
-                n.interval_secs,
-                n.timeout_secs
-            ),
-            ("http", Some(8081), "/up", 10, 4)
-        );
-        let off = Health::defaults("TCP")
-            .with_params(&params(&[("HealthCheckEnabled", "false")]))
-            .unwrap();
+        assert_eq!((n.protocol.as_str(), n.port, n.path.as_str(), n.interval_secs, n.timeout_secs), ("http", Some(8081), "/up", 10, 4));
+        let off = Health::defaults("TCP").with_params(&params(&[("HealthCheckEnabled", "false")])).unwrap();
         assert_eq!(off.native().protocol, "none");
     }
 
@@ -995,119 +666,37 @@ mod tests {
             ("HealthyThresholdCount", "11", "ValidationError"),
             ("HealthCheckEnabled", "yes", "ValidationError"),
         ] {
-            assert_eq!(
-                d.clone().with_params(&params(&[(k, v)])).unwrap_err().code,
-                code,
-                "{k}={v}"
-            );
+            assert_eq!(d.clone().with_params(&params(&[(k, v)])).unwrap_err().code, code, "{k}={v}");
         }
     }
 
     #[test]
     fn attributes_that_promise_unavailable_behaviour_are_refused() {
         use AttrKind::*;
-        assert!(check_attribute(
-            LoadBalancer,
-            "network",
-            "deletion_protection.enabled",
-            "true"
-        )
-        .is_ok());
-        assert!(check_attribute(
-            LoadBalancer,
-            "application",
-            "idle_timeout.timeout_seconds",
-            "120"
-        )
-        .is_ok());
-        assert!(check_attribute(
-            TargetGroup,
-            "network",
-            "deregistration_delay.timeout_seconds",
-            "30"
-        )
-        .is_ok());
+        assert!(check_attribute(LoadBalancer, "network", "deletion_protection.enabled", "true").is_ok());
+        assert!(check_attribute(LoadBalancer, "application", "idle_timeout.timeout_seconds", "120").is_ok());
+        assert!(check_attribute(TargetGroup, "network", "deregistration_delay.timeout_seconds", "30").is_ok());
         for (kind, key, value, code) in [
-            (
-                LoadBalancer,
-                "access_logs.s3.enabled",
-                "true",
-                "UnsupportedOperation",
-            ),
+            (LoadBalancer, "access_logs.s3.enabled", "true", "UnsupportedOperation"),
             (LoadBalancer, "no.such.key", "1", "ValidationError"),
-            (
-                LoadBalancer,
-                "deletion_protection.enabled",
-                "maybe",
-                "ValidationError",
-            ),
-            (
-                TargetGroup,
-                "stickiness.enabled",
-                "true",
-                "UnsupportedOperation",
-            ),
-            (
-                TargetGroup,
-                "load_balancing.algorithm.type",
-                "least_outstanding_requests",
-                "UnsupportedOperation",
-            ),
-            (
-                TargetGroup,
-                "slow_start.duration_seconds",
-                "30",
-                "UnsupportedOperation",
-            ),
-            (
-                TargetGroup,
-                "proxy_protocol_v2.enabled",
-                "true",
-                "UnsupportedOperation",
-            ),
-            (
-                Listener,
-                "tcp.idle_timeout.seconds",
-                "soon",
-                "ValidationError",
-            ),
+            (LoadBalancer, "deletion_protection.enabled", "maybe", "ValidationError"),
+            (TargetGroup, "stickiness.enabled", "true", "UnsupportedOperation"),
+            (TargetGroup, "load_balancing.algorithm.type", "least_outstanding_requests", "UnsupportedOperation"),
+            (TargetGroup, "slow_start.duration_seconds", "30", "UnsupportedOperation"),
+            (TargetGroup, "proxy_protocol_v2.enabled", "true", "UnsupportedOperation"),
+            (Listener, "tcp.idle_timeout.seconds", "soon", "ValidationError"),
         ] {
-            assert_eq!(
-                check_attribute(kind, "application", key, value)
-                    .unwrap_err()
-                    .code,
-                code,
-                "{key}={value}"
-            );
+            assert_eq!(check_attribute(kind, "application", key, value).unwrap_err().code, code, "{key}={value}");
         }
         // an application-only attribute does not exist on a network balancer
-        assert_eq!(
-            check_attribute(
-                LoadBalancer,
-                "network",
-                "idle_timeout.timeout_seconds",
-                "60"
-            )
-            .unwrap_err()
-            .code,
-            "ValidationError"
-        );
+        assert_eq!(check_attribute(LoadBalancer, "network", "idle_timeout.timeout_seconds", "60").unwrap_err().code, "ValidationError");
     }
 
     #[test]
     fn xml_carries_what_the_sdks_read() {
         let id = Uuid::new_v4();
         let subnets = vec!["subnet-0123456789abcdef0".to_string()];
-        let x = lb_xml(&LbView {
-            id,
-            name: "web",
-            lb_type: "network",
-            scheme: "internet-facing",
-            created_at: "2026-10-08 10:00:00",
-            zone: "host-a",
-            subnets: &subnets,
-            state: ("active", ""),
-        });
+        let x = lb_xml(&LbView { id, name: "web", lb_type: "network", scheme: "internet-facing", created_at: "2026-10-08 10:00:00", zone: "host-a", subnets: &subnets, state: ("active", "") });
         for needle in [
             "<LoadBalancerName>web</LoadBalancerName>",
             "<Type>network</Type>",
@@ -1118,74 +707,23 @@ mod tests {
         ] {
             assert!(x.contains(needle), "{needle} in {x}");
         }
-        let failed = lb_xml(&LbView {
-            id,
-            name: "web",
-            lb_type: "network",
-            scheme: "internal",
-            created_at: "",
-            zone: "h",
-            subnets: &[],
-            state: ("failed", "agent <down>"),
-        });
-        assert!(
-            failed
-                .contains("<State><Code>failed</Code><Reason>agent &lt;down&gt;</Reason></State>"),
-            "{failed}"
-        );
+        let failed = lb_xml(&LbView { id, name: "web", lb_type: "network", scheme: "internal", created_at: "", zone: "h", subnets: &[], state: ("failed", "agent <down>") });
+        assert!(failed.contains("<State><Code>failed</Code><Reason>agent &lt;down&gt;</Reason></State>"), "{failed}");
 
         let h = Health::defaults("HTTP");
-        let tg = tg_xml(&TgView {
-            id,
-            name: "pool",
-            protocol: "HTTP",
-            port: 80,
-            vpc_id: "vpc-1",
-            target_type: "instance",
-            health: &h,
-            lb_arns: &[lb_arn("application", "web", id)],
-        });
-        for needle in [
-            "<TargetGroupName>pool</TargetGroupName>",
-            "<HealthCheckPath>/</HealthCheckPath>",
-            "<Matcher><HttpCode>200</HttpCode></Matcher>",
-            "<ProtocolVersion>HTTP1</ProtocolVersion>",
-            "<VpcId>vpc-1</VpcId>",
-            "<TargetType>instance</TargetType>",
-        ] {
+        let tg = tg_xml(&TgView { id, name: "pool", protocol: "HTTP", port: 80, vpc_id: "vpc-1", target_type: "instance", health: &h, lb_arns: &[lb_arn("application", "web", id)] });
+        for needle in ["<TargetGroupName>pool</TargetGroupName>", "<HealthCheckPath>/</HealthCheckPath>", "<Matcher><HttpCode>200</HttpCode></Matcher>", "<ProtocolVersion>HTTP1</ProtocolVersion>", "<VpcId>vpc-1</VpcId>", "<TargetType>instance</TargetType>"] {
             assert!(tg.contains(needle), "{needle} in {tg}");
         }
         let tcp = Health::defaults("TCP");
-        let tg = tg_xml(&TgView {
-            id,
-            name: "pool",
-            protocol: "TCP",
-            port: 80,
-            vpc_id: "",
-            target_type: "instance",
-            health: &tcp,
-            lb_arns: &[],
-        });
-        assert!(
-            !tg.contains("HealthCheckPath") && !tg.contains("<Matcher>") && !tg.contains("<VpcId>"),
-            "{tg}"
-        );
+        let tg = tg_xml(&TgView { id, name: "pool", protocol: "TCP", port: 80, vpc_id: "", target_type: "instance", health: &tcp, lb_arns: &[] });
+        assert!(!tg.contains("HealthCheckPath") && !tg.contains("<Matcher>") && !tg.contains("<VpcId>"), "{tg}");
         assert!(tg.contains("<LoadBalancerArns></LoadBalancerArns>"));
 
         let r = rule_xml("network", "web", id, id, "arn-x");
-        assert!(
-            r.contains("<Priority>default</Priority>")
-                && r.contains("<IsDefault>true</IsDefault>")
-                && r.contains("<Conditions/>"),
-            "{r}"
-        );
+        assert!(r.contains("<Priority>default</Priority>") && r.contains("<IsDefault>true</IsDefault>") && r.contains("<Conditions/>"), "{r}");
         let l = listener_xml("network", "web", id, id, "TCP", 80, "arn-x");
-        assert!(
-            l.contains("<Port>80</Port>")
-                && l.contains("<Type>forward</Type>")
-                && l.contains("<Weight>1</Weight>"),
-            "{l}"
-        );
+        assert!(l.contains("<Port>80</Port>") && l.contains("<Type>forward</Type>") && l.contains("<Weight>1</Weight>"), "{l}");
     }
 
     #[test]
@@ -1193,24 +731,10 @@ mod tests {
         assert_eq!(target_state("healthy", true, "").0, "healthy");
         assert_eq!(target_state("unknown", true, "").0, "initial");
         let (s, r, d) = target_state("unhealthy", true, "connection refused");
-        assert_eq!(
-            (s, r, d.as_str()),
-            (
-                "unhealthy",
-                "Target.FailedHealthChecks",
-                "connection refused"
-            )
-        );
+        assert_eq!((s, r, d.as_str()), ("unhealthy", "Target.FailedHealthChecks", "connection refused"));
         // with the check off every target in rotation is healthy
         assert_eq!(target_state("unknown", false, "").0, "healthy");
-        let x = target_health_xml(
-            "i-1",
-            80,
-            "traffic-port",
-            "unhealthy",
-            "Target.FailedHealthChecks",
-            "a < b",
-        );
+        let x = target_health_xml("i-1", 80, "traffic-port", "unhealthy", "Target.FailedHealthChecks", "a < b");
         assert!(x.contains("<State>unhealthy</State><Reason>Target.FailedHealthChecks</Reason><Description>a &lt; b</Description>"), "{x}");
     }
 

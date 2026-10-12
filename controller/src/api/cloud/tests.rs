@@ -612,12 +612,11 @@ async fn groups_drain_from_their_load_balancer_then_sleep() {
     let group: Uuid = serde_json::from_value(g["id"].clone()).unwrap();
     let reconcile = || crate::engine::cloud::reconcile_group(&f.state, group);
     reconcile().await.unwrap();
-    let vm: Uuid =
-        crate::db::query_scalar("SELECT vm_id FROM cloud_group_members WHERE group_id=?")
-            .bind(group)
-            .fetch_one(&f.state.pool)
-            .await
-            .unwrap();
+    let vm: Uuid = crate::db::query_scalar("SELECT vm_id FROM cloud_group_members WHERE group_id=?")
+        .bind(group)
+        .fetch_one(&f.state.pool)
+        .await
+        .unwrap();
     let member = || async {
         crate::db::query_scalar::<_, bool>(
             "SELECT enabled FROM lb_members WHERE load_balancer_id=? AND vm_id=?",
@@ -684,13 +683,11 @@ async fn groups_drain_from_their_load_balancer_then_sleep() {
         .execute(&f.state.pool)
         .await
         .unwrap();
-    crate::db::query(
-        "UPDATE vms SET desired_state='sleeping', observed_state='shut off' WHERE id=?",
-    )
-    .bind(vm)
-    .execute(&f.state.pool)
-    .await
-    .unwrap();
+    crate::db::query("UPDATE vms SET desired_state='sleeping', observed_state='shut off' WHERE id=?")
+        .bind(vm)
+        .execute(&f.state.pool)
+        .await
+        .unwrap();
     f.admin("PATCH", &path, json!({"policy":policy(1),"paused":false}))
         .await;
     reconcile().await.unwrap();
@@ -820,18 +817,8 @@ async fn groups_and_unused_templates_can_be_deleted_and_used_ones_cannot() {
     let f = Fixture::new().await;
     let vpc = f.vpc("10.20.0.0/16").await;
     let subnet = f.subnet(vpc).await;
-    crate::db::query("UPDATE cloud_subnets SET status='ready' WHERE id=?")
-        .bind(subnet)
-        .execute(&f.state.pool)
-        .await
-        .unwrap();
-    let (_, t) = f
-        .admin(
-            "POST",
-            &format!("/api/v1/cloud/projects/{}/launch-templates", f.project),
-            json!({"name":"base","vm":template()}),
-        )
-        .await;
+    crate::db::query("UPDATE cloud_subnets SET status='ready' WHERE id=?").bind(subnet).execute(&f.state.pool).await.unwrap();
+    let (_, t) = f.admin("POST", &format!("/api/v1/cloud/projects/{}/launch-templates", f.project), json!({"name":"base","vm":template()})).await;
     let (status, g) = f
         .admin(
             "POST",
@@ -842,59 +829,22 @@ async fn groups_and_unused_templates_can_be_deleted_and_used_ones_cannot() {
     assert_eq!(status, StatusCode::OK, "{g}");
     let template = t["id"].as_str().unwrap();
     let group = g["id"].as_str().unwrap();
-    let (code, _) = f
-        .admin(
-            "DELETE",
-            &format!("/api/v1/cloud/launch-templates/{template}"),
-            Value::Null,
-        )
-        .await;
-    assert_eq!(
-        code,
-        StatusCode::CONFLICT,
-        "a template in use cannot be deleted"
-    );
-    let (code, _) = f
-        .call(
-            Fixture::actor("alice", "viewer"),
-            "DELETE",
-            &format!("/api/v1/cloud/instance-groups/{group}"),
-            Value::Null,
-        )
-        .await;
+    let (code, _) = f.admin("DELETE", &format!("/api/v1/cloud/launch-templates/{template}"), Value::Null).await;
+    assert_eq!(code, StatusCode::CONFLICT, "a template in use cannot be deleted");
+    let (code, _) = f.call(Fixture::actor("alice", "viewer"), "DELETE", &format!("/api/v1/cloud/instance-groups/{group}"), Value::Null).await;
     assert_ne!(code, StatusCode::OK, "no write access, no delete");
-    let (code, body) = f
-        .admin(
-            "DELETE",
-            &format!("/api/v1/cloud/instance-groups/{group}"),
-            Value::Null,
-        )
-        .await;
+    let (code, body) = f.admin("DELETE", &format!("/api/v1/cloud/instance-groups/{group}"), Value::Null).await;
     assert_eq!(code, StatusCode::OK, "{body}");
-    let (code, _) = f
-        .admin(
-            "DELETE",
-            &format!("/api/v1/cloud/instance-groups/{group}"),
-            Value::Null,
-        )
-        .await;
+    let (code, _) = f.admin("DELETE", &format!("/api/v1/cloud/instance-groups/{group}"), Value::Null).await;
     assert_eq!(code, StatusCode::NOT_FOUND);
-    let (code, _) = f
-        .admin(
-            "DELETE",
-            &format!("/api/v1/cloud/launch-templates/{template}"),
-            Value::Null,
-        )
-        .await;
+    let (code, _) = f.admin("DELETE", &format!("/api/v1/cloud/launch-templates/{template}"), Value::Null).await;
     assert_eq!(code, StatusCode::OK, "unused now");
 }
 
 #[test]
 fn a_group_with_running_members_cannot_be_deleted() {
     assert!(elastic::group_delete_blocker(0).is_none());
-    assert!(elastic::group_delete_blocker(2)
-        .unwrap()
-        .contains("2 member"));
+    assert!(elastic::group_delete_blocker(2).unwrap().contains("2 member"));
 }
 
 #[tokio::test]
@@ -903,29 +853,14 @@ async fn a_subnet_with_reserved_addresses_cannot_be_deleted() {
     let vpc = f.vpc("10.20.0.0/16").await;
     let subnet = f.subnet(vpc).await;
     let (status, addr) = f
-        .admin(
-            "POST",
-            &format!("/api/v1/cloud/subnets/{subnet}/addresses"),
-            json!({"request_key":"keep"}),
-        )
+        .admin("POST", &format!("/api/v1/cloud/subnets/{subnet}/addresses"), json!({"request_key":"keep"}))
         .await;
     assert_eq!(status, StatusCode::OK, "{addr}");
-    let (code, body) = f
-        .admin(
-            "DELETE",
-            &format!("/api/v1/cloud/subnets/{subnet}"),
-            Value::Null,
-        )
-        .await;
+    let (code, body) = f.admin("DELETE", &format!("/api/v1/cloud/subnets/{subnet}"), Value::Null).await;
     assert_eq!(code, StatusCode::CONFLICT, "{body}");
     assert!(body.to_string().contains("reserved address"), "{body}");
     let (code, _) = f
-        .call(
-            Fixture::actor("alice", "viewer"),
-            "DELETE",
-            &format!("/api/v1/cloud/subnets/{subnet}"),
-            Value::Null,
-        )
+        .call(Fixture::actor("alice", "viewer"), "DELETE", &format!("/api/v1/cloud/subnets/{subnet}"), Value::Null)
         .await;
     assert_ne!(code, StatusCode::OK, "no write access, no delete");
 }
@@ -941,10 +876,7 @@ async fn a_project_scoped_api_key_reaches_only_its_projects() {
     let key = Fixture::actor("apikey:svc", "operator");
     let own = format!("/api/v1/cloud/projects/{}/vpcs", f.project);
     let other = format!("/api/v1/cloud/projects/{}/vpcs", f.other);
-    assert_eq!(
-        f.call(key.clone(), "GET", &own, json!({})).await.0,
-        StatusCode::OK
-    );
+    assert_eq!(f.call(key.clone(), "GET", &own, json!({})).await.0, StatusCode::OK);
     let (code, body) = f.call(key.clone(), "GET", &other, json!({})).await;
     assert_eq!(code, StatusCode::FORBIDDEN, "{body}");
     assert!(body.to_string().contains("key_scope_forbidden"), "{body}");
@@ -955,17 +887,7 @@ async fn a_project_scoped_api_key_reaches_only_its_projects() {
         .await
         .unwrap();
     let ro = Fixture::actor("apikey:ro", "viewer");
-    assert_eq!(
-        f.call(ro.clone(), "GET", &own, json!({})).await.0,
-        StatusCode::OK
-    );
-    let (code, _) = f
-        .call(
-            ro,
-            "POST",
-            &own,
-            json!({"name":"x","cidr":"10.20.0.0/16","host_id":f.host}),
-        )
-        .await;
+    assert_eq!(f.call(ro.clone(), "GET", &own, json!({})).await.0, StatusCode::OK);
+    let (code, _) = f.call(ro, "POST", &own, json!({"name":"x","cidr":"10.20.0.0/16","host_id":f.host})).await;
     assert_eq!(code, StatusCode::FORBIDDEN);
 }

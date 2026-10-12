@@ -1,11 +1,11 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
 
-use crate::db::DbPool;
 use axum::extract::State;
 use axum::Extension;
 use axum::Json;
 use serde::Serialize;
+use crate::db::DbPool;
 
 use crate::auth::{require_admin, require_operator, AuthUser};
 use crate::engine::drs::{self, ClusterSettings, ClusterSettingsPatch};
@@ -51,11 +51,10 @@ pub struct LeadershipStatus {
 pub async fn get_leadership(
     State(state): State<AppState>,
 ) -> Result<Json<LeadershipStatus>, ApiError> {
-    let row: (String, chrono::DateTime<chrono::Utc>) = crate::db::query_as(
-        "SELECT holder_id, lease_until FROM controller_leadership WHERE id = 1",
-    )
-    .fetch_one(&state.pool)
-    .await?;
+    let row: (String, chrono::DateTime<chrono::Utc>) =
+        crate::db::query_as("SELECT holder_id, lease_until FROM controller_leadership WHERE id = 1")
+            .fetch_one(&state.pool)
+            .await?;
     Ok(Json(LeadershipStatus {
         controller_id: state.config.controller_id.clone(),
         is_leader: state.leader.is_leader(),

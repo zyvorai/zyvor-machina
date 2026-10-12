@@ -25,22 +25,11 @@ fn bad(code: &'static str, msg: impl Into<String>) -> Ec2Error {
 }
 
 fn need(p: &Params, k: &str) -> Result<String, Ec2Error> {
-    p.get(k).cloned().ok_or_else(|| {
-        bad(
-            "MissingParameter",
-            format!("The request must contain the parameter {k}"),
-        )
-    })
+    p.get(k).cloned().ok_or_else(|| bad("MissingParameter", format!("The request must contain the parameter {k}")))
 }
 
 pub async fn describe_volume_attribute(state: &AppState, p: &Params) -> Result<String, Ec2Error> {
-    let id = resolve(
-        state,
-        Kind::Volume,
-        &need(p, "VolumeId")?,
-        "InvalidVolume.NotFound",
-    )
-    .await?;
+    let id = resolve(state, Kind::Volume, &need(p, "VolumeId")?, "InvalidVolume.NotFound").await?;
     let row: Option<(bool, Option<i64>, Option<i64>, Option<i64>, Option<i64>)> = crate::db::query_as(
         "SELECT delete_on_termination, read_iops, write_iops, read_bps, write_bps FROM volumes WHERE id = ?",
     )
@@ -61,23 +50,10 @@ pub async fn describe_volume_attribute(state: &AppState, p: &Params) -> Result<S
     ))
 }
 
-pub async fn modify_volume_attribute(
-    state: &AppState,
-    actor: &AuthUser,
-    p: &Params,
-) -> Result<String, Ec2Error> {
+pub async fn modify_volume_attribute(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
     require_operator(actor)?;
-    let id = resolve(
-        state,
-        Kind::Volume,
-        &need(p, "VolumeId")?,
-        "InvalidVolume.NotFound",
-    )
-    .await?;
-    if let Some(v) = p
-        .get("DeleteOnTermination.Value")
-        .or_else(|| p.get("DeleteOnTermination"))
-    {
+    let id = resolve(state, Kind::Volume, &need(p, "VolumeId")?, "InvalidVolume.NotFound").await?;
+    if let Some(v) = p.get("DeleteOnTermination.Value").or_else(|| p.get("DeleteOnTermination")) {
         let value = matches!(v.as_str(), "true" | "1");
         let _ = crate::api::volumes::set_volume_delete_on_termination(
             State(state.clone()),
@@ -97,12 +73,7 @@ pub async fn modify_volume_attribute(
             State(state.clone()),
             Extension(actor.clone()),
             Path(id),
-            Json(crate::api::volumes::IoTuneBody {
-                read_iops,
-                write_iops,
-                read_bps,
-                write_bps,
-            }),
+            Json(crate::api::volumes::IoTuneBody { read_iops, write_iops, read_bps, write_bps }),
         )
         .await
         .map_err(api_err)?;
@@ -114,17 +85,8 @@ fn lb_id(id: Uuid) -> String {
     format!("lb-{}", &id.simple().to_string()[..17])
 }
 
-pub async fn describe_load_balancers(
-    state: &AppState,
-    actor: &AuthUser,
-    _p: &Params,
-) -> Result<String, Ec2Error> {
-    let Json(rows) = crate::api::load_balancers::list_load_balancers(
-        State(state.clone()),
-        Extension(actor.clone()),
-    )
-    .await
-    .map_err(api_err)?;
+pub async fn describe_load_balancers(state: &AppState, actor: &AuthUser, _p: &Params) -> Result<String, Ec2Error> {
+    let Json(rows) = crate::api::load_balancers::list_load_balancers(State(state.clone()), Extension(actor.clone())).await.map_err(api_err)?;
     let items: String = rows
         .iter()
         .map(|r| {
@@ -142,18 +104,10 @@ pub async fn describe_load_balancers(
     Ok(format!("<loadBalancerSet>{items}</loadBalancerSet>"))
 }
 
-pub async fn create_load_balancer(
-    state: &AppState,
-    actor: &AuthUser,
-    p: &Params,
-) -> Result<String, Ec2Error> {
+pub async fn create_load_balancer(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
     require_operator(actor)?;
-    let host: Uuid = need(p, "HostId")?
-        .parse()
-        .map_err(|_| bad("InvalidParameterValue", "HostId must be a host UUID"))?;
-    let port: u16 = need(p, "ListenerPort")?
-        .parse()
-        .map_err(|_| bad("InvalidParameterValue", "ListenerPort must be a number"))?;
+    let host: Uuid = need(p, "HostId")?.parse().map_err(|_| bad("InvalidParameterValue", "HostId must be a host UUID"))?;
+    let port: u16 = need(p, "ListenerPort")?.parse().map_err(|_| bad("InvalidParameterValue", "ListenerPort must be a number"))?;
     let body = crate::api::load_balancers::CreateLoadBalancerBody {
         name: need(p, "LoadBalancerName")?,
         host_id: host,
@@ -161,62 +115,32 @@ pub async fn create_load_balancer(
         protocol: p.get("Protocol").cloned().unwrap_or_else(|| "tcp".into()),
         project_id: p.get("ProjectId").and_then(|s| Uuid::parse_str(s).ok()),
     };
-    let Json(row) = crate::api::load_balancers::create_load_balancer(
-        State(state.clone()),
-        Extension(actor.clone()),
-        Json(body),
-    )
-    .await
-    .map_err(api_err)?;
-    Ok(format!(
-        "<loadBalancerId>{}</loadBalancerId><dnsName>{}</dnsName>",
-        lb_id(row.id),
-        xml_escape(&row.name)
-    ))
+    let Json(row) = crate::api::load_balancers::create_load_balancer(State(state.clone()), Extension(actor.clone()), Json(body))
+        .await
+        .map_err(api_err)?;
+    Ok(format!("<loadBalancerId>{}</loadBalancerId><dnsName>{}</dnsName>", lb_id(row.id), xml_escape(&row.name)))
 }
 
-pub async fn delete_load_balancer(
-    state: &AppState,
-    actor: &AuthUser,
-    p: &Params,
-) -> Result<String, Ec2Error> {
+pub async fn delete_load_balancer(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
     require_operator(actor)?;
     let raw = need(p, "LoadBalancerId")?;
     let hex = raw.strip_prefix("lb-").unwrap_or(&raw);
     if hex.len() != 17 || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err(bad(
-            "InvalidParameterValue",
-            format!("The load balancer '{raw}' is not a valid id"),
-        ));
+        return Err(bad("InvalidParameterValue", format!("The load balancer '{raw}' is not a valid id")));
     }
-    let id: Option<Uuid> =
-        crate::db::query_scalar("SELECT id FROM load_balancers WHERE lower(hex(id)) LIKE ?")
-            .bind(format!("{hex}%"))
-            .fetch_optional(&state.pool)
-            .await?;
+    let id: Option<Uuid> = crate::db::query_scalar("SELECT id FROM load_balancers WHERE lower(hex(id)) LIKE ?")
+        .bind(format!("{hex}%"))
+        .fetch_optional(&state.pool)
+        .await?;
     let Some(id) = id else {
-        return Err(bad(
-            "InvalidParameterValue",
-            format!("The load balancer '{raw}' does not exist"),
-        ));
+        return Err(bad("InvalidParameterValue", format!("The load balancer '{raw}' does not exist")));
     };
-    let _ = crate::api::load_balancers::delete_load_balancer(
-        State(state.clone()),
-        Extension(actor.clone()),
-        Path(id),
-    )
-    .await
-    .map_err(api_err)?;
+    let _ = crate::api::load_balancers::delete_load_balancer(State(state.clone()), Extension(actor.clone()), Path(id)).await.map_err(api_err)?;
     Ok("<return>true</return>".into())
 }
 
 /// Attach `GroupId.N` after `RunInstances` has ids. The run body has no security-group field.
-pub async fn attach_run_groups(
-    state: &AppState,
-    actor: &AuthUser,
-    p: &Params,
-    vms: &[Uuid],
-) -> Result<(), Ec2Error> {
+pub async fn attach_run_groups(state: &AppState, actor: &AuthUser, p: &Params, vms: &[Uuid]) -> Result<(), Ec2Error> {
     let groups = super::indexed(p, "SecurityGroupId");
     if groups.is_empty() {
         return Ok(());

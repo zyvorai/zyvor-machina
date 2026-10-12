@@ -19,11 +19,10 @@ pub struct CpuCompatRule {
 pub async fn get_cpu_compat_matrix(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<CpuCompatRule>>, ApiError> {
-    let raw: serde_json::Value = crate::db::query_scalar(
-        "SELECT cpu_compat_matrix FROM clusters ORDER BY created_at LIMIT 1",
-    )
-    .fetch_one(&state.pool)
-    .await?;
+    let raw: serde_json::Value =
+        crate::db::query_scalar("SELECT cpu_compat_matrix FROM clusters ORDER BY created_at LIMIT 1")
+            .fetch_one(&state.pool)
+            .await?;
     let rules: Vec<CpuCompatRule> = serde_json::from_value(raw).unwrap_or_default();
     Ok(Json(rules))
 }

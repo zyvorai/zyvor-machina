@@ -55,11 +55,7 @@ pub fn any_match(values: &[String], candidate: &str) -> bool {
 }
 
 /// `Some(result)` when `name` is a tag filter (`tag:KEY`, `tag-key`, `tag-value`), `None` for any other filter name.
-pub fn tag_filter_matches(
-    tags: &[(String, String)],
-    name: &str,
-    values: &[String],
-) -> Option<bool> {
+pub fn tag_filter_matches(tags: &[(String, String)], name: &str, values: &[String]) -> Option<bool> {
     if let Some(key) = name.strip_prefix("tag:") {
         return Some(tags.iter().any(|(k, v)| k == key && any_match(values, v)));
     }
@@ -76,22 +72,12 @@ fn flag(p: &Params, key: &str) -> Result<bool, Ec2Error> {
     match p.get(key).map(String::as_str) {
         None | Some("false") => Ok(false),
         Some("true") => Ok(true),
-        Some(_) => Err(Ec2Error::bad(
-            "InvalidParameterValue",
-            format!("{key} must be true or false"),
-        )),
+        Some(_) => Err(Ec2Error::bad("InvalidParameterValue", format!("{key} must be true or false"))),
     }
 }
 
 /// Actions that need an administrator (the same ones whose handlers call `require_admin`).
-const ADMIN_ACTIONS: &[&str] = &[
-    "FenceHost",
-    "CreateWebhook",
-    "DeleteWebhook",
-    "ProposeResize",
-    "ProposeConsolidation",
-    "CreateProject",
-];
+const ADMIN_ACTIONS: &[&str] = &["FenceHost", "CreateWebhook", "DeleteWebhook", "ProposeResize", "ProposeConsolidation", "CreateProject"];
 
 fn is_read(action: &str) -> bool {
     action.starts_with("Describe") || action.starts_with("Get")
@@ -121,19 +107,11 @@ pub fn dry_run_gate(action: &str, p: &Params, actor: &AuthUser) -> Result<(), Ec
 // ---- ClientToken idempotency -----------------------------------------------------------------------------------
 
 /// Actions that honour `ClientToken`.
-pub const IDEMPOTENT_ACTIONS: &[&str] = &[
-    "RunInstances",
-    "CreateLaunchTemplate",
-    "CreateFleet",
-    "RequestSpotInstances",
-];
+pub const IDEMPOTENT_ACTIONS: &[&str] = &["RunInstances", "CreateLaunchTemplate", "CreateFleet", "RequestSpotInstances"];
 
 pub fn validate_token(token: &str) -> Result<(), Ec2Error> {
     if token.is_empty() || token.len() > 64 || !token.bytes().all(|b| b.is_ascii_graphic()) {
-        return Err(Ec2Error::bad(
-            "InvalidParameterValue",
-            "ClientToken must be 1 to 64 printable ASCII characters",
-        ));
+        return Err(Ec2Error::bad("InvalidParameterValue", "ClientToken must be 1 to 64 printable ASCII characters"));
     }
     Ok(())
 }
@@ -166,19 +144,11 @@ pub enum TokenClaim {
     InFlight,
 }
 
-pub async fn claim_token(
-    state: &AppState,
-    user: &str,
-    action: &str,
-    token: &str,
-    hash: &str,
-) -> Result<TokenClaim, Ec2Error> {
+pub async fn claim_token(state: &AppState, user: &str, action: &str, token: &str, hash: &str) -> Result<TokenClaim, Ec2Error> {
     // tokens are remembered for a day (AWS keeps them at least a few hours)
-    let _ = crate::db::query(
-        "DELETE FROM ec2_client_tokens WHERE created_at < datetime('now', '-1 day')",
-    )
-    .execute(&state.pool)
-    .await;
+    let _ = crate::db::query("DELETE FROM ec2_client_tokens WHERE created_at < datetime('now', '-1 day')")
+        .execute(&state.pool)
+        .await;
     let inserted = crate::db::query(
         "INSERT INTO ec2_client_tokens (username, action, token, request_hash, response) VALUES (?, ?, ?, ?, '') \
          ON CONFLICT (username, action, token) DO NOTHING",
@@ -208,50 +178,33 @@ pub async fn claim_token(
     })
 }
 
-pub async fn finish_token(
-    state: &AppState,
-    user: &str,
-    action: &str,
-    token: &str,
-    response: &str,
-) -> Result<(), Ec2Error> {
-    crate::db::query(
-        "UPDATE ec2_client_tokens SET response = ? WHERE username = ? AND action = ? AND token = ?",
-    )
-    .bind(response)
-    .bind(user)
-    .bind(action)
-    .bind(token)
-    .execute(&state.pool)
-    .await?;
+pub async fn finish_token(state: &AppState, user: &str, action: &str, token: &str, response: &str) -> Result<(), Ec2Error> {
+    crate::db::query("UPDATE ec2_client_tokens SET response = ? WHERE username = ? AND action = ? AND token = ?")
+        .bind(response)
+        .bind(user)
+        .bind(action)
+        .bind(token)
+        .execute(&state.pool)
+        .await?;
     Ok(())
 }
 
 /// The action failed: forget the token so the client can retry with it.
 pub async fn release_token(state: &AppState, user: &str, action: &str, token: &str) {
-    let _ = crate::db::query(
-        "DELETE FROM ec2_client_tokens WHERE username = ? AND action = ? AND token = ?",
-    )
-    .bind(user)
-    .bind(action)
-    .bind(token)
-    .execute(&state.pool)
-    .await;
+    let _ = crate::db::query("DELETE FROM ec2_client_tokens WHERE username = ? AND action = ? AND token = ?")
+        .bind(user)
+        .bind(action)
+        .bind(token)
+        .execute(&state.pool)
+        .await;
 }
 
 pub fn mismatch_error() -> Ec2Error {
-    Ec2Error::bad(
-        "IdempotentParameterMismatch",
-        "The same ClientToken was used with different parameters",
-    )
+    Ec2Error::bad("IdempotentParameterMismatch", "The same ClientToken was used with different parameters")
 }
 
 pub fn in_flight_error() -> Ec2Error {
-    Ec2Error::new(
-        StatusCode::CONFLICT,
-        "ConcurrentIdempotentRequest",
-        "A request with this ClientToken is still being processed",
-    )
+    Ec2Error::new(StatusCode::CONFLICT, "ConcurrentIdempotentRequest", "A request with this ClientToken is still being processed")
 }
 
 // ---- filter tables ---------------------------------------------------------------------------------------------
@@ -267,10 +220,7 @@ const fn native(name: &'static str) -> FilterDef {
     FilterDef { name, field: None }
 }
 const fn field(name: &'static str, f: &'static str) -> FilterDef {
-    FilterDef {
-        name,
-        field: Some(f),
-    }
+    FilterDef { name, field: Some(f) }
 }
 
 /// Per describe: whether the action filters tags itself, and the filter names it answers. Describes that are not
@@ -285,53 +235,24 @@ pub const FILTER_SPECS: &[FilterSpec] = &[
     FilterSpec {
         action: "DescribeInstances",
         native_tags: true,
-        filters: &[
-            native("instance-id"),
-            native("instance-state-name"),
-            native("instance-type"),
-            native("private-ip-address"),
-        ],
+        filters: &[native("instance-id"), native("instance-state-name"), native("instance-type"), native("private-ip-address")],
     },
     FilterSpec {
         action: "DescribeVolumes",
         native_tags: true,
-        filters: &[
-            native("volume-id"),
-            native("status"),
-            native("size"),
-            native("attachment.instance-id"),
-        ],
+        filters: &[native("volume-id"), native("status"), native("size"), native("attachment.instance-id")],
     },
-    FilterSpec {
-        action: "DescribeSecurityGroups",
-        native_tags: true,
-        filters: &[native("group-id"), native("group-name")],
-    },
-    FilterSpec {
-        action: "DescribeImages",
-        native_tags: true,
-        filters: &[native("image-id"), native("name"), native("is-public")],
-    },
+    FilterSpec { action: "DescribeSecurityGroups", native_tags: true, filters: &[native("group-id"), native("group-name")] },
+    FilterSpec { action: "DescribeImages", native_tags: true, filters: &[native("image-id"), native("name"), native("is-public")] },
     FilterSpec {
         action: "DescribeVpcs",
         native_tags: false,
-        filters: &[
-            field("vpc-id", "vpcId"),
-            field("cidr", "cidrBlock"),
-            field("cidr-block", "cidrBlock"),
-            field("state", "state"),
-        ],
+        filters: &[field("vpc-id", "vpcId"), field("cidr", "cidrBlock"), field("cidr-block", "cidrBlock"), field("state", "state")],
     },
     FilterSpec {
         action: "DescribeSubnets",
         native_tags: false,
-        filters: &[
-            field("subnet-id", "subnetId"),
-            field("vpc-id", "vpcId"),
-            field("cidr-block", "cidrBlock"),
-            field("cidr", "cidrBlock"),
-            field("state", "state"),
-        ],
+        filters: &[field("subnet-id", "subnetId"), field("vpc-id", "vpcId"), field("cidr-block", "cidrBlock"), field("cidr", "cidrBlock"), field("state", "state")],
     },
     FilterSpec {
         action: "DescribeNetworkInterfaces",
@@ -348,58 +269,32 @@ pub const FILTER_SPECS: &[FilterSpec] = &[
     FilterSpec {
         action: "DescribeKeyPairs",
         native_tags: false,
-        filters: &[
-            field("key-name", "keyName"),
-            field("key-pair-id", "keyPairId"),
-            field("fingerprint", "keyFingerprint"),
-        ],
+        filters: &[field("key-name", "keyName"), field("key-pair-id", "keyPairId"), field("fingerprint", "keyFingerprint")],
     },
     FilterSpec {
         action: "DescribeLaunchTemplates",
         native_tags: false,
-        filters: &[
-            field("launch-template-id", "launchTemplateId"),
-            field("launch-template-name", "launchTemplateName"),
-        ],
+        filters: &[field("launch-template-id", "launchTemplateId"), field("launch-template-name", "launchTemplateName")],
     },
     FilterSpec {
         action: "DescribeSnapshots",
         native_tags: false,
-        filters: &[
-            field("snapshot-id", "snapshotId"),
-            field("volume-id", "volumeId"),
-            field("status", "status"),
-        ],
+        filters: &[field("snapshot-id", "snapshotId"), field("volume-id", "volumeId"), field("status", "status")],
     },
     FilterSpec {
         action: "DescribeInternetGateways",
         native_tags: true,
-        filters: &[
-            native("internet-gateway-id"),
-            native("attachment.vpc-id"),
-            native("attachment.state"),
-            native("owner-id"),
-        ],
+        filters: &[native("internet-gateway-id"), native("attachment.vpc-id"), native("attachment.state"), native("owner-id")],
     },
     FilterSpec {
         action: "DescribeNatGateways",
         native_tags: true,
-        filters: &[
-            native("nat-gateway-id"),
-            native("vpc-id"),
-            native("subnet-id"),
-            native("state"),
-        ],
+        filters: &[native("nat-gateway-id"), native("vpc-id"), native("subnet-id"), native("state")],
     },
     FilterSpec {
         action: "DescribeDhcpOptions",
         native_tags: true,
-        filters: &[
-            native("dhcp-options-id"),
-            native("key"),
-            native("value"),
-            native("owner-id"),
-        ],
+        filters: &[native("dhcp-options-id"), native("key"), native("value"), native("owner-id")],
     },
     FilterSpec {
         action: "DescribeRouteTables",
@@ -445,42 +340,19 @@ pub const FILTER_SPECS: &[FilterSpec] = &[
     FilterSpec {
         action: "DescribeInstanceTypes",
         native_tags: false,
-        filters: &[
-            field("instance-type", "instanceType"),
-            field("current-generation", "currentGeneration"),
-            field("bare-metal", "bareMetal"),
-            field("hypervisor", "hypervisor"),
-        ],
+        filters: &[field("instance-type", "instanceType"), field("current-generation", "currentGeneration"), field("bare-metal", "bareMetal"), field("hypervisor", "hypervisor")],
     },
     FilterSpec {
         action: "DescribePlacementGroups",
         native_tags: false,
-        filters: &[
-            field("group-name", "groupName"),
-            field("strategy", "strategy"),
-            field("state", "state"),
-            field("group-id", "groupId"),
-        ],
+        filters: &[field("group-name", "groupName"), field("strategy", "strategy"), field("state", "state"), field("group-id", "groupId")],
     },
-    FilterSpec {
-        action: "DescribeVolumeStatus",
-        native_tags: false,
-        filters: &[],
-    },
-    FilterSpec {
-        action: "DescribeLaunchTemplateVersions",
-        native_tags: false,
-        filters: &[],
-    },
+    FilterSpec { action: "DescribeVolumeStatus", native_tags: false, filters: &[] },
+    FilterSpec { action: "DescribeLaunchTemplateVersions", native_tags: false, filters: &[] },
     FilterSpec {
         action: "DescribeTags",
         native_tags: true,
-        filters: &[
-            native("key"),
-            native("value"),
-            native("resource-type"),
-            native("resource-id"),
-        ],
+        filters: &[native("key"), native("value"), native("resource-type"), native("resource-id")],
     },
 ];
 
@@ -490,24 +362,16 @@ fn spec_for(action: &str) -> Option<&'static FilterSpec> {
 
 /// Unknown filter names (and filters without a value) are an error, never "matches nothing".
 pub fn validate_filters(action: &str, p: &Params) -> Result<(), Ec2Error> {
-    let Some(spec) = spec_for(action) else {
-        return Ok(());
-    };
+    let Some(spec) = spec_for(action) else { return Ok(()) };
     for (name, values) in parse_filters(p) {
         if values.is_empty() {
-            return Err(Ec2Error::bad(
-                "InvalidParameterValue",
-                format!("The filter '{name}' needs at least one value"),
-            ));
+            return Err(Ec2Error::bad("InvalidParameterValue", format!("The filter '{name}' needs at least one value")));
         }
         let tag = name.starts_with("tag:") || name == "tag-key" || name == "tag-value";
         if tag || spec.filters.iter().any(|f| f.name == name) {
             continue;
         }
-        return Err(Ec2Error::bad(
-            "InvalidParameterValue",
-            format!("The filter '{name}' is not valid for {action}"),
-        ));
+        return Err(Ec2Error::bad("InvalidParameterValue", format!("The filter '{name}' is not valid for {action}")));
     }
     Ok(())
 }
@@ -540,12 +404,7 @@ pub fn children(xml: &str) -> Vec<(String, String)> {
             continue;
         }
         let selfclosing = tag.ends_with('/');
-        let name: String = tag
-            .trim_end_matches('/')
-            .split_whitespace()
-            .next()
-            .unwrap_or("")
-            .to_string();
+        let name: String = tag.trim_end_matches('/').split_whitespace().next().unwrap_or("").to_string();
         if selfclosing {
             out.push((name, String::new()));
             i += end + 1;
@@ -568,8 +427,7 @@ pub fn children(xml: &str) -> Vec<(String, String)> {
                             break;
                         }
                     }
-                } else if !t2.ends_with('/') && t2.split_whitespace().next() == Some(name.as_str())
-                {
+                } else if !t2.ends_with('/') && t2.split_whitespace().next() == Some(name.as_str()) {
                     depth += 1;
                 }
                 j += e2 + 1;
@@ -595,14 +453,7 @@ pub fn split_set(inner: &str) -> Option<SetXml> {
     }
     let end = first.find('>')?;
     let name = &first[1..end];
-    if name.is_empty()
-        || name.ends_with('/')
-        || name.starts_with('/')
-        || !name.ends_with("Set")
-            && name != "launchTemplates"
-            && name != "securityGroupInfo"
-            && name != "availabilityZoneInfo"
-    {
+    if name.is_empty() || name.ends_with('/') || name.starts_with('/') || !name.ends_with("Set") && name != "launchTemplates" && name != "securityGroupInfo" && name != "availabilityZoneInfo" {
         return None;
     }
     let kids = children(first);
@@ -610,61 +461,37 @@ pub fn split_set(inner: &str) -> Option<SetXml> {
     if set_name != name {
         return None;
     }
-    let items: Vec<String> = children(&body)
-        .into_iter()
-        .filter(|(n, _)| n == "item")
-        .map(|(_, x)| x)
-        .collect();
+    let items: Vec<String> = children(&body).into_iter().filter(|(n, _)| n == "item").map(|(_, x)| x).collect();
     let open = format!("<{name}>");
     let close = format!("</{name}>");
     let outer_len = open.len() + body.len() + close.len();
     let tail = first.get(outer_len..).unwrap_or("").to_string();
-    Some(SetXml {
-        open,
-        items,
-        close,
-        tail,
-    })
+    Some(SetXml { open, items, close, tail })
 }
 
 impl SetXml {
     pub fn render(&self) -> String {
-        let items: String = self
-            .items
-            .iter()
-            .map(|i| format!("<item>{i}</item>"))
-            .collect();
+        let items: String = self.items.iter().map(|i| format!("<item>{i}</item>")).collect();
         format!("{}{items}{}{}", self.open, self.close, self.tail)
     }
 }
 
 fn item_tags(item: &str) -> Vec<(String, String)> {
     let kids = children(item);
-    let Some((_, tag_set)) = kids.iter().find(|(n, _)| n == "tagSet") else {
-        return Vec::new();
-    };
+    let Some((_, tag_set)) = kids.iter().find(|(n, _)| n == "tagSet") else { return Vec::new() };
     children(tag_set)
         .into_iter()
         .filter(|(n, _)| n == "item")
         .map(|(_, x)| {
             let kv = children(&x);
-            let get = |k: &str| {
-                kv.iter()
-                    .find(|(n, _)| n == k)
-                    .map(|(_, v)| unescape(v))
-                    .unwrap_or_default()
-            };
+            let get = |k: &str| kv.iter().find(|(n, _)| n == k).map(|(_, v)| unescape(v)).unwrap_or_default();
             (get("key"), get("value"))
         })
         .collect()
 }
 
 fn unescape(s: &str) -> String {
-    s.replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
-        .replace("&amp;", "&")
+    s.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'").replace("&amp;", "&")
 }
 
 /// Apply the filters a describe left to us (tag filters and `field` filters).
@@ -676,11 +503,7 @@ pub fn filter_items(action: &str, p: &Params, set: &mut SetXml) {
     }
     set.items.retain(|item| {
         let kids = children(item);
-        let tags = if spec.native_tags {
-            Vec::new()
-        } else {
-            item_tags(item)
-        };
+        let tags = if spec.native_tags { Vec::new() } else { item_tags(item) };
         filters.iter().all(|(name, values)| {
             if !spec.native_tags {
                 if let Some(r) = tag_filter_matches(&tags, name, values) {
@@ -688,10 +511,7 @@ pub fn filter_items(action: &str, p: &Params, set: &mut SetXml) {
                 }
             }
             match spec.filters.iter().find(|f| f.name == name) {
-                Some(FilterDef { field: Some(f), .. }) => kids
-                    .iter()
-                    .find(|(n, _)| n == f)
-                    .is_some_and(|(_, v)| any_match(values, &unescape(v))),
+                Some(FilterDef { field: Some(f), .. }) => kids.iter().find(|(n, _)| n == f).is_some_and(|(_, v)| any_match(values, &unescape(v))),
                 // native filters were applied by the action; tag filters of native-tag actions too
                 _ => true,
             }
@@ -717,12 +537,7 @@ pub fn paginate(p: &Params, set: &mut SetXml) -> Result<(), Ec2Error> {
     }
     let bad = |m: String| Ec2Error::bad("InvalidParameterValue", m);
     let limit = page::max_results(p.get("MaxResults").map(String::as_str)).map_err(bad)?;
-    let mut ids: Vec<String> = set
-        .items
-        .iter()
-        .enumerate()
-        .map(|(n, i)| item_id(i, n))
-        .collect();
+    let mut ids: Vec<String> = set.items.iter().enumerate().map(|(n, i)| item_id(i, n)).collect();
     // a repeated id would make a token ambiguous: fall back to positions for the whole list
     let mut uniq = ids.clone();
     uniq.sort();
@@ -730,16 +545,10 @@ pub fn paginate(p: &Params, set: &mut SetXml) -> Result<(), Ec2Error> {
     if uniq.len() != ids.len() {
         ids = (0..ids.len()).map(|n| format!("n-{n:08}")).collect();
     }
-    let (slice, token) =
-        page::page(&ids, p.get("NextToken").map(String::as_str), limit).map_err(bad)?;
+    let (slice, token) = page::page(&ids, p.get("NextToken").map(String::as_str), limit).map_err(bad)?;
     let keep: Vec<String> = slice.to_vec();
     let items = std::mem::take(&mut set.items);
-    set.items = items
-        .into_iter()
-        .zip(ids.iter())
-        .filter(|(_, id)| keep.contains(id))
-        .map(|(i, _)| i)
-        .collect();
+    set.items = items.into_iter().zip(ids.iter()).filter(|(_, id)| keep.contains(id)).map(|(i, _)| i).collect();
     set.tail.push_str(&page::token_xml(&token));
     Ok(())
 }
@@ -749,14 +558,11 @@ pub fn post_process(action: &str, p: &Params, inner: String) -> Result<String, E
     if !action.starts_with("Describe") || inner.contains("<nextToken>") {
         return Ok(inner);
     }
-    let wants =
-        !parse_filters(p).is_empty() || p.contains_key("MaxResults") || p.contains_key("NextToken");
+    let wants = !parse_filters(p).is_empty() || p.contains_key("MaxResults") || p.contains_key("NextToken");
     if !wants {
         return Ok(inner);
     }
-    let Some(mut set) = split_set(&inner) else {
-        return Ok(inner);
-    };
+    let Some(mut set) = split_set(&inner) else { return Ok(inner) };
     filter_items(action, p, &mut set);
     paginate(p, &mut set)?;
     Ok(set.render())
@@ -779,18 +585,11 @@ mod tests {
     use super::*;
 
     fn p(pairs: &[(&str, &str)]) -> Params {
-        pairs
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect()
+        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
     }
 
     fn actor(role: &str) -> AuthUser {
-        AuthUser {
-            username: "u".into(),
-            role: role.into(),
-            auth_source: None,
-        }
+        AuthUser { username: "u".into(), role: role.into(), auth_source: None }
     }
 
     #[test]
@@ -807,40 +606,19 @@ mod tests {
 
     #[test]
     fn tag_filters() {
-        let tags = vec![
-            ("Env".to_string(), "prod".to_string()),
-            ("Name".to_string(), "web-1".to_string()),
-        ];
-        assert_eq!(
-            tag_filter_matches(&tags, "tag:Env", &["pr*".into()]),
-            Some(true)
-        );
-        assert_eq!(
-            tag_filter_matches(&tags, "tag:Env", &["dev".into()]),
-            Some(false)
-        );
-        assert_eq!(
-            tag_filter_matches(&tags, "tag-key", &["Na*".into()]),
-            Some(true)
-        );
-        assert_eq!(
-            tag_filter_matches(&tags, "tag-value", &["web-?".into()]),
-            Some(true)
-        );
-        assert_eq!(
-            tag_filter_matches(&tags, "instance-id", &["x".into()]),
-            None
-        );
+        let tags = vec![("Env".to_string(), "prod".to_string()), ("Name".to_string(), "web-1".to_string())];
+        assert_eq!(tag_filter_matches(&tags, "tag:Env", &["pr*".into()]), Some(true));
+        assert_eq!(tag_filter_matches(&tags, "tag:Env", &["dev".into()]), Some(false));
+        assert_eq!(tag_filter_matches(&tags, "tag-key", &["Na*".into()]), Some(true));
+        assert_eq!(tag_filter_matches(&tags, "tag-value", &["web-?".into()]), Some(true));
+        assert_eq!(tag_filter_matches(&tags, "instance-id", &["x".into()]), None);
     }
 
     #[test]
     fn dry_run_says_what_the_real_call_would() {
         let dry = p(&[("DryRun", "true")]);
         let e = dry_run_gate("TerminateInstances", &dry, &actor("operator")).unwrap_err();
-        assert_eq!(
-            (e.status, e.code),
-            (StatusCode::PRECONDITION_FAILED, "DryRunOperation")
-        );
+        assert_eq!((e.status, e.code), (StatusCode::PRECONDITION_FAILED, "DryRunOperation"));
         let e = dry_run_gate("TerminateInstances", &dry, &actor("viewer")).unwrap_err();
         assert_eq!(e.code, "UnauthorizedOperation");
         let e = dry_run_gate("FenceHost", &dry, &actor("operator")).unwrap_err();
@@ -848,64 +626,21 @@ mod tests {
         let e = dry_run_gate("FenceHost", &dry, &actor("admin")).unwrap_err();
         assert_eq!(e.code, "DryRunOperation");
         // a read needs no role
-        assert_eq!(
-            dry_run_gate("DescribeInstances", &dry, &actor("viewer"))
-                .unwrap_err()
-                .code,
-            "DryRunOperation"
-        );
+        assert_eq!(dry_run_gate("DescribeInstances", &dry, &actor("viewer")).unwrap_err().code, "DryRunOperation");
         // no flag, or false: the call goes ahead
         assert!(dry_run_gate("TerminateInstances", &p(&[]), &actor("viewer")).is_ok());
-        assert!(dry_run_gate(
-            "TerminateInstances",
-            &p(&[("DryRun", "false")]),
-            &actor("viewer")
-        )
-        .is_ok());
-        assert_eq!(
-            dry_run_gate(
-                "TerminateInstances",
-                &p(&[("DryRun", "maybe")]),
-                &actor("admin")
-            )
-            .unwrap_err()
-            .code,
-            "InvalidParameterValue"
-        );
+        assert!(dry_run_gate("TerminateInstances", &p(&[("DryRun", "false")]), &actor("viewer")).is_ok());
+        assert_eq!(dry_run_gate("TerminateInstances", &p(&[("DryRun", "maybe")]), &actor("admin")).unwrap_err().code, "InvalidParameterValue");
     }
 
     #[test]
     fn request_hash_ignores_order_token_and_dry_run_but_not_values() {
-        let a = request_hash(
-            "RunInstances",
-            &p(&[
-                ("ImageId", "ami-1"),
-                ("MaxCount", "1"),
-                ("ClientToken", "t1"),
-            ]),
-        );
-        let b = request_hash(
-            "RunInstances",
-            &p(&[
-                ("MaxCount", "1"),
-                ("ImageId", "ami-1"),
-                ("ClientToken", "t2"),
-                ("DryRun", "false"),
-            ]),
-        );
-        let c = request_hash(
-            "RunInstances",
-            &p(&[("ImageId", "ami-1"), ("MaxCount", "2")]),
-        );
+        let a = request_hash("RunInstances", &p(&[("ImageId", "ami-1"), ("MaxCount", "1"), ("ClientToken", "t1")]));
+        let b = request_hash("RunInstances", &p(&[("MaxCount", "1"), ("ImageId", "ami-1"), ("ClientToken", "t2"), ("DryRun", "false")]));
+        let c = request_hash("RunInstances", &p(&[("ImageId", "ami-1"), ("MaxCount", "2")]));
         assert_eq!(a, b);
         assert_ne!(a, c);
-        assert_ne!(
-            a,
-            request_hash(
-                "CreateLaunchTemplate",
-                &p(&[("ImageId", "ami-1"), ("MaxCount", "1")])
-            )
-        );
+        assert_ne!(a, request_hash("CreateLaunchTemplate", &p(&[("ImageId", "ami-1"), ("MaxCount", "1")])));
     }
 
     #[test]
@@ -919,71 +654,26 @@ mod tests {
     #[tokio::test]
     async fn token_claims_replay_mismatch_and_release() {
         let (state, _rx) = crate::engine::test_support::test_state().await;
-        assert_eq!(
-            claim_token(&state, "u", "RunInstances", "t", "h1")
-                .await
-                .unwrap(),
-            TokenClaim::Fresh
-        );
+        assert_eq!(claim_token(&state, "u", "RunInstances", "t", "h1").await.unwrap(), TokenClaim::Fresh);
         // a second request while the first runs
-        assert_eq!(
-            claim_token(&state, "u", "RunInstances", "t", "h1")
-                .await
-                .unwrap(),
-            TokenClaim::InFlight
-        );
-        assert_eq!(
-            claim_token(&state, "u", "RunInstances", "t", "h2")
-                .await
-                .unwrap(),
-            TokenClaim::Mismatch
-        );
-        finish_token(&state, "u", "RunInstances", "t", "<x/>")
-            .await
-            .unwrap();
-        assert_eq!(
-            claim_token(&state, "u", "RunInstances", "t", "h1")
-                .await
-                .unwrap(),
-            TokenClaim::Replay("<x/>".into())
-        );
+        assert_eq!(claim_token(&state, "u", "RunInstances", "t", "h1").await.unwrap(), TokenClaim::InFlight);
+        assert_eq!(claim_token(&state, "u", "RunInstances", "t", "h2").await.unwrap(), TokenClaim::Mismatch);
+        finish_token(&state, "u", "RunInstances", "t", "<x/>").await.unwrap();
+        assert_eq!(claim_token(&state, "u", "RunInstances", "t", "h1").await.unwrap(), TokenClaim::Replay("<x/>".into()));
         // another user or action has its own tokens
-        assert_eq!(
-            claim_token(&state, "v", "RunInstances", "t", "h1")
-                .await
-                .unwrap(),
-            TokenClaim::Fresh
-        );
-        assert_eq!(
-            claim_token(&state, "u", "CreateLaunchTemplate", "t", "h1")
-                .await
-                .unwrap(),
-            TokenClaim::Fresh
-        );
+        assert_eq!(claim_token(&state, "v", "RunInstances", "t", "h1").await.unwrap(), TokenClaim::Fresh);
+        assert_eq!(claim_token(&state, "u", "CreateLaunchTemplate", "t", "h1").await.unwrap(), TokenClaim::Fresh);
         // a failed run frees the token
         release_token(&state, "u", "RunInstances", "t").await;
-        assert_eq!(
-            claim_token(&state, "u", "RunInstances", "t", "h3")
-                .await
-                .unwrap(),
-            TokenClaim::Fresh
-        );
+        assert_eq!(claim_token(&state, "u", "RunInstances", "t", "h3").await.unwrap(), TokenClaim::Fresh);
     }
 
     #[test]
     fn unknown_filter_names_are_an_error_but_tags_and_unlisted_actions_pass() {
-        let ok = p(&[
-            ("Filter.1.Name", "tag:Env"),
-            ("Filter.1.Value.1", "prod"),
-            ("Filter.2.Name", "vpc-id"),
-            ("Filter.2.Value.1", "vpc-1"),
-        ]);
+        let ok = p(&[("Filter.1.Name", "tag:Env"), ("Filter.1.Value.1", "prod"), ("Filter.2.Name", "vpc-id"), ("Filter.2.Value.1", "vpc-1")]);
         assert!(validate_filters("DescribeSubnets", &ok).is_ok());
         let typo = p(&[("Filter.1.Name", "vpcid"), ("Filter.1.Value.1", "x")]);
-        assert_eq!(
-            validate_filters("DescribeSubnets", &typo).unwrap_err().code,
-            "InvalidParameterValue"
-        );
+        assert_eq!(validate_filters("DescribeSubnets", &typo).unwrap_err().code, "InvalidParameterValue");
         let empty = p(&[("Filter.1.Name", "vpc-id")]);
         assert!(validate_filters("DescribeSubnets", &empty).is_err());
         assert!(validate_filters("DescribeAlarms", &typo).is_ok());
@@ -996,18 +686,7 @@ mod tests {
         </subnetSet>";
 
     fn ids(x: &str) -> Vec<String> {
-        split_set(x)
-            .unwrap()
-            .items
-            .iter()
-            .map(|i| {
-                children(i)
-                    .into_iter()
-                    .find(|(n, _)| n == "subnetId")
-                    .unwrap()
-                    .1
-            })
-            .collect()
+        split_set(x).unwrap().items.iter().map(|i| children(i).into_iter().find(|(n, _)| n == "subnetId").unwrap().1).collect()
     }
 
     #[test]
@@ -1018,38 +697,21 @@ mod tests {
         assert_eq!(set.tail, "");
         assert_eq!(set.render(), SUBNETS);
         let with_tail = format!("{SUBNETS}<nextToken>x</nextToken>");
-        assert_eq!(
-            split_set(&with_tail).unwrap().tail,
-            "<nextToken>x</nextToken>"
-        );
+        assert_eq!(split_set(&with_tail).unwrap().tail, "<nextToken>x</nextToken>");
         assert!(split_set("<return>true</return>").is_none());
     }
 
     #[test]
     fn field_and_tag_filters_apply_to_items() {
         let by_vpc = p(&[("Filter.1.Name", "vpc-id"), ("Filter.1.Value.1", "vpc-1")]);
-        assert_eq!(
-            ids(&post_process("DescribeSubnets", &by_vpc, SUBNETS.into()).unwrap()),
-            ["subnet-a", "subnet-c"]
-        );
-        let wild = p(&[
-            ("Filter.1.Name", "subnet-id"),
-            ("Filter.1.Value.1", "subnet-[ab]"),
-            ("Filter.2.Name", "state"),
-            ("Filter.2.Value.1", "avail*"),
-        ]);
+        assert_eq!(ids(&post_process("DescribeSubnets", &by_vpc, SUBNETS.into()).unwrap()), ["subnet-a", "subnet-c"]);
+        let wild = p(&[("Filter.1.Name", "subnet-id"), ("Filter.1.Value.1", "subnet-[ab]"), ("Filter.2.Name", "state"), ("Filter.2.Value.1", "avail*")]);
         // brackets are literal in EC2 wildcards, so nothing matches
         assert!(ids(&post_process("DescribeSubnets", &wild, SUBNETS.into()).unwrap()).is_empty());
         let tag = p(&[("Filter.1.Name", "tag:Env"), ("Filter.1.Value.1", "pr*")]);
-        assert_eq!(
-            ids(&post_process("DescribeSubnets", &tag, SUBNETS.into()).unwrap()),
-            ["subnet-a"]
-        );
+        assert_eq!(ids(&post_process("DescribeSubnets", &tag, SUBNETS.into()).unwrap()), ["subnet-a"]);
         let key = p(&[("Filter.1.Name", "tag-key"), ("Filter.1.Value.1", "Env")]);
-        assert_eq!(
-            ids(&post_process("DescribeSubnets", &key, SUBNETS.into()).unwrap()),
-            ["subnet-a", "subnet-c"]
-        );
+        assert_eq!(ids(&post_process("DescribeSubnets", &key, SUBNETS.into()).unwrap()), ["subnet-a", "subnet-c"]);
     }
 
     #[test]
@@ -1057,39 +719,14 @@ mod tests {
         let two = p(&[("MaxResults", "2")]);
         let first = post_process("DescribeSubnets", &two, SUBNETS.into()).unwrap();
         assert_eq!(ids(&first), ["subnet-a", "subnet-b"]);
-        let token = first
-            .split("<nextToken>")
-            .nth(1)
-            .unwrap()
-            .split("</nextToken>")
-            .next()
-            .unwrap()
-            .to_string();
-        let next = post_process(
-            "DescribeSubnets",
-            &p(&[("MaxResults", "2"), ("NextToken", &token)]),
-            SUBNETS.into(),
-        )
-        .unwrap();
+        let token = first.split("<nextToken>").nth(1).unwrap().split("</nextToken>").next().unwrap().to_string();
+        let next = post_process("DescribeSubnets", &p(&[("MaxResults", "2"), ("NextToken", &token)]), SUBNETS.into()).unwrap();
         assert_eq!(ids(&next), ["subnet-c"]);
         assert!(!next.contains("<nextToken>"));
         // no MaxResults: everything, untouched
-        assert_eq!(
-            post_process("DescribeSubnets", &p(&[]), SUBNETS.into()).unwrap(),
-            SUBNETS
-        );
-        assert!(post_process(
-            "DescribeSubnets",
-            &p(&[("MaxResults", "0")]),
-            SUBNETS.into()
-        )
-        .is_err());
-        assert!(post_process(
-            "DescribeSubnets",
-            &p(&[("NextToken", "@@@")]),
-            SUBNETS.into()
-        )
-        .is_err());
+        assert_eq!(post_process("DescribeSubnets", &p(&[]), SUBNETS.into()).unwrap(), SUBNETS);
+        assert!(post_process("DescribeSubnets", &p(&[("MaxResults", "0")]), SUBNETS.into()).is_err());
+        assert!(post_process("DescribeSubnets", &p(&[("NextToken", "@@@")]), SUBNETS.into()).is_err());
     }
 
     #[test]
@@ -1100,15 +737,8 @@ mod tests {
             </reservationSet>";
         // the action already filtered by tag; the post step must not drop items for lacking a direct tagSet
         let f = p(&[("Filter.1.Name", "tag:A"), ("Filter.1.Value.1", "1")]);
-        assert_eq!(
-            split_set(&post_process("DescribeInstances", &f, xml.into()).unwrap())
-                .unwrap()
-                .items
-                .len(),
-            2
-        );
-        let one =
-            post_process("DescribeInstances", &p(&[("MaxResults", "1")]), xml.into()).unwrap();
+        assert_eq!(split_set(&post_process("DescribeInstances", &f, xml.into()).unwrap()).unwrap().items.len(), 2);
+        let one = post_process("DescribeInstances", &p(&[("MaxResults", "1")]), xml.into()).unwrap();
         assert_eq!(split_set(&one).unwrap().items.len(), 1);
         assert!(one.contains("<nextToken>"));
     }

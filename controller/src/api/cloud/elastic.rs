@@ -364,18 +364,14 @@ pub async fn delete_group(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, ApiError> {
     let mut tx = crate::db::begin_write(&state.pool).await?;
-    let project: Uuid =
-        crate::db::query_scalar("SELECT project_id FROM cloud_instance_groups WHERE id=?")
-            .bind(id)
-            .fetch_optional(&mut *tx)
-            .await?
-            .ok_or_else(|| ApiError::not_found("instance group not found"))?;
+    let project: Uuid = crate::db::query_scalar("SELECT project_id FROM cloud_instance_groups WHERE id=?")
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| ApiError::not_found("instance group not found"))?;
     access(&mut tx, &actor, project, true).await?;
     // Stop the reconciler touching it while we check.
-    crate::db::query("UPDATE cloud_instance_groups SET paused = TRUE WHERE id=?")
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
+    crate::db::query("UPDATE cloud_instance_groups SET paused = TRUE WHERE id=?").bind(id).execute(&mut *tx).await?;
     let active: i64 = crate::db::query_scalar(
         "SELECT COUNT(*) FROM cloud_group_members m JOIN vms v ON v.id = m.vm_id \
          WHERE m.group_id = ? AND v.observed_state NOT IN ('shutoff', 'stopped', 'missing')",
@@ -388,20 +384,9 @@ pub async fn delete_group(
         tx.rollback().await?;
         return Err(conflict(why));
     }
-    crate::db::query("DELETE FROM cloud_group_members WHERE group_id=?")
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
-    crate::db::query(
-        "UPDATE cloud_alarms SET action='none', group_id=NULL, step=0 WHERE group_id=?",
-    )
-    .bind(id)
-    .execute(&mut *tx)
-    .await?;
-    crate::db::query("DELETE FROM cloud_instance_groups WHERE id=?")
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
+    crate::db::query("DELETE FROM cloud_group_members WHERE group_id=?").bind(id).execute(&mut *tx).await?;
+    crate::db::query("UPDATE cloud_alarms SET action='none', group_id=NULL, step=0 WHERE group_id=?").bind(id).execute(&mut *tx).await?;
+    crate::db::query("DELETE FROM cloud_instance_groups WHERE id=?").bind(id).execute(&mut *tx).await?;
     audit(&mut tx, &actor, "cloud.group.delete", id).await?;
     tx.commit().await?;
     Ok(Json(json!({"deleted":true})))
@@ -414,27 +399,20 @@ pub async fn delete_template(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, ApiError> {
     let mut tx = crate::db::begin_write(&state.pool).await?;
-    let project: Uuid =
-        crate::db::query_scalar("SELECT project_id FROM cloud_launch_templates WHERE id=?")
-            .bind(id)
-            .fetch_optional(&mut *tx)
-            .await?
-            .ok_or_else(|| ApiError::not_found("launch template not found"))?;
-    access(&mut tx, &actor, project, true).await?;
-    let used: i64 =
-        crate::db::query_scalar("SELECT COUNT(*) FROM cloud_instance_groups WHERE template_id=?")
-            .bind(id)
-            .fetch_one(&mut *tx)
-            .await?;
-    if used > 0 {
-        return Err(conflict(format!(
-            "{used} instance group(s) still use this launch template"
-        )));
-    }
-    crate::db::query("DELETE FROM cloud_launch_templates WHERE id=?")
+    let project: Uuid = crate::db::query_scalar("SELECT project_id FROM cloud_launch_templates WHERE id=?")
         .bind(id)
-        .execute(&mut *tx)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| ApiError::not_found("launch template not found"))?;
+    access(&mut tx, &actor, project, true).await?;
+    let used: i64 = crate::db::query_scalar("SELECT COUNT(*) FROM cloud_instance_groups WHERE template_id=?")
+        .bind(id)
+        .fetch_one(&mut *tx)
         .await?;
+    if used > 0 {
+        return Err(conflict(format!("{used} instance group(s) still use this launch template")));
+    }
+    crate::db::query("DELETE FROM cloud_launch_templates WHERE id=?").bind(id).execute(&mut *tx).await?;
     audit(&mut tx, &actor, "cloud.template.delete", id).await?;
     tx.commit().await?;
     Ok(Json(json!({"deleted":true})))

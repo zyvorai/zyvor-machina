@@ -129,12 +129,11 @@ pub async fn cancel_task(
     // taken that side effect. A bare status write here — same class of bug as
     // the worker/enqueue/reap terminal-failure paths fixed elsewhere — would
     // leave the VM silently pointing at a host it was never created on.
-    let row: Option<(String, serde_json::Value)> = crate::db::query_as(
-        "SELECT operation, payload FROM tasks WHERE id = ? AND status = 'pending'",
-    )
-    .bind(id)
-    .fetch_optional(&state.pool)
-    .await?;
+    let row: Option<(String, serde_json::Value)> =
+        crate::db::query_as("SELECT operation, payload FROM tasks WHERE id = ? AND status = 'pending'")
+            .bind(id)
+            .fetch_optional(&state.pool)
+            .await?;
     let Some((operation, payload)) = row else {
         return Err(ApiError::bad_request("task not pending or not found"));
     };

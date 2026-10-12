@@ -36,12 +36,7 @@ fn unsupported(msg: impl Into<String>) -> Ec2Error {
 }
 
 fn need(p: &Params, k: &str) -> Result<String, Ec2Error> {
-    p.get(k).cloned().ok_or_else(|| {
-        bad(
-            "MissingParameter",
-            format!("The request must contain the parameter {k}"),
-        )
-    })
+    p.get(k).cloned().ok_or_else(|| bad("MissingParameter", format!("The request must contain the parameter {k}")))
 }
 
 // ---- key pairs -------------------------------------------------------------------------------------------------------
@@ -89,77 +84,37 @@ pub fn encode_ed25519(seed: &[u8], public: &[u8], comment: &str, check: u32) -> 
     put_str(&mut file, &pub_blob);
     put_str(&mut file, &private);
     let b64 = base64::engine::general_purpose::STANDARD.encode(&file);
-    let wrapped: Vec<&str> = b64
-        .as_bytes()
-        .chunks(70)
-        .map(|c| std::str::from_utf8(c).unwrap_or_default())
-        .collect();
+    let wrapped: Vec<&str> = b64.as_bytes().chunks(70).map(|c| std::str::from_utf8(c).unwrap_or_default()).collect();
     SshKey {
-        private_pem: format!(
-            "-----BEGIN OPENSSH PRIVATE KEY-----\n{}\n-----END OPENSSH PRIVATE KEY-----\n",
-            wrapped.join("\n")
-        ),
-        public_line: format!(
-            "ssh-ed25519 {} {comment}",
-            base64::engine::general_purpose::STANDARD.encode(&pub_blob)
-        ),
+        private_pem: format!("-----BEGIN OPENSSH PRIVATE KEY-----\n{}\n-----END OPENSSH PRIVATE KEY-----\n", wrapped.join("\n")),
+        public_line: format!("ssh-ed25519 {} {comment}", base64::engine::general_purpose::STANDARD.encode(&pub_blob)),
     }
 }
 
 pub fn generate_ed25519(comment: &str) -> Result<SshKey, Ec2Error> {
-    let internal = |m: &str| {
-        Ec2Error::new(
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            "InternalError",
-            m.to_string(),
-        )
-    };
+    let internal = |m: &str| Ec2Error::new(axum::http::StatusCode::INTERNAL_SERVER_ERROR, "InternalError", m.to_string());
     let rng = SystemRandom::new();
-    let doc =
-        Ed25519KeyPair::generate_pkcs8(&rng).map_err(|_| internal("could not generate a key"))?;
+    let doc = Ed25519KeyPair::generate_pkcs8(&rng).map_err(|_| internal("could not generate a key"))?;
     let bytes = doc.as_ref();
     // ring's PKCS#8 for ed25519 is a fixed 16-byte header, the 32-byte seed, then the public key
-    let seed = bytes
-        .get(16..48)
-        .ok_or_else(|| internal("unexpected key encoding"))?;
-    let pair = Ed25519KeyPair::from_pkcs8(bytes)
-        .map_err(|_| internal("could not read the generated key"))?;
+    let seed = bytes.get(16..48).ok_or_else(|| internal("unexpected key encoding"))?;
+    let pair = Ed25519KeyPair::from_pkcs8(bytes).map_err(|_| internal("could not read the generated key"))?;
     let public = pair.public_key().as_ref();
-    Ed25519KeyPair::from_seed_and_public_key(seed, public)
-        .map_err(|_| internal("the generated key is inconsistent"))?;
+    Ed25519KeyPair::from_seed_and_public_key(seed, public).map_err(|_| internal("the generated key is inconsistent"))?;
     let mut check = [0u8; 4];
-    rng.fill(&mut check)
-        .map_err(|_| internal("no randomness"))?;
-    Ok(encode_ed25519(
-        seed,
-        public,
-        comment,
-        u32::from_be_bytes(check),
-    ))
+    rng.fill(&mut check).map_err(|_| internal("no randomness"))?;
+    Ok(encode_ed25519(seed, public, comment, u32::from_be_bytes(check)))
 }
 
 /// `CreateKeyPair`: the key is generated here, only the public half is stored, and the private key is returned once.
 /// ed25519 only (`KeyType` defaults to it here); `rsa` and `.ppk` are refused.
-pub async fn create_key_pair(
-    state: &AppState,
-    actor: &AuthUser,
-    p: &Params,
-) -> Result<String, Ec2Error> {
+pub async fn create_key_pair(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
     require_operator(actor)?;
     let name = need(p, "KeyName")?;
     match p.get("KeyType").map(String::as_str) {
         None | Some("ed25519") => {}
-        Some("rsa") => {
-            return Err(unsupported(
-                "KeyType=rsa is not supported: keys are ed25519 (omit KeyType or pass ed25519)",
-            ))
-        }
-        Some(_) => {
-            return Err(bad(
-                "InvalidParameterValue",
-                "KeyType must be rsa or ed25519",
-            ))
-        }
+        Some("rsa") => return Err(unsupported("KeyType=rsa is not supported: keys are ed25519 (omit KeyType or pass ed25519)")),
+        Some(_) => return Err(bad("InvalidParameterValue", "KeyType must be rsa or ed25519")),
     }
     match p.get("KeyFormat").map(String::as_str) {
         None | Some("pem") => {}
@@ -169,22 +124,9 @@ pub async fn create_key_pair(
     tagspec::only_types(p, &["key-pair"])?;
     let key = generate_ed25519(&name)?;
     let body: crate::api::keypairs::CreateKeypairBody =
-        serde_json::from_value(serde_json::json!({ "name": name, "public_key": key.public_line }))
-            .map_err(|e| bad("InvalidParameterValue", e.to_string()))?;
-    let Json(k) = crate::api::keypairs::create_keypair(
-        State(state.clone()),
-        Extension(actor.clone()),
-        Json(body),
-    )
-    .await
-    .map_err(api_err)?;
-    tagspec::apply(
-        state,
-        Kind::KeyPair,
-        k.id,
-        &tagspec::tags_for(p, "key-pair"),
-    )
-    .await?;
+        serde_json::from_value(serde_json::json!({ "name": name, "public_key": key.public_line })).map_err(|e| bad("InvalidParameterValue", e.to_string()))?;
+    let Json(k) = crate::api::keypairs::create_keypair(State(state.clone()), Extension(actor.clone()), Json(body)).await.map_err(api_err)?;
+    tagspec::apply(state, Kind::KeyPair, k.id, &tagspec::tags_for(p, "key-pair")).await?;
     Ok(format!(
         "<keyName>{}</keyName><keyFingerprint>{}</keyFingerprint><keyPairId>{}</keyPairId><keyMaterial>{}</keyMaterial>",
         xml_escape(&k.name),
@@ -196,22 +138,7 @@ pub async fn create_key_pair(
 
 // ---- images --------------------------------------------------------------------------------------------------------
 
-async fn template_row(
-    state: &AppState,
-    image: &str,
-) -> Result<
-    (
-        Uuid,
-        String,
-        String,
-        String,
-        bool,
-        Option<String>,
-        String,
-        String,
-    ),
-    Ec2Error,
-> {
+async fn template_row(state: &AppState, image: &str) -> Result<(Uuid, String, String, String, bool, Option<String>, String, String), Ec2Error> {
     let id = resolve(state, Kind::Image, image, "InvalidAMIID.NotFound").await?;
     let row = crate::db::query_as(
         "SELECT id, name, version, source_disk, cloud_init, os_family, category, description FROM templates WHERE id = ?",
@@ -219,25 +146,14 @@ async fn template_row(
     .bind(id)
     .fetch_optional(&state.pool)
     .await?;
-    row.ok_or_else(|| {
-        bad(
-            "InvalidAMIID.NotFound",
-            format!("The image id '{image}' does not exist"),
-        )
-    })
+    row.ok_or_else(|| bad("InvalidAMIID.NotFound", format!("The image id '{image}' does not exist")))
 }
 
 fn check_register_options(p: &Params) -> Result<(), Ec2Error> {
     if p.contains_key("ImageLocation") {
         return Err(unsupported("ImageLocation (an S3 manifest) is not supported: register an image from a snapshot with BlockDeviceMapping.1.Ebs.SnapshotId"));
     }
-    for k in [
-        "BootMode",
-        "TpmSupport",
-        "UefiData",
-        "ImdsSupport",
-        "BillingProducts.1",
-    ] {
+    for k in ["BootMode", "TpmSupport", "UefiData", "ImdsSupport", "BillingProducts.1"] {
         if p.contains_key(k) {
             return Err(unsupported(format!("{k} is not supported")));
         }
@@ -246,20 +162,14 @@ fn check_register_options(p: &Params) -> Result<(), Ec2Error> {
         return Err(unsupported("only hvm images are supported"));
     }
     if p.get("EnaSupport").is_some_and(|v| v == "false") || p.get("SriovNetSupport").is_some() {
-        return Err(unsupported(
-            "EnaSupport and SriovNetSupport are not supported",
-        ));
+        return Err(unsupported("EnaSupport and SriovNetSupport are not supported"));
     }
     Ok(())
 }
 
 /// `RegisterImage` from a snapshot: the snapshot is cloned into a volume the image owns and a private template is registered
 /// over it.
-pub async fn register_image(
-    state: &AppState,
-    actor: &AuthUser,
-    p: &Params,
-) -> Result<String, Ec2Error> {
+pub async fn register_image(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
     require_operator(actor)?;
     let name = need(p, "Name")?;
     check_register_options(p)?;
@@ -267,36 +177,24 @@ pub async fn register_image(
     let mut snapshot: Option<String> = None;
     for n in 1..=24 {
         let pre = format!("BlockDeviceMapping.{n}");
-        let Some(dev) = p.get(&format!("{pre}.DeviceName")) else {
-            break;
-        };
-        let root = super::run_options::normalize_device(dev).is_some_and(|(_, root)| root)
-            || p.get("RootDeviceName") == Some(dev);
+        let Some(dev) = p.get(&format!("{pre}.DeviceName")) else { break };
+        let root = super::run_options::normalize_device(dev).is_some_and(|(_, root)| root) || p.get("RootDeviceName") == Some(dev);
         if let Some(s) = p.get(&format!("{pre}.Ebs.SnapshotId")) {
             if root {
                 snapshot = Some(s.clone());
             } else {
-                return Err(unsupported(format!(
-                    "{pre}: only the root device can come from a snapshot in an image"
-                )));
+                return Err(unsupported(format!("{pre}: only the root device can come from a snapshot in an image")));
             }
         }
     }
-    let snapshot = snapshot.ok_or_else(|| {
-        bad(
-            "MissingParameter",
-            "a root BlockDeviceMapping with Ebs.SnapshotId is required",
-        )
-    })?;
+    let snapshot = snapshot.ok_or_else(|| bad("MissingParameter", "a root BlockDeviceMapping with Ebs.SnapshotId is required"))?;
     let snap = resolve(state, Kind::Snapshot, &snapshot, "InvalidSnapshot.NotFound").await?;
     let source_name = format!("ami-src-{}", &Uuid::new_v4().simple().to_string()[..8]);
     let Json(vol) = crate::api::volumes::create_volume_from_snapshot(
         State(state.clone()),
         Extension(actor.clone()),
         Path(snap),
-        Json(crate::api::volumes::VolumeFromSnapshotBody {
-            name: source_name.clone(),
-        }),
+        Json(crate::api::volumes::VolumeFromSnapshotBody { name: source_name.clone() }),
     )
     .await
     .map_err(api_err)?;
@@ -307,29 +205,15 @@ pub async fn register_image(
         cloud_init: true,
         os_family: None,
         category: "instance".into(),
-        description: p.get("Description").cloned().unwrap_or_else(|| {
-            format!(
-                "registered from {snapshot} (volume {})",
-                ec2_id(Kind::Volume, vol.id)
-            )
-        }),
+        description: p.get("Description").cloned().unwrap_or_else(|| format!("registered from {snapshot} (volume {})", ec2_id(Kind::Volume, vol.id))),
         featured: false,
         marketplace: false,
         icon: None,
     };
-    let Json(row) = crate::api::templates::create_template(
-        State(state.clone()),
-        Extension(actor.clone()),
-        Json(body),
-    )
-    .await
-    .map_err(api_err)?;
+    let Json(row) = crate::api::templates::create_template(State(state.clone()), Extension(actor.clone()), Json(body)).await.map_err(api_err)?;
     private(state, actor, &name, "1").await;
     tagspec::apply(state, Kind::Image, row.id, &tagspec::tags_for(p, "image")).await?;
-    Ok(format!(
-        "<imageId>{}</imageId>",
-        ec2_id(Kind::Image, row.id)
-    ))
+    Ok(format!("<imageId>{}</imageId>", ec2_id(Kind::Image, row.id)))
 }
 
 async fn private(state: &AppState, actor: &AuthUser, name: &str, version: &str) {
@@ -337,35 +221,25 @@ async fn private(state: &AppState, actor: &AuthUser, name: &str, version: &str) 
         State(state.clone()),
         Extension(actor.clone()),
         Path((name.to_string(), version.to_string())),
-        Json(crate::api::templates::VisibilityBody {
-            visibility: "private".into(),
-        }),
+        Json(crate::api::templates::VisibilityBody { visibility: "private".into() }),
     )
     .await;
 }
 
 /// `CopyImage` inside the one region: another private template over the same source disk.
-pub async fn copy_image(
-    state: &AppState,
-    actor: &AuthUser,
-    p: &Params,
-) -> Result<String, Ec2Error> {
+pub async fn copy_image(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
     require_operator(actor)?;
     let name = need(p, "Name")?;
     let source = need(p, "SourceImageId")?;
     let region = need(p, "SourceRegion")?;
     if region != REGION {
-        return Err(bad(
-            "InvalidParameterValue",
-            format!("SourceRegion must be '{REGION}', the only region"),
-        ));
+        return Err(bad("InvalidParameterValue", format!("SourceRegion must be '{REGION}', the only region")));
     }
     if p.get("Encrypted").is_some_and(|v| v == "true") || p.contains_key("KmsKeyId") {
         return Err(unsupported("encrypted images are not supported"));
     }
     tagspec::only_types(p, &["image"])?;
-    let (_, _, _, source_disk, cloud_init, os_family, category, description) =
-        template_row(state, &source).await?;
+    let (_, _, _, source_disk, cloud_init, os_family, category, description) = template_row(state, &source).await?;
     let body = crate::api::templates::CreateTemplateBody {
         name: name.clone(),
         version: "1".into(),
@@ -373,30 +247,15 @@ pub async fn copy_image(
         cloud_init,
         os_family,
         category,
-        description: p.get("Description").cloned().unwrap_or_else(|| {
-            if description.is_empty() {
-                format!("copy of {source}")
-            } else {
-                description
-            }
-        }),
+        description: p.get("Description").cloned().unwrap_or_else(|| if description.is_empty() { format!("copy of {source}") } else { description }),
         featured: false,
         marketplace: false,
         icon: None,
     };
-    let Json(row) = crate::api::templates::create_template(
-        State(state.clone()),
-        Extension(actor.clone()),
-        Json(body),
-    )
-    .await
-    .map_err(api_err)?;
+    let Json(row) = crate::api::templates::create_template(State(state.clone()), Extension(actor.clone()), Json(body)).await.map_err(api_err)?;
     private(state, actor, &name, "1").await;
     tagspec::apply(state, Kind::Image, row.id, &tagspec::tags_for(p, "image")).await?;
-    Ok(format!(
-        "<imageId>{}</imageId>",
-        ec2_id(Kind::Image, row.id)
-    ))
+    Ok(format!("<imageId>{}</imageId>", ec2_id(Kind::Image, row.id)))
 }
 
 /// `DescribeImageAttribute`.
@@ -431,38 +290,18 @@ pub async fn describe_image_attribute(state: &AppState, p: &Params) -> Result<St
 // ---- instance type offerings -------------------------------------------------------------------------------------------
 
 /// `DescribeInstanceTypeOfferings`: every instance type is offered in the region and on every host (a zone is a host).
-pub async fn describe_instance_type_offerings(
-    state: &AppState,
-    p: &Params,
-) -> Result<String, Ec2Error> {
+pub async fn describe_instance_type_offerings(state: &AppState, p: &Params) -> Result<String, Ec2Error> {
     check_offering_filters(p)?;
-    let location_type = p
-        .get("LocationType")
-        .map(String::as_str)
-        .unwrap_or("region");
-    let flavors: Vec<String> = crate::db::query_scalar("SELECT name FROM flavors ORDER BY name")
-        .fetch_all(&state.pool)
-        .await?;
+    let location_type = p.get("LocationType").map(String::as_str).unwrap_or("region");
+    let flavors: Vec<String> = crate::db::query_scalar("SELECT name FROM flavors ORDER BY name").fetch_all(&state.pool).await?;
     let locations: Vec<String> = match location_type {
         "region" => vec![REGION.to_string()],
-        "availability-zone" => {
-            crate::db::query_scalar("SELECT hostname FROM hosts ORDER BY hostname")
-                .fetch_all(&state.pool)
-                .await?
-        }
+        "availability-zone" => crate::db::query_scalar("SELECT hostname FROM hosts ORDER BY hostname").fetch_all(&state.pool).await?,
         "availability-zone-id" => {
-            let hosts: Vec<Uuid> =
-                crate::db::query_scalar("SELECT id FROM hosts ORDER BY hostname")
-                    .fetch_all(&state.pool)
-                    .await?;
+            let hosts: Vec<Uuid> = crate::db::query_scalar("SELECT id FROM hosts ORDER BY hostname").fetch_all(&state.pool).await?;
             hosts.into_iter().map(super::fleet::zone_id).collect()
         }
-        _ => {
-            return Err(bad(
-                "InvalidParameterValue",
-                "LocationType must be region, availability-zone or availability-zone-id",
-            ))
-        }
+        _ => return Err(bad("InvalidParameterValue", "LocationType must be region, availability-zone or availability-zone-id")),
     };
     let filters = super::parse_filters(p);
     let mut items = String::new();
@@ -482,19 +321,14 @@ pub async fn describe_instance_type_offerings(
             }
         }
     }
-    Ok(format!(
-        "<instanceTypeOfferingSet>{items}</instanceTypeOfferingSet>"
-    ))
+    Ok(format!("<instanceTypeOfferingSet>{items}</instanceTypeOfferingSet>"))
 }
 
 /// Rows for the filter names `DescribeInstanceTypeOfferings` answers; other names are refused.
 pub fn check_offering_filters(p: &Params) -> Result<(), Ec2Error> {
     for (name, values) in super::parse_filters(p) {
         if values.is_empty() || !matches!(name.as_str(), "instance-type" | "location") {
-            return Err(bad(
-                "InvalidParameterValue",
-                format!("The filter '{name}' is not valid for DescribeInstanceTypeOfferings"),
-            ));
+            return Err(bad("InvalidParameterValue", format!("The filter '{name}' is not valid for DescribeInstanceTypeOfferings")));
         }
     }
     Ok(())
@@ -505,10 +339,7 @@ mod tests {
     use super::*;
 
     fn p(pairs: &[(&str, &str)]) -> Params {
-        pairs
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect()
+        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
     }
 
     struct Reader<'a> {
@@ -533,9 +364,7 @@ mod tests {
     /// Reads the file back the way OpenSSH does: magic, cipher none, one key, matching check ints, ed25519, 64-byte secret.
     fn parse_private(pem: &str) -> (Vec<u8>, Vec<u8>, String) {
         let b64: String = pem.lines().filter(|l| !l.starts_with("-----")).collect();
-        let raw = base64::engine::general_purpose::STANDARD
-            .decode(b64)
-            .unwrap();
+        let raw = base64::engine::general_purpose::STANDARD.decode(b64).unwrap();
         assert!(raw.starts_with(b"openssh-key-v1\0"));
         let mut r = Reader { buf: &raw, at: 15 };
         assert_eq!(r.string(), b"none");
@@ -544,16 +373,9 @@ mod tests {
         assert_eq!(r.u32(), 1);
         let _pub_blob = r.string();
         let private = r.string();
-        assert_eq!(
-            private.len() % 8,
-            0,
-            "the private section is padded to the cipher block size"
-        );
+        assert_eq!(private.len() % 8, 0, "the private section is padded to the cipher block size");
         assert_eq!(private[0..4], private[4..8], "check ints match");
-        let mut q = Reader {
-            buf: &private,
-            at: 8,
-        };
+        let mut q = Reader { buf: &private, at: 8 };
         assert_eq!(q.string(), b"ssh-ed25519");
         let public = q.string();
         let secret = q.string();
@@ -564,27 +386,15 @@ mod tests {
     #[test]
     fn a_generated_key_is_a_valid_openssh_ed25519_pair() {
         let k = generate_ed25519("mykey").unwrap();
-        assert!(
-            k.private_pem
-                .starts_with("-----BEGIN OPENSSH PRIVATE KEY-----\n")
-                && k.private_pem
-                    .ends_with("-----END OPENSSH PRIVATE KEY-----\n")
-        );
+        assert!(k.private_pem.starts_with("-----BEGIN OPENSSH PRIVATE KEY-----\n") && k.private_pem.ends_with("-----END OPENSSH PRIVATE KEY-----\n"));
         let (secret, public, comment) = parse_private(&k.private_pem);
         assert_eq!(comment, "mykey");
         assert_eq!(secret.len(), 64);
-        assert_eq!(
-            &secret[32..],
-            &public[..],
-            "the secret ends with the public key"
-        );
-        Ed25519KeyPair::from_seed_and_public_key(&secret[..32], &public)
-            .expect("seed and public key belong together");
+        assert_eq!(&secret[32..], &public[..], "the secret ends with the public key");
+        Ed25519KeyPair::from_seed_and_public_key(&secret[..32], &public).expect("seed and public key belong together");
         // the public line carries the same key
         let line_b64 = k.public_line.split_whitespace().nth(1).unwrap();
-        let blob = base64::engine::general_purpose::STANDARD
-            .decode(line_b64)
-            .unwrap();
+        let blob = base64::engine::general_purpose::STANDARD.decode(line_b64).unwrap();
         assert!(blob.ends_with(&public));
         assert!(k.public_line.starts_with("ssh-ed25519 ") && k.public_line.ends_with(" mykey"));
         // two keys differ
@@ -604,17 +414,9 @@ mod tests {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
         }
-        match std::process::Command::new("ssh-keygen")
-            .args(["-y", "-f"])
-            .arg(&path)
-            .output()
-        {
+        match std::process::Command::new("ssh-keygen").args(["-y", "-f"]).arg(&path).output() {
             Ok(out) => {
-                assert!(
-                    out.status.success(),
-                    "ssh-keygen rejected the key: {}",
-                    String::from_utf8_lossy(&out.stderr)
-                );
+                assert!(out.status.success(), "ssh-keygen rejected the key: {}", String::from_utf8_lossy(&out.stderr));
                 let derived = String::from_utf8_lossy(&out.stdout);
                 let want: Vec<&str> = k.public_line.split_whitespace().take(2).collect();
                 let got: Vec<&str> = derived.split_whitespace().take(2).collect();
@@ -628,35 +430,16 @@ mod tests {
     #[test]
     fn key_options_that_are_not_ed25519_are_refused() {
         let reg = |pairs: &[(&str, &str)]| check_register_options(&p(pairs));
-        assert_eq!(
-            reg(&[("ImageLocation", "s3://x")]).unwrap_err().code,
-            "UnsupportedOperation"
-        );
-        assert_eq!(
-            reg(&[("BootMode", "uefi")]).unwrap_err().code,
-            "UnsupportedOperation"
-        );
-        assert_eq!(
-            reg(&[("VirtualizationType", "paravirtual")])
-                .unwrap_err()
-                .code,
-            "UnsupportedOperation"
-        );
+        assert_eq!(reg(&[("ImageLocation", "s3://x")]).unwrap_err().code, "UnsupportedOperation");
+        assert_eq!(reg(&[("BootMode", "uefi")]).unwrap_err().code, "UnsupportedOperation");
+        assert_eq!(reg(&[("VirtualizationType", "paravirtual")]).unwrap_err().code, "UnsupportedOperation");
         assert!(reg(&[("VirtualizationType", "hvm"), ("Architecture", "x86_64")]).is_ok());
     }
 
     #[test]
     fn offering_filters_are_checked() {
-        assert!(check_offering_filters(&p(&[
-            ("Filter.1.Name", "location"),
-            ("Filter.1.Value.1", "machina")
-        ]))
-        .is_ok());
-        assert!(check_offering_filters(&p(&[
-            ("Filter.1.Name", "memory"),
-            ("Filter.1.Value.1", "x")
-        ]))
-        .is_err());
+        assert!(check_offering_filters(&p(&[("Filter.1.Name", "location"), ("Filter.1.Value.1", "machina")])).is_ok());
+        assert!(check_offering_filters(&p(&[("Filter.1.Name", "memory"), ("Filter.1.Value.1", "x")])).is_err());
     }
 
     #[tokio::test]
@@ -664,28 +447,12 @@ mod tests {
         let (state, _rx) = crate::engine::test_support::test_state().await;
         crate::db::query("INSERT INTO flavors (id, name, vcpus, memory_mib, disk_gib) VALUES (?, 'm1.small', 1, 2048, 20)").bind(Uuid::new_v4()).execute(&state.pool).await.unwrap();
         crate::db::query("INSERT INTO flavors (id, name, vcpus, memory_mib, disk_gib) VALUES (?, 'm1.large', 4, 8192, 20)").bind(Uuid::new_v4()).execute(&state.pool).await.unwrap();
-        let region = describe_instance_type_offerings(&state, &p(&[]))
-            .await
-            .unwrap();
+        let region = describe_instance_type_offerings(&state, &p(&[])).await.unwrap();
         assert_eq!(region.matches("<item>").count(), 2);
         assert!(region.contains("<locationType>region</locationType><location>machina</location>"));
-        let one = describe_instance_type_offerings(
-            &state,
-            &p(&[
-                ("Filter.1.Name", "instance-type"),
-                ("Filter.1.Value.1", "m1.l*"),
-            ]),
-        )
-        .await
-        .unwrap();
+        let one = describe_instance_type_offerings(&state, &p(&[("Filter.1.Name", "instance-type"), ("Filter.1.Value.1", "m1.l*")])).await.unwrap();
         assert_eq!(one.matches("<item>").count(), 1);
         assert!(one.contains("m1.large"));
-        assert_eq!(
-            describe_instance_type_offerings(&state, &p(&[("LocationType", "rack")]))
-                .await
-                .unwrap_err()
-                .code,
-            "InvalidParameterValue"
-        );
+        assert_eq!(describe_instance_type_offerings(&state, &p(&[("LocationType", "rack")])).await.unwrap_err().code, "InvalidParameterValue");
     }
 }

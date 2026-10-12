@@ -27,12 +27,7 @@ fn bad(code: &'static str, msg: impl Into<String>) -> Ec2Error {
 }
 
 fn need(p: &Params, k: &str) -> Result<String, Ec2Error> {
-    p.get(k).cloned().ok_or_else(|| {
-        bad(
-            "MissingParameter",
-            format!("The request must contain the parameter {k}"),
-        )
-    })
+    p.get(k).cloned().ok_or_else(|| bad("MissingParameter", format!("The request must contain the parameter {k}")))
 }
 
 fn comparator(op: &str) -> Result<&'static str, Ec2Error> {
@@ -41,10 +36,7 @@ fn comparator(op: &str) -> Result<&'static str, Ec2Error> {
         "GreaterThanOrEqualToThreshold" | "gte" => Ok("gte"),
         "LessThanThreshold" | "lt" => Ok("lt"),
         "LessThanOrEqualToThreshold" | "lte" => Ok("lte"),
-        _ => Err(bad(
-            "InvalidParameterValue",
-            "ComparisonOperator must be GreaterThanThreshold or LessThanThreshold",
-        )),
+        _ => Err(bad("InvalidParameterValue", "ComparisonOperator must be GreaterThanThreshold or LessThanThreshold")),
     }
 }
 
@@ -59,15 +51,7 @@ fn comparator_out(stored: &str) -> &str {
 }
 
 fn alarm_item(row: &crate::api::alarms::AlarmRow) -> String {
-    let group = row
-        .group_id
-        .map(|id| {
-            format!(
-                "<instanceGroupId>{}</instanceGroupId>",
-                ec2_id(Kind::InstanceGroup, id)
-            )
-        })
-        .unwrap_or_default();
+    let group = row.group_id.map(|id| format!("<instanceGroupId>{}</instanceGroupId>", ec2_id(Kind::InstanceGroup, id))).unwrap_or_default();
     format!(
         "<item><alarmName>{}</alarmName><metricName>{}</metricName><namespace>Machina/EC2</namespace><statistic>{}</statistic>\
 <period>{}</period><evaluationPeriods>{}</evaluationPeriods><threshold>{}</threshold><comparisonOperator>{}</comparisonOperator>\
@@ -85,15 +69,8 @@ fn alarm_item(row: &crate::api::alarms::AlarmRow) -> String {
     )
 }
 
-pub async fn describe_alarms(
-    state: &AppState,
-    actor: &AuthUser,
-    p: &Params,
-) -> Result<String, Ec2Error> {
-    let Json(rows) =
-        crate::api::alarms::list_alarms(State(state.clone()), Extension(actor.clone()))
-            .await
-            .map_err(api_err)?;
+pub async fn describe_alarms(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
+    let Json(rows) = crate::api::alarms::list_alarms(State(state.clone()), Extension(actor.clone())).await.map_err(api_err)?;
     let wanted = indexed(p, "AlarmName");
     let items: String = rows
         .iter()
@@ -103,60 +80,20 @@ pub async fn describe_alarms(
     Ok(format!("<metricAlarms>{items}</metricAlarms>"))
 }
 
-pub async fn put_metric_alarm(
-    state: &AppState,
-    actor: &AuthUser,
-    p: &Params,
-) -> Result<String, Ec2Error> {
+pub async fn put_metric_alarm(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
     require_operator(actor)?;
     let name = need(p, "AlarmName")?;
     let metric = need(p, "MetricName")?;
-    let subject = p
-        .get("Dimensions.member.1.Value")
-        .cloned()
-        .or_else(|| p.get("Subject").cloned())
-        .unwrap_or_else(|| name.clone());
-    let threshold: f64 = need(p, "Threshold")?
-        .parse()
-        .map_err(|_| bad("InvalidParameterValue", "Threshold must be a number"))?;
-    let period: i64 = p
-        .get("Period")
-        .map(|s| s.parse())
-        .transpose()
-        .map_err(|_| bad("InvalidParameterValue", "Period must be a number"))?
-        .unwrap_or(300);
-    let evaluation: i64 = p
-        .get("EvaluationPeriods")
-        .map(|s| s.parse())
-        .transpose()
-        .map_err(|_| {
-            bad(
-                "InvalidParameterValue",
-                "EvaluationPeriods must be a number",
-            )
-        })?
-        .unwrap_or(1);
-    let statistic = p
-        .get("Statistic")
-        .cloned()
-        .unwrap_or_else(|| "Average".into());
-    let comparison = comparator(
-        p.get("ComparisonOperator")
-            .map(String::as_str)
-            .unwrap_or("GreaterThanThreshold"),
-    )?;
-    let policy_arn = super::autoscaling::members(p, "AlarmActions")
-        .into_iter()
-        .find(|a| a.starts_with("arn:aws:autoscaling:"));
+    let subject = p.get("Dimensions.member.1.Value").cloned().or_else(|| p.get("Subject").cloned()).unwrap_or_else(|| name.clone());
+    let threshold: f64 = need(p, "Threshold")?.parse().map_err(|_| bad("InvalidParameterValue", "Threshold must be a number"))?;
+    let period: i64 = p.get("Period").map(|s| s.parse()).transpose().map_err(|_| bad("InvalidParameterValue", "Period must be a number"))?.unwrap_or(300);
+    let evaluation: i64 = p.get("EvaluationPeriods").map(|s| s.parse()).transpose().map_err(|_| bad("InvalidParameterValue", "EvaluationPeriods must be a number"))?.unwrap_or(1);
+    let statistic = p.get("Statistic").cloned().unwrap_or_else(|| "Average".into());
+    let comparison = comparator(p.get("ComparisonOperator").map(String::as_str).unwrap_or("GreaterThanThreshold"))?;
+    let policy_arn = super::autoscaling::members(p, "AlarmActions").into_iter().find(|a| a.starts_with("arn:aws:autoscaling:"));
     let (action, group_id, step) = if let Some(group) = p.get("InstanceGroupId") {
-        let id = super::more::resolve(state, Kind::InstanceGroup, group, "InvalidParameterValue")
-            .await?;
-        let step: i64 = p
-            .get("Step")
-            .map(|s| s.parse())
-            .transpose()
-            .map_err(|_| bad("InvalidParameterValue", "Step must be a number"))?
-            .unwrap_or(1);
+        let id = super::more::resolve(state, Kind::InstanceGroup, group, "InvalidParameterValue").await?;
+        let step: i64 = p.get("Step").map(|s| s.parse()).transpose().map_err(|_| bad("InvalidParameterValue", "Step must be a number"))?.unwrap_or(1);
         ("scale_group".to_string(), Some(id), step)
     } else if let Some(arn) = policy_arn {
         // an Auto Scaling policy as the alarm action: the alarm applies the policy's step to its group
@@ -179,61 +116,35 @@ pub async fn put_metric_alarm(
         step,
         cooldown_secs: 300,
     };
-    let _ = crate::api::alarms::create_alarm(
-        State(state.clone()),
-        Extension(actor.clone()),
-        Json(body),
-    )
-    .await
-    .map_err(api_err)?;
+    let _ = crate::api::alarms::create_alarm(State(state.clone()), Extension(actor.clone()), Json(body)).await.map_err(api_err)?;
     Ok("<return>true</return>".into())
 }
 
-pub async fn delete_alarms(
-    state: &AppState,
-    actor: &AuthUser,
-    p: &Params,
-) -> Result<String, Ec2Error> {
+pub async fn delete_alarms(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
     require_operator(actor)?;
     let names = indexed(p, "AlarmName");
     if names.is_empty() {
-        return Err(bad(
-            "MissingParameter",
-            "The request must contain the parameter AlarmName.1",
-        ));
+        return Err(bad("MissingParameter", "The request must contain the parameter AlarmName.1"));
     }
     for name in names {
-        let id: Option<Uuid> =
-            crate::db::query_scalar("SELECT id FROM cloud_alarms WHERE name = ?")
-                .bind(&name)
-                .fetch_optional(&state.pool)
-                .await?;
+        let id: Option<Uuid> = crate::db::query_scalar("SELECT id FROM cloud_alarms WHERE name = ?")
+            .bind(&name)
+            .fetch_optional(&state.pool)
+            .await?;
         if let Some(id) = id {
-            let _ = crate::api::alarms::delete_alarm(
-                State(state.clone()),
-                Extension(actor.clone()),
-                Path(id),
-            )
-            .await
-            .map_err(api_err)?;
+            let _ = crate::api::alarms::delete_alarm(State(state.clone()), Extension(actor.clone()), Path(id)).await.map_err(api_err)?;
         }
     }
     Ok("<return>true</return>".into())
 }
 
-pub async fn set_alarm_actions(
-    state: &AppState,
-    actor: &AuthUser,
-    p: &Params,
-    enabled: bool,
-) -> Result<String, Ec2Error> {
+pub async fn set_alarm_actions(state: &AppState, actor: &AuthUser, p: &Params, enabled: bool) -> Result<String, Ec2Error> {
     require_operator(actor)?;
     for name in indexed(p, "AlarmName") {
-        let id: Option<Uuid> =
-            crate::db::query_scalar("SELECT id FROM cloud_alarms WHERE name = ?")
-                .bind(&name)
-                .fetch_optional(&state.pool)
-                .await?;
+        let id: Option<Uuid> = crate::db::query_scalar("SELECT id FROM cloud_alarms WHERE name = ?")
+            .bind(&name)
+            .fetch_optional(&state.pool)
+            .await?;
         let Some(id) = id else { continue };
         let _ = crate::api::alarms::set_alarm_enabled(
             State(state.clone()),
@@ -247,28 +158,12 @@ pub async fn set_alarm_actions(
     Ok("<return>true</return>".into())
 }
 
-pub async fn get_metric_statistics(
-    state: &AppState,
-    actor: &AuthUser,
-    p: &Params,
-) -> Result<String, Ec2Error> {
+pub async fn get_metric_statistics(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
     require_operator(actor)?;
-    let subject = p
-        .get("Dimensions.member.1.Value")
-        .cloned()
-        .or_else(|| p.get("Subject").cloned())
-        .ok_or_else(|| {
-            bad(
-                "MissingParameter",
-                "Dimensions.member.1.Value (the instance id or name) is required",
-            )
-        })?;
+    let subject = p.get("Dimensions.member.1.Value").cloned().or_else(|| p.get("Subject").cloned()).ok_or_else(|| bad("MissingParameter", "Dimensions.member.1.Value (the instance id or name) is required"))?;
     let metric = need(p, "MetricName")?;
     let period = p.get("Period").and_then(|s| s.parse().ok());
-    let stats = p
-        .get("Statistics.member.1")
-        .cloned()
-        .or_else(|| p.get("Statistics").cloned());
+    let stats = p.get("Statistics.member.1").cloned().or_else(|| p.get("Statistics").cloned());
     let query = crate::api::metric_stats::StatsQuery {
         subject,
         metric,
@@ -277,18 +172,8 @@ pub async fn get_metric_statistics(
         end: p.get("EndTime").and_then(|s| s.parse().ok()),
         statistics: stats,
     };
-    let Json(body) = crate::api::metric_stats::statistics(
-        State(state.clone()),
-        Extension(actor.clone()),
-        Query(query),
-    )
-    .await
-    .map_err(api_err)?;
-    let points = body
-        .get("datapoints")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let Json(body) = crate::api::metric_stats::statistics(State(state.clone()), Extension(actor.clone()), Query(query)).await.map_err(api_err)?;
+    let points = body.get("datapoints").and_then(|v| v.as_array()).cloned().unwrap_or_default();
     let items: String = points
         .iter()
         .map(|d| {
@@ -300,20 +185,13 @@ pub async fn get_metric_statistics(
             let n = d.get("sample_count").and_then(|v| v.as_u64());
             format!(
                 "<item><timestamp>{ts}</timestamp>{}{}{}{}{}</item>",
-                avg.map(|v| format!("<average>{v}</average>"))
-                    .unwrap_or_default(),
-                max.map(|v| format!("<maximum>{v}</maximum>"))
-                    .unwrap_or_default(),
-                min.map(|v| format!("<minimum>{v}</minimum>"))
-                    .unwrap_or_default(),
+                avg.map(|v| format!("<average>{v}</average>")).unwrap_or_default(),
+                max.map(|v| format!("<maximum>{v}</maximum>")).unwrap_or_default(),
+                min.map(|v| format!("<minimum>{v}</minimum>")).unwrap_or_default(),
                 sum.map(|v| format!("<sum>{v}</sum>")).unwrap_or_default(),
-                n.map(|v| format!("<sampleCount>{v}</sampleCount>"))
-                    .unwrap_or_default()
+                n.map(|v| format!("<sampleCount>{v}</sampleCount>")).unwrap_or_default()
             )
         })
         .collect();
-    Ok(format!(
-        "<label>{}</label><datapoints>{items}</datapoints>",
-        xml_escape(body.get("metric").and_then(|v| v.as_str()).unwrap_or(""))
-    ))
+    Ok(format!("<label>{}</label><datapoints>{items}</datapoints>", xml_escape(body.get("metric").and_then(|v| v.as_str()).unwrap_or(""))))
 }

@@ -739,25 +739,13 @@ const MAX_IOPS: u64 = 10_000_000;
 const MAX_BPS: u64 = 100_000_000_000;
 
 pub(crate) fn validate_iotune(b: &IoTuneBody) -> Result<(), String> {
-    if b.read_iops.is_none()
-        && b.write_iops.is_none()
-        && b.read_bps.is_none()
-        && b.write_bps.is_none()
-    {
+    if b.read_iops.is_none() && b.write_iops.is_none() && b.read_bps.is_none() && b.write_bps.is_none() {
         return Err("give at least one of read_iops, write_iops, read_bps, write_bps".into());
     }
-    if [b.read_iops, b.write_iops]
-        .iter()
-        .flatten()
-        .any(|v| *v > MAX_IOPS)
-    {
+    if [b.read_iops, b.write_iops].iter().flatten().any(|v| *v > MAX_IOPS) {
         return Err(format!("iops limits are at most {MAX_IOPS}"));
     }
-    if [b.read_bps, b.write_bps]
-        .iter()
-        .flatten()
-        .any(|v| *v > MAX_BPS)
-    {
+    if [b.read_bps, b.write_bps].iter().flatten().any(|v| *v > MAX_BPS) {
         return Err(format!("bytes-per-second limits are at most {MAX_BPS}"));
     }
     Ok(())
@@ -785,13 +773,11 @@ pub async fn set_volume_iotune(
                 .bind(vm)
                 .fetch_one(&state.pool)
                 .await?;
-        let host =
-            host.ok_or_else(|| ApiError::conflict("the instance has no host", "start it first"))?;
-        let addr: String =
-            crate::db::query_scalar("SELECT agent_grpc_addr FROM hosts WHERE id = ?")
-                .bind(host)
-                .fetch_one(&state.pool)
-                .await?;
+        let host = host.ok_or_else(|| ApiError::conflict("the instance has no host", "start it first"))?;
+        let addr: String = crate::db::query_scalar("SELECT agent_grpc_addr FROM hosts WHERE id = ?")
+            .bind(host)
+            .fetch_one(&state.pool)
+            .await?;
         let mut client = crate::agent_client::connect(&addr)
             .await
             .map_err(|e| ApiError::internal(format!("agent unreachable: {e:#}")))?;
@@ -835,11 +821,7 @@ pub(crate) async fn purge_terminating_volumes(state: &AppState, vm_id: Uuid, hos
     for (id, atlas, pool) in rows {
         let result: Result<(), String> = if let Some(a) = atlas {
             match atlas_bridge::require_client(&state.config) {
-                Ok(c) => c
-                    .delete_volume(&a)
-                    .await
-                    .map(|_| ())
-                    .map_err(|e| e.to_string()),
+                Ok(c) => c.delete_volume(&a).await.map(|_| ()).map_err(|e| e.to_string()),
                 Err(e) => Err(e.to_string()),
             }
         } else if let (Some(pool), Some(host)) = (pool, host) {
@@ -851,14 +833,8 @@ pub(crate) async fn purge_terminating_volumes(state: &AppState, vm_id: Uuid, hos
         };
         match result {
             Ok(()) => {
-                let _ = crate::db::query("DELETE FROM volumes WHERE id = ?")
-                    .bind(id)
-                    .execute(&state.pool)
-                    .await;
-                state.emit_event(
-                    "volume.delete",
-                    format!("Volume {id} deleted with its instance"),
-                );
+                let _ = crate::db::query("DELETE FROM volumes WHERE id = ?").bind(id).execute(&state.pool).await;
+                state.emit_event("volume.delete", format!("Volume {id} deleted with its instance"));
             }
             Err(e) => tracing::warn!(volume = %id, "delete on termination failed: {e}"),
         }
@@ -870,12 +846,7 @@ mod iotune_tests {
     use super::*;
 
     fn b(r: Option<u64>) -> IoTuneBody {
-        IoTuneBody {
-            read_iops: r,
-            write_iops: None,
-            read_bps: None,
-            write_bps: None,
-        }
+        IoTuneBody { read_iops: r, write_iops: None, read_bps: None, write_bps: None }
     }
 
     #[test]
@@ -883,12 +854,7 @@ mod iotune_tests {
         assert!(validate_iotune(&b(None)).is_err());
         assert!(validate_iotune(&b(Some(0))).is_ok());
         assert!(validate_iotune(&b(Some(MAX_IOPS + 1))).is_err());
-        let big = IoTuneBody {
-            read_iops: None,
-            write_iops: None,
-            read_bps: None,
-            write_bps: Some(MAX_BPS + 1),
-        };
+        let big = IoTuneBody { read_iops: None, write_iops: None, read_bps: None, write_bps: Some(MAX_BPS + 1) };
         assert!(validate_iotune(&big).is_err());
     }
 }
@@ -908,12 +874,11 @@ pub async fn create_volume_from_snapshot(
 ) -> Result<Json<VolumeRow>, ApiError> {
     require_operator(&actor)?;
     machina_spec::validate_name(&body.name).map_err(|e| ApiError::bad_request(e.to_string()))?;
-    let snap: Option<(Option<String>, Uuid)> = crate::db::query_as(
-        "SELECT atlas_snapshot_id, volume_id FROM volume_snapshots WHERE id = ?",
-    )
-    .bind(snapshot_id)
-    .fetch_optional(&state.pool)
-    .await?;
+    let snap: Option<(Option<String>, Uuid)> =
+        crate::db::query_as("SELECT atlas_snapshot_id, volume_id FROM volume_snapshots WHERE id = ?")
+            .bind(snapshot_id)
+            .fetch_optional(&state.pool)
+            .await?;
     let Some((atlas_snapshot, parent)) = snap else {
         return Err(ApiError::not_found("snapshot not found"));
     };
@@ -954,13 +919,11 @@ pub async fn create_volume_from_snapshot(
     .await;
     match cloned {
         Ok(vol) => {
-            crate::db::query(
-                "UPDATE volumes SET status = 'available', atlas_volume_id = ? WHERE id = ?",
-            )
-            .bind(&vol)
-            .bind(id)
-            .execute(&state.pool)
-            .await?;
+            crate::db::query("UPDATE volumes SET status = 'available', atlas_volume_id = ? WHERE id = ?")
+                .bind(&vol)
+                .bind(id)
+                .execute(&state.pool)
+                .await?;
         }
         Err(e) => {
             crate::db::query("UPDATE volumes SET status = 'error' WHERE id = ?")

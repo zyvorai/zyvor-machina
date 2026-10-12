@@ -61,20 +61,8 @@ async fn fetch(url: &str) -> Option<Feed> {
         }
     }
     let feed = async {
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(5))
-            .build()
-            .ok()?;
-        client
-            .get(url)
-            .send()
-            .await
-            .ok()?
-            .error_for_status()
-            .ok()?
-            .json::<Feed>()
-            .await
-            .ok()
+        let client = reqwest::Client::builder().timeout(Duration::from_secs(5)).build().ok()?;
+        client.get(url).send().await.ok()?.error_for_status().ok()?.json::<Feed>().await.ok()
     }
     .await;
     if let Ok(mut c) = CACHE.lock() {
@@ -83,25 +71,15 @@ async fn fetch(url: &str) -> Option<Feed> {
     feed
 }
 
-pub async fn update_check(
-    Extension(actor): Extension<AuthUser>,
-) -> Result<Json<UpdateCheck>, ApiError> {
+pub async fn update_check(Extension(actor): Extension<AuthUser>) -> Result<Json<UpdateCheck>, ApiError> {
     require_operator(&actor)?;
     let current = env!("CARGO_PKG_VERSION").to_string();
     let url = std::env::var("MACHINA_UPDATE_CHECK_URL").unwrap_or_default();
     if url.trim().is_empty() {
-        return Ok(Json(UpdateCheck {
-            enabled: false,
-            current,
-            latest: None,
-            available: false,
-            notes_url: None,
-        }));
+        return Ok(Json(UpdateCheck { enabled: false, current, latest: None, available: false, notes_url: None }));
     }
     let feed = fetch(url.trim()).await;
-    let available = feed
-        .as_ref()
-        .is_some_and(|f| is_newer(&current, &f.version));
+    let available = feed.as_ref().is_some_and(|f| is_newer(&current, &f.version));
     Ok(Json(UpdateCheck {
         enabled: true,
         current,

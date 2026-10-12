@@ -120,22 +120,21 @@ pub async fn batch_vm_snapshot(
         } else {
             format!("{}-{}", body.name, i + 1)
         };
-        let host_id: Option<Uuid> =
-            match crate::db::query_scalar("SELECT host_id FROM vms WHERE id = ?")
-                .bind(vm_id)
-                .fetch_optional(&state.pool)
-                .await?
-            {
-                Some(h) => h,
-                None => {
-                    results.push(BatchVmPowerItem {
-                        vm_id: vm_id.to_string(),
-                        task_id: None,
-                        error: Some("vm not found".into()),
-                    });
-                    continue;
-                }
-            };
+        let host_id: Option<Uuid> = match crate::db::query_scalar("SELECT host_id FROM vms WHERE id = ?")
+            .bind(vm_id)
+            .fetch_optional(&state.pool)
+            .await?
+        {
+            Some(h) => h,
+            None => {
+                results.push(BatchVmPowerItem {
+                    vm_id: vm_id.to_string(),
+                    task_id: None,
+                    error: Some("vm not found".into()),
+                });
+                continue;
+            }
+        };
         let snapshot_id = Uuid::new_v4();
         if crate::db::query(
             "INSERT INTO snapshot_records (id, vm_id, name, status) VALUES (?, ?, ?, 'pending')",

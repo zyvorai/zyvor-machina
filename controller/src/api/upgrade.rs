@@ -60,38 +60,20 @@ pub async fn upgrade_matrix(
     .await?;
     let hosts: Vec<HostSkew> = rows
         .into_iter()
-        .map(
-            |(id, hostname, agent_version, maintenance_mode, running_vms)| {
-                let skew = crate::engine::upgrade_skew::classify(controller, &agent_version);
-                let blocker = crate::engine::upgrade_skew::upgrade_blocker(
-                    controller,
-                    controller,
-                    maintenance_mode,
-                    running_vms,
-                );
-                HostSkew {
-                    id,
-                    hostname,
-                    agent_version,
-                    status: skew.status,
-                    reason: skew.reason,
-                    running_vms,
-                    maintenance_mode,
-                    blocker,
-                }
-            },
-        )
+        .map(|(id, hostname, agent_version, maintenance_mode, running_vms)| {
+            let skew = crate::engine::upgrade_skew::classify(controller, &agent_version);
+            let blocker = crate::engine::upgrade_skew::upgrade_blocker(
+                controller,
+                controller,
+                maintenance_mode,
+                running_vms,
+            );
+            HostSkew { id, hostname, agent_version, status: skew.status, reason: skew.reason, running_vms, maintenance_mode, blocker }
+        })
         .collect();
-    let load: Vec<(String, i64)> = hosts
-        .iter()
-        .map(|h| (h.hostname.clone(), h.running_vms))
-        .collect();
+    let load: Vec<(String, i64)> = hosts.iter().map(|h| (h.hostname.clone(), h.running_vms)).collect();
     let mut order = vec!["controller".to_string()];
-    order.extend(
-        crate::engine::upgrade_skew::order(&load)
-            .into_iter()
-            .map(String::from),
-    );
+    order.extend(crate::engine::upgrade_skew::order(&load).into_iter().map(String::from));
     Ok(Json(AgentUpgradeMatrix {
         controller_version: controller.into(),
         recommended_agent: controller.into(),

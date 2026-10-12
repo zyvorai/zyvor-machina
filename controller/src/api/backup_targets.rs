@@ -60,15 +60,13 @@ pub async fn create_backup_target(
         )));
     }
     let id = Uuid::new_v4();
-    crate::db::query(
-        "INSERT INTO backup_targets (id, name, kind, config_json) VALUES (?, ?, ?, ?)",
-    )
-    .bind(id)
-    .bind(&body.name)
-    .bind(&body.kind)
-    .bind(&body.config_json)
-    .execute(&state.pool)
-    .await?;
+    crate::db::query("INSERT INTO backup_targets (id, name, kind, config_json) VALUES (?, ?, ?, ?)")
+        .bind(id)
+        .bind(&body.name)
+        .bind(&body.kind)
+        .bind(&body.config_json)
+        .execute(&state.pool)
+        .await?;
     let row = crate::db::query_as::<_, BackupTargetRow>(
         "SELECT id, name, kind, config_json FROM backup_targets WHERE id = ?",
     )

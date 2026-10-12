@@ -50,14 +50,12 @@ pub async fn create_enrollment_token(
         .await?
         .ok_or_else(|| ApiError::internal("no cluster configured"))?;
 
-    crate::db::query(
-        "INSERT INTO enrollment_tokens (token, cluster_id, expires_at) VALUES (?, ?, ?)",
-    )
-    .bind(&token)
-    .bind(cluster_id)
-    .bind(expires)
-    .execute(&state.pool)
-    .await?;
+    crate::db::query("INSERT INTO enrollment_tokens (token, cluster_id, expires_at) VALUES (?, ?, ?)")
+        .bind(&token)
+        .bind(cluster_id)
+        .bind(expires)
+        .execute(&state.pool)
+        .await?;
 
     // Use the configured public URL (MACHINA_PUBLIC_URL) for the join command —
     // `state.config.host` is the bind address, which is typically 0.0.0.0 and thus
@@ -88,10 +86,7 @@ pub async fn create_enrollment_token(
         None,
         "info",
         "token",
-        &format!(
-            "enrollment token issued by {}, valid {ttl} h",
-            actor.username
-        ),
+        &format!("enrollment token issued by {}, valid {ttl} h", actor.username),
     )
     .await;
     Ok(Json(EnrollmentTokenResponse {
@@ -171,12 +166,11 @@ pub async fn revoke_enrollment_token(
     Path(token): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_admin(&actor)?;
-    let revoked =
-        crate::db::query("DELETE FROM enrollment_tokens WHERE token = ? AND used_at IS NULL")
-            .bind(&token)
-            .execute(&state.pool)
-            .await?
-            .rows_affected();
+    let revoked = crate::db::query("DELETE FROM enrollment_tokens WHERE token = ? AND used_at IS NULL")
+        .bind(&token)
+        .execute(&state.pool)
+        .await?
+        .rows_affected();
     if revoked == 0 {
         return Err(ApiError::not_found(
             "enrollment token not found or already used",
@@ -192,14 +186,7 @@ mod install_script_tests {
     #[test]
     fn the_script_verifies_before_it_installs_and_hides_the_token() {
         assert!(INSTALL_SH.starts_with("#!/usr/bin/env bash\n"));
-        for must in [
-            "set -euo pipefail",
-            "SHA256SUMS",
-            "--ca-sha256",
-            "sha256sum",
-            "<hidden>",
-            "[ \"$have\" = \"$want\" ]",
-        ] {
+        for must in ["set -euo pipefail", "SHA256SUMS", "--ca-sha256", "sha256sum", "<hidden>", "[ \"$have\" = \"$want\" ]"] {
             assert!(INSTALL_SH.contains(must), "install.sh must contain {must}");
         }
         assert_eq!(install_script_sha256().len(), 64);

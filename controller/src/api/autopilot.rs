@@ -73,13 +73,12 @@ pub async fn propose_resize(
             )
         }
         (v, m) => {
-            let (_, _, cv, cm): (String, Option<Uuid>, i64, i64) = crate::db::query_as(
-                "SELECT name, host_id, vcpus, memory_mib FROM vms WHERE id = ?",
-            )
-            .bind(body.vm_id)
-            .fetch_optional(&state.pool)
-            .await?
-            .ok_or_else(|| ApiError::not_found("vm not found"))?;
+            let (_, _, cv, cm): (String, Option<Uuid>, i64, i64) =
+                crate::db::query_as("SELECT name, host_id, vcpus, memory_mib FROM vms WHERE id = ?")
+                    .bind(body.vm_id)
+                    .fetch_optional(&state.pool)
+                    .await?
+                    .ok_or_else(|| ApiError::not_found("vm not found"))?;
             (
                 v.unwrap_or(cv.max(1) as u32),
                 m.unwrap_or(cm),
