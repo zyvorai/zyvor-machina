@@ -20,7 +20,9 @@ use tracing::{info, warn};
 use machina_core::{LibvirtError, LibvirtManager};
 
 use crate::auth::{require_browser_session_for_host_insight, RequestActor};
-use crate::cluster_bootstrap::{run_cluster_bootstrap, ClusterBootstrapParams, CniChoice};
+use crate::cluster_bootstrap::{
+    k3s_install_url, mirror, run_cluster_bootstrap, ClusterBootstrapParams, CniChoice,
+};
 use crate::error::AppError;
 use crate::k8s_quantity::{parse_cpu_to_millicores, parse_memory_to_bytes};
 
@@ -45,8 +47,30 @@ const KATA_GITHUB_LATEST: &str =
     "https://api.github.com/repos/kata-containers/kata-containers/releases/latest";
 /// When `curl` cannot reach GitHub, pin chart version (bump when kata ships a new major you care about).
 const KATA_HELM_VERSION_FALLBACK: &str = "3.29.0";
-/// Official `https://get.k3s.io` installer (network + root on daemon host).
-const K3S_INSTALL_SHELL: &str = "curl -sfL https://get.k3s.io | sh -";
+/// The k3s installer (network + root on daemon host): `https://get.k3s.io` unless
+/// `MACHINA_K3S_INSTALL_URL` points at an internal mirror (air-gapped sites). The URL is
+/// single-quoted into a shell command, so anything with a metacharacter is refused and the
+/// upstream default is used instead.
+fn k3s_install_shell() -> String {
+    let url = k3s_install_url();
+    let bad = url.contains(['\'', '"', ';', '|', '&', '$', '`', '\n', ' ']);
+    let url = if bad {
+        "https://get.k3s.io".to_string()
+    } else {
+        url
+    };
+    format!("curl -sfL '{url}' | sh -")
+}
+
+fn kata_latest_api() -> String {
+    mirror("MACHINA_KATA_LATEST_API_URL", KATA_GITHUB_LATEST)
+}
+fn kata_helm_chart() -> String {
+    mirror("MACHINA_KATA_HELM_CHART", KATA_HELM_CHART)
+}
+fn kata_examples_base() -> String {
+    mirror("MACHINA_KATA_EXAMPLES_URL", KATA_EXAMPLE_MANIFEST_BASE)
+}
 const K3S_INSTALL_TIMEOUT_SECS: u64 = 900;
 const K3S_UNINSTALL_TIMEOUT_SECS: u64 = 420;
 const K3S_UNINSTALL_SERVER: &str = "/usr/local/bin/k3s-uninstall.sh";
@@ -2614,7 +2638,7 @@ async fn k8s_kata_deploy(
     }
 
     let build_example_apply = |suffix: &str, dry_run_apply: bool| -> Vec<String> {
-        let url = format!("{KATA_EXAMPLE_MANIFEST_BASE}{suffix}");
+        let url = format!("{}{suffix}", kata_examples_base());
         let mut a = vec!["apply".into(), "-f".into(), url];
         if dry_run_apply {
             a.push("--dry-run=server".into());
@@ -2641,7 +2665,7 @@ async fn k8s_kata_deploy(
                 "upgrade".into(),
                 "--install".into(),
                 KATA_HELM_RELEASE_NAME.into(),
-                KATA_HELM_CHART.into(),
+                kata_helm_chart(),
             ];
             if let Some(d) = kata_helm_k8s_distribution(ctx).await {
                 info!(
@@ -2790,7 +2814,7 @@ async fn kata_containers_latest_release_tag() -> Result<String, LibvirtError> {
                 "-fsSL",
                 "-H",
                 "User-Agent: machina-daemon",
-                KATA_GITHUB_LATEST,
+                kata_latest_api().as_str(),
             ])
             .output(),
     )
@@ -3849,7 +3873,7 @@ async fn run_k3s_install_script(req: &K3sInstallRequest) -> Result<KubectlResult
     }
 
     let mut cmd = Command::new("/bin/sh");
-    cmd.arg("-c").arg(K3S_INSTALL_SHELL);
+    cmd.arg("-c").arg(k3s_install_shell());
     cmd.stdin(Stdio::null());
     if let Some(ref v) = req.install_k3s_version {
         cmd.env("INSTALL_K3S_VERSION", v);
@@ -3858,7 +3882,7 @@ async fn run_k3s_install_script(req: &K3sInstallRequest) -> Result<KubectlResult
         cmd.env("INSTALL_K3S_EXEC", e);
     }
 
-    let mut command_text = K3S_INSTALL_SHELL.to_string();
+    let mut command_text = k3s_install_shell();
     if req.install_k3s_version.is_some() {
         command_text.push_str(" (INSTALL_K3S_VERSION set)");
     }
@@ -3954,12 +3978,12 @@ async fn k8s_k3s_install(
     if req.dry_run == Some(true) {
         let preview = serde_json::json!({
             "note": "dry_run only — no install was executed",
-            "shell": K3S_INSTALL_SHELL,
+            "shell": k3s_install_shell(),
             "INSTALL_K3S_VERSION": req.install_k3s_version,
             "INSTALL_K3S_EXEC": req.install_k3s_exec,
         });
         return Ok(Json(KubectlResult {
-            command: format!("(dry_run) {K3S_INSTALL_SHELL}"),
+            command: format!("(dry_run) {}", k3s_install_shell()),
             stdout: preview.to_string(),
             stderr: String::new(),
             exit_code: 0,
