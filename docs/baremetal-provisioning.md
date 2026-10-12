@@ -138,6 +138,24 @@ PXE-boots, `/boot/ipxe` hands it the installer and the document by URL.
 - Hostname, timezone, keys and the join command are validated before rendering; a
   value that could break out of the document is refused.
 
+## CLI and UI
+
+```
+machinactl metal add rack2-u14 --bmc 10.20.0.14 --user admin --mac aa:bb:cc:dd:ee:ff --zone rack2
+machinactl metal commission <id>        # then PXE-boot the machine
+machinactl metal inventory <id>
+machinactl metal allocate --zone rack2 --cores 16
+machinactl metal deploy <id> --os ubuntu-24.04 --key "ssh-ed25519 AAAA… ops"
+machinactl metal release <id>
+machinactl metal list | zones | power <id> on|off|cycle|reset [--dry-run]
+machinactl metal dnsmasq --subnet 10.20.0.0 --interface eth1 > /etc/dnsmasq.d/machina.conf
+```
+
+The BMC password is read from `MACHINA_BMC_PASSWORD`, never an argument. The commands
+talk to the controller (`--fleet` is implied). In the UI, Platform -> Bare Metal shows
+lifecycle and zone next to power state, takes BMC credentials, MAC and zone on
+registration, and has Commission and Release buttons.
+
 ## Not done yet
 
 1. A commissioning image build (kernel, initrd, rootfs). The script and the contract
