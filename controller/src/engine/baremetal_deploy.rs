@@ -310,6 +310,18 @@ pub fn select_target_disk(
         .map(|n| format!("/dev/{n}"))
 }
 
+/// Lab override: deploy with the plain `http` join command. Always allowed in unit tests,
+/// which have no TLS listener.
+fn allow_http_join() -> bool {
+    cfg!(test)
+        || matches!(
+            std::env::var("MACHINA_METAL_ALLOW_HTTP_JOIN")
+                .ok()
+                .as_deref(),
+            Some("1" | "true" | "yes")
+        )
+}
+
 /// Allocated -> deploying. Issues an enrollment token, renders the document and stores it.
 /// Returns the join command (so the caller can show it) and the install kind.
 pub async fn begin_deploy(
@@ -369,7 +381,16 @@ pub async fn begin_deploy(
     };
     let enroll = format!("join-{}", Uuid::new_v4());
     let (install_cmd, pinned) = crate::api::enrollment::join_commands(controller_base, &enroll);
-    let join = pinned.unwrap_or(install_cmd);
+    let join = match pinned {
+        Some(p) => p,
+        None if allow_http_join() => install_cmd,
+        None => anyhow::bail!(
+            "deployed machines join over the controller's pinned TLS listener, which is not \
+             enabled: set MACHINA_CONTROLLER_TLS_ADDR (machinactl bootstrap does it). A plain \
+             http join leaves the agent serving in the foreground on loopback, unreachable by the \
+             controller; MACHINA_METAL_ALLOW_HTTP_JOIN=1 overrides this for a lab"
+        ),
+    };
     let input = RenderInput {
         hostname: &hostname,
         join_command: &join,
@@ -407,6 +428,11 @@ pub async fn begin_deploy(
     .bind(doc)
     .execute(pool)
     .await?;
+    // The next boot must be PXE (the deploy ramdisk), whatever is on the disk now.
+    let note =
+        super::baremetal::set_boot_best_effort(pool, id, super::baremetal_bmc::BootDevice::Pxe)
+            .await;
+    tracing::info!("deploy {id}: {note}");
     Ok(kind)
 }
 
@@ -540,6 +566,14 @@ pub async fn report_deploy(
             .bind(id)
             .execute(pool)
             .await?;
+            // Boot the new OS next, even if the firmware prefers the network.
+            let note = super::baremetal::set_boot_best_effort(
+                pool,
+                id,
+                super::baremetal_bmc::BootDevice::Disk,
+            )
+            .await;
+            tracing::info!("deploy {id} written: {note}");
         }
         "failed" => {
             let msg: String = message

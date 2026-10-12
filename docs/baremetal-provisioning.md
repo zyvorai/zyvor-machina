@@ -25,6 +25,31 @@ POST /api/v1/baremetal/servers   (admin)
 - `bmc_address` is a host, `host:port`, or an `http(s)://` URL. Anything that could
   be read as an option or a path is rejected.
 
+### What the BMC reports, and boot device
+
+```
+GET  /api/v1/baremetal/servers/{id}/power-state      (operator) -> {"power_state": "on|off|unknown"}
+POST /api/v1/baremetal/servers/{id}/boot-device      (admin)    {"device": "pxe|disk|cdrom", "persistent": false, "uefi": true}
+```
+
+- `power-state` asks the BMC (Redfish `PowerState`, `ipmitool chassis power status`,
+  `virsh domstate`) and records it in `state`; `state` otherwise only reflects the last
+  command sent. `MACHINA_BMC_POLL_SECS` (default `0` = off, minimum 30) polls every server
+  with a BMC address.
+- Power calls are idempotent: `on` for a running machine and `off` for a stopped one do
+  nothing; `cycle`/`reset` of a stopped machine powers it on. Redfish picks the
+  `ResetType` the BMC lists as allowed (many lack `PowerCycle`; it falls back to
+  `ForceRestart`), and an async action (HTTP 202) is followed to completion.
+- Requests are retried (3 attempts) on connection errors and 502/503/504.
+  `MACHINA_BMC_CA_FILE` is a PEM bundle trusted for BMC certificates (with
+  `MACHINA_BMC_VERIFY_TLS=1`).
+- **Boot override**: commissioning and image deploy set the next boot to PXE, once, before
+  the machine is powered, so a server with an OS on disk still reaches the boot service.
+  When the image is written the next boot is set to disk. Redfish uses
+  `Boot.BootSourceOverrideTarget`/`Enabled`, checked against the BMC's allowed values; IPMI
+  uses `chassis bootdev`. A machine without BMC credentials is left to its own boot order.
+  The libvirt driver cannot override (boot order is fixed in the domain).
+
 ### Power
 
 ```
@@ -268,6 +293,17 @@ The BMC password is read from `MACHINA_BMC_PASSWORD`, never an argument. The com
 talk to the controller (`--fleet` is implied). In the UI, Platform -> Bare Metal shows
 lifecycle and zone next to power state, takes BMC credentials, MAC and zone on
 registration, and has Commission and Release buttons.
+
+## Joining requires the TLS listener
+
+A deployed machine joins with the controller's **pinned** join command: it checks the
+script's checksum and the controller CA by fingerprint, gets a node certificate, and its
+agent restarts on its own address. That needs `MACHINA_CONTROLLER_TLS_ADDR` (and a
+`MACHINA_PUBLIC_URL` the machine can reach); `machinactl bootstrap` sets both. Without it
+`deploy` is refused: over plain `http` the agent does not store its token and ends up
+serving in the foreground on loopback, so `cloud-init` never finishes and the controller
+cannot reach the agent (seen on the lab host). `MACHINA_METAL_ALLOW_HTTP_JOIN=1` lifts the
+check for experiments.
 
 ## Not done yet
 
