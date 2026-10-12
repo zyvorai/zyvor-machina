@@ -190,6 +190,11 @@ mod tests {
             .execute(pool)
             .await
             .unwrap();
+        // Migration 073 seeds a local Ollama provider; start from none.
+        crate::db::query("DELETE FROM ai_providers")
+            .execute(pool)
+            .await
+            .unwrap();
     }
 
     async fn add_provider(pool: &DbPool, kind: &str, base_url: &str, key: &str) -> Uuid {
