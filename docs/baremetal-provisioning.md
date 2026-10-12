@@ -229,6 +229,25 @@ machinactl metal profile add web --image ubuntu-26.04 --key … --auto --count 8
 - Not done: validation does not yet check that the bridge or pool really exists on the host
   afterwards, and `MACHINA_METAL`-style profiles do not carry networks or pools yet.
 
+## Machines that already have an OS
+
+```
+sudo machinactl bootstrap --public-url https://ctl.example:5093   # on the controller, once
+machinactl host add --file hosts.txt --parallel 8 --site fra1 --rack r12 \
+    --tag gpu --network br-prod --pool ssd-pool
+sudo ./install.sh --agent --join https://ctl:5094 --token-file /root/join.token --ca-sha256 <fp>   # offline bundle
+```
+
+- `bootstrap` writes `MACHINA_PUBLIC_URL` and `MACHINA_CONTROLLER_TLS_ADDR` (and
+  `_SANS`) to `/etc/default/machina-platform` (mode 0600), restarts the controller only
+  if they changed, runs `dist publish`, and waits for health. It prints what to run next.
+- `host add` mints one single-use token per host (with the labels above) and runs the
+  join command over SSH, up to `--parallel` at a time, revoking the token of any host that
+  fails and exiting non-zero with the list. Lines of `--file` are `USER@HOST`, `#` comments.
+  With a single host it keeps the interactive terminal as before.
+- The offline bundle's `install.sh` joins in the same step with `--join`; it still never
+  installs OS packages, so libvirt and QEMU must already be present.
+
 ## CLI and UI
 
 ```
