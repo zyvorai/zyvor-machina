@@ -353,6 +353,10 @@ sudo machinactl dist publish-metal --dir /var/tmp/metal-out                     
   `$MACHINA_PUBLIC_URL/dist/metal-ipxe.iso` (or `-uefi.iso`), set the next boot to CD,
   and when the image is written eject it and set the next boot to disk.
   `MACHINA_METAL_IPXE_ISO_URL` overrides the URL (a mirror the BMC can reach).
+- Commissioning and deploy also power the machine: reset if it is on, power on if it is off
+  (`MACHINA_METAL_NO_AUTO_POWER=1` leaves the power step to you), because the boot override
+  only matters at the next boot. This applies to `pxe` servers too, when they have BMC
+  credentials.
 - Manually: `POST /api/v1/baremetal/servers/{id}/virtual-media` `{"action":"insert"|"eject","url":"…"}`.
 - The BMC fetches the image itself, so it must reach the controller (or the mirror) over
   http(s). An image already mounted is replaced; a BMC without an `InsertMedia` action is

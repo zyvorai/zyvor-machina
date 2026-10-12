@@ -509,6 +509,29 @@ async fn boot_method_of(pool: &DbPool, id: Uuid) -> String {
 /// Make the next boot reach the boot service: PXE once, or mount the iPXE ISO and boot the
 /// CD once. Best effort; the outcome is returned for the log.
 pub async fn boot_network_best_effort(pool: &DbPool, id: Uuid) -> String {
+    let prepared = prepare_boot_network(pool, id).await;
+    // The override only matters at the next boot: a machine that is on is reset, one that is
+    // off is powered on, so provisioning needs no separate power step. A machine that cannot
+    // be reached by BMC is left to the operator (the note says so).
+    if matches!(
+        std::env::var("MACHINA_METAL_NO_AUTO_POWER").ok().as_deref(),
+        Some("1" | "true" | "yes")
+    ) || prepared.contains("failed")
+        || prepared.contains("skipped")
+        || prepared.starts_with("no BMC")
+    {
+        return prepared;
+    }
+    match load_bmc(pool, id).await {
+        Ok(Some(c)) => match super::baremetal_bmc::power(&c.target(), PowerAction::Cycle).await {
+            Ok(m) => format!("{prepared}; {m}"),
+            Err(e) => format!("{prepared}; power step failed: {e}"),
+        },
+        _ => prepared,
+    }
+}
+
+async fn prepare_boot_network(pool: &DbPool, id: Uuid) -> String {
     let method = boot_method_of(pool, id).await;
     if !method.starts_with("virtual_media") {
         return set_boot_best_effort(pool, id, BootDevice::Pxe).await;
