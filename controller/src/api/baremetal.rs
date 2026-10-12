@@ -10,7 +10,7 @@ use crate::api::ApiError;
 use crate::auth::{require_admin, require_operator, AuthUser};
 use crate::engine::{
     baremetal, baremetal_alloc, baremetal_boot, baremetal_deploy, baremetal_images,
-    baremetal_lifecycle,
+    baremetal_lifecycle, baremetal_profiles,
 };
 use crate::state::AppState;
 
@@ -499,4 +499,81 @@ pub async fn deploy_complete(
         .await
         .map_err(|e| ApiError::forbidden(e.to_string()))?;
     Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+pub async fn list_profiles(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+) -> Result<Json<Vec<baremetal_profiles::Profile>>, ApiError> {
+    require_operator(&actor)?;
+    baremetal_profiles::list(&state.pool)
+        .await
+        .map_err(|e| ApiError::internal(e.to_string()))
+        .map(Json)
+}
+
+pub async fn put_profile(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Json(body): Json<baremetal_profiles::ProfileBody>,
+) -> Result<Json<baremetal_profiles::Profile>, ApiError> {
+    require_admin(&actor)?;
+    baremetal_profiles::upsert(&state.pool, &body)
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))
+        .map(Json)
+}
+
+pub async fn delete_profile(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(name): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&actor)?;
+    baremetal_profiles::delete(&state.pool, &name)
+        .await
+        .map_err(|e| ApiError::not_found(e.to_string()))?;
+    Ok(Json(serde_json::json!({ "deleted": name })))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ProvisionBody {
+    pub profile: String,
+    #[serde(default = "one")]
+    pub count: usize,
+}
+
+fn one() -> usize {
+    1
+}
+
+/// Allocate and deploy `count` machines for a profile in one call.
+pub async fn provision(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Json(body): Json<ProvisionBody>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&actor)?;
+    if body.count == 0 || body.count > 100 {
+        return Err(ApiError::bad_request("count must be between 1 and 100"));
+    }
+    let base = state
+        .config
+        .public_base_url
+        .trim_end_matches('/')
+        .to_string();
+    let (started, stopped) = baremetal_profiles::provision(
+        &state.pool,
+        &body.profile,
+        body.count,
+        &actor.username,
+        &base,
+    )
+    .await
+    .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    Ok(Json(serde_json::json!({
+        "requested": body.count,
+        "started": started,
+        "stopped_because": stopped,
+    })))
 }

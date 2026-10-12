@@ -14,6 +14,7 @@ pub mod baremetal_boot;
 pub mod baremetal_deploy;
 pub mod baremetal_images;
 pub mod baremetal_lifecycle;
+pub mod baremetal_profiles;
 pub mod bpf;
 pub mod cert_monitor;
 pub mod channel_worker;

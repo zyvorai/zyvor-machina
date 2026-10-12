@@ -685,6 +685,15 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/baremetal/boot/dnsmasq.conf", get(baremetal::boot_dnsmasq))
         .route("/api/v1/baremetal/allocate", post(baremetal::allocate))
         .route(
+            "/api/v1/baremetal/profiles",
+            get(baremetal::list_profiles).put(baremetal::put_profile),
+        )
+        .route(
+            "/api/v1/baremetal/profiles/{name}",
+            axum::routing::delete(baremetal::delete_profile),
+        )
+        .route("/api/v1/baremetal/provision", post(baremetal::provision))
+        .route(
             "/api/v1/baremetal/images",
             get(baremetal::list_images).post(baremetal::import_image),
         )

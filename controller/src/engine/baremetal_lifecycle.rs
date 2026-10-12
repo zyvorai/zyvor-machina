@@ -237,6 +237,40 @@ pub async fn accept_report(
     Ok(to)
 }
 
+pub fn auto_enroll_enabled() -> bool {
+    matches!(
+        std::env::var("MACHINA_METAL_AUTO_ENROLL").ok().as_deref(),
+        Some("1" | "true" | "yes")
+    )
+}
+
+/// An unknown MAC PXE-booted with auto-enroll on: record it as `new` (named from the MAC,
+/// no BMC details yet) and start commissioning. At most one row per MAC, even when two
+/// requests race. Returns the new server's id, or `None` if the MAC is already known.
+pub async fn auto_enroll(pool: &DbPool, mac: &str) -> anyhow::Result<Option<Uuid>> {
+    let Some(mac) = super::baremetal_boot::normalize_mac(mac) else {
+        return Ok(None);
+    };
+    let id = Uuid::new_v4();
+    let host = format!("metal-{}", mac.replace(':', ""));
+    let res = crate::db::query(
+        "INSERT INTO baremetal_servers (id, hostname, bmc_type, state, mac_address)
+         SELECT ?, ?, 'redfish', 'discovered', ?
+         WHERE NOT EXISTS (SELECT 1 FROM baremetal_servers WHERE mac_address = ?)",
+    )
+    .bind(id)
+    .bind(host)
+    .bind(&mac)
+    .bind(&mac)
+    .execute(pool)
+    .await?;
+    if res.rows_affected() == 0 {
+        return Ok(None);
+    }
+    begin_commissioning(pool, id).await?;
+    Ok(Some(id))
+}
+
 /// A PXE-booting machine asks what to boot. Only a server that is being commissioned and
 /// whose MAC is registered gets an image; it receives a fresh one-time token (the issued
 /// one is stored hashed, so it cannot be put in a boot script). Anything else boots from disk.
@@ -244,12 +278,15 @@ pub async fn boot_target(pool: &DbPool, mac: &str) -> anyhow::Result<Option<(Uui
     let Some(mac) = super::baremetal_boot::normalize_mac(mac) else {
         return Ok(None);
     };
-    let id: Option<Uuid> = crate::db::query_scalar(
+    let mut id: Option<Uuid> = crate::db::query_scalar(
         "SELECT id FROM baremetal_servers WHERE mac_address = ? AND lifecycle = 'commissioning'",
     )
     .bind(&mac)
     .fetch_optional(pool)
     .await?;
+    if id.is_none() && auto_enroll_enabled() {
+        id = auto_enroll(pool, &mac).await?;
+    }
     let Some(id) = id else { return Ok(None) };
     let token = new_token();
     crate::db::query(
@@ -377,6 +414,35 @@ mod tests {
             .await
             .unwrap()
             .is_none());
+    }
+
+    #[tokio::test]
+    async fn auto_enroll_creates_one_commissioning_row_per_mac() {
+        let pool = crate::db::testing::pool().await;
+        let id = auto_enroll(&pool, "AA-BB-CC-DD-EE-01")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(auto_enroll(&pool, "aa:bb:cc:dd:ee:01")
+            .await
+            .unwrap()
+            .is_none());
+        assert!(auto_enroll(&pool, "garbage").await.unwrap().is_none());
+        let (host, lc, mac): (String, String, String) = crate::db::query_as(
+            "SELECT hostname, lifecycle, mac_address FROM baremetal_servers WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(host, "metal-aabbccddee01");
+        assert_eq!(lc, "commissioning");
+        assert_eq!(mac, "aa:bb:cc:dd:ee:01");
+        let n: i64 = crate::db::query_scalar("SELECT COUNT(*) FROM baremetal_servers")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(n, 1);
     }
 
     #[tokio::test]

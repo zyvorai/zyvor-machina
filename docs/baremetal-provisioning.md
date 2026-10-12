@@ -186,6 +186,30 @@ and have been commissioned (the inventory picks the disk).
 
 The image must contain cloud-init (all catalog images do).
 
+## Profiles, one-step provisioning and auto-enroll
+
+A profile is "what a machine of this kind gets": image, SSH keys, zone, minimum size.
+
+```
+machinactl metal profile add web --image ubuntu-26.04 --key "ssh-ed25519 AAAA… ops" --zone rack2 --cores 16
+machinactl metal provision --profile web --count 8     # allocate 8 ready machines and deploy each
+machinactl metal profile add web --image ubuntu-26.04 --key … --auto --count 8   # keep 8 deployed
+```
+
+- `provision` allocates the smallest ready machine that fits (as `allocate` does), deploys
+  it, and stops at the first shortage, reporting how many started and why it stopped.
+  A machine whose deploy cannot start is returned to `ready`.
+- With `auto_deploy` and a `desired_count`, the leader checks every
+  `MACHINA_METAL_AUTODEPLOY_SECS` (default 60, `0` = off) and tops up to the desired count
+  as machines become `ready`, at most 10 per pass. Machines allocated, deploying or
+  deployed under the profile count toward it.
+- **Auto-enroll** (`MACHINA_METAL_AUTO_ENROLL=1`, off by default): a PXE-booting machine
+  with an unknown MAC is recorded as `metal-<mac>` and commissioned straight away, so a
+  newly racked machine reaches `ready` with no registration. It has no BMC details yet,
+  so power calls are refused until you set them. With it on, any machine that can reach
+  the boot service and PXE-boots is enrolled and its hardware report accepted: enable it
+  only on a provisioning network you control.
+
 ## CLI and UI
 
 ```

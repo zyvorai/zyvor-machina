@@ -22,6 +22,10 @@ machinactl metal <command>
   image add NAME [--url U --checksum HEX|--sums-url U] [--algo sha256|sha512]
                                            NAME alone imports a catalog image (ubuntu-26.04, ...)
   image rm NAME
+  profile list|add|rm                      Deploy profiles
+  profile add NAME --image IMG --key "ssh-ed25519 …" [--zone Z] [--cores N] [--memory-mib N]
+                    [--timezone TZ] [--auto --count N]
+  provision --profile NAME [--count N]     Allocate and deploy N machines in one step
   zones                                    Servers per zone
   dnsmasq --subnet CIDR-NET [--interface IF] [--tftp-root DIR]
                                            dnsmasq.conf for a site's boot host
@@ -155,6 +159,60 @@ metal_main() {
                     ;;
                 *) np_die "usage: metal image list|catalog|add|rm" ;;
             esac
+            ;;
+        profile | profiles)
+            local psub="${1:-list}"
+            shift || true
+            case "$psub" in
+                list | ls)
+                    np_api GET /baremetal/profiles | jq -r '
+                      (["NAME","IMAGE","ZONE","MIN_CORES","MIN_MEM_MIB","AUTO","COUNT"] | @tsv),
+                      (.[] | [.name, .image, .zone, .min_cpu_cores, .min_memory_mib, .auto_deploy, .desired_count] | @tsv)' |
+                        column -t -s $'\t'
+                    ;;
+                add)
+                    local name="${1:-}" image="" zone="" cores=0 mem=0 tz=UTC auto=false count=0 keys=()
+                    [[ -n "$name" ]] || np_die "usage: metal profile add NAME --image IMG --key KEY"
+                    shift
+                    while [[ $# -gt 0 ]]; do
+                        case "$1" in
+                            --image) image=${2:-}; shift 2 ;;
+                            --key) keys+=("${2:-}"); shift 2 ;;
+                            --zone) zone=${2:-}; shift 2 ;;
+                            --cores) cores=${2:-0}; shift 2 ;;
+                            --memory-mib) mem=${2:-0}; shift 2 ;;
+                            --timezone) tz=${2:-}; shift 2 ;;
+                            --auto) auto=true; shift ;;
+                            --count) count=${2:-0}; shift 2 ;;
+                            *) np_die "unknown option $1" ;;
+                        esac
+                    done
+                    [[ -n "$image" && ${#keys[@]} -gt 0 ]] || np_die "profile add needs --image and at least one --key"
+                    printf '%s\n' "${keys[@]}" | jq -R . | jq -s --arg n "$name" --arg i "$image" --arg z "$zone" \
+                        --argjson c "$cores" --argjson m "$mem" --arg t "$tz" --argjson a "$auto" --argjson k "$count" \
+                        '{name:$n, image:$i, ssh_keys:., zone:$z, min_cpu_cores:$c, min_memory_mib:$m,
+                          timezone:$t, auto_deploy:$a, desired_count:$k}' |
+                        np_api PUT /baremetal/profiles -H 'Content-Type: application/json' --data-binary @- | jq .
+                    ;;
+                rm | delete)
+                    [[ -n "${1:-}" ]] || np_die "usage: metal profile rm NAME"
+                    np_api DELETE "/baremetal/profiles/$1" | jq .
+                    ;;
+                *) np_die "usage: metal profile list|add|rm" ;;
+            esac
+            ;;
+        provision)
+            local prof="" count=1
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --profile) prof=${2:-}; shift 2 ;;
+                    --count) count=${2:-1}; shift 2 ;;
+                    *) np_die "unknown option $1" ;;
+                esac
+            done
+            [[ -n "$prof" ]] || np_die "usage: metal provision --profile NAME [--count N]"
+            jq -n --arg p "$prof" --argjson c "$count" '{profile:$p, count:$c}' |
+                np_api POST /baremetal/provision -H 'Content-Type: application/json' --data-binary @- | jq .
             ;;
         zones)
             np_api GET /baremetal/zones | jq -r '
