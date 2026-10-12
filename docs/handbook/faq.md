@@ -6,6 +6,30 @@
 
 ---
 
+## Bare-metal provisioning
+
+**Can Machina install machines that have no OS yet?**
+Yes, from a BMC address to a joined host: it discovers or imports the BMCs, commissions
+the machines over the network (or BMC virtual media), keeps a pool by zone, writes a
+checksum-verified OS image (Ubuntu, Debian, Rocky, AlmaLinux) to the right disk, and the
+machine joins on first boot with its site, tags, networks and pools. Guide:
+[baremetal-provisioning.md](../baremetal-provisioning.md).
+
+**Does it need PXE?**
+No. PXE (proxyDHCP + TFTP beside your DHCP server) is one way; a Redfish BMC can mount a
+small iPXE ISO as virtual media instead, which needs only DHCP on the machine's network.
+
+**Is it tested on real servers?**
+Not yet. The flow has run end to end on a lab host against VMs and BMC emulators (sushy-tools,
+VirtualBMC). Validate on your hardware before relying on it; `docs/claims.md` lists exactly
+what ran.
+
+**Where are BMC passwords kept?**
+Encrypted at rest (AES-256-GCM) when `MACHINA_API_KEY_MASTER_KEY` is set, never returned by
+the API, and passed to `ipmitool` through the environment.
+
+---
+
 ## Product & concepts
 
 **Q1. What is Machina?**

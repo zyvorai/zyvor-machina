@@ -301,6 +301,47 @@ Frontend polls `/api/v1/tasks/{task_id}`.
 
 ---
 
+## Bare-metal provisioning (Metal as a Service)
+
+Controller-side pipeline that takes a machine from a BMC address to a joined host. Guide:
+[docs/baremetal-provisioning.md](docs/baremetal-provisioning.md); verification status:
+`docs/claims.md` C49 to C51.
+
+- **Modules** (`controller/src/engine/`): `baremetal.rs` (registry, `load_bmc`, power state,
+  boot override, virtual-media helpers, BMC poll), `baremetal_bmc.rs` (drivers: Redfish
+  client with retries/async tasks, IPMI via `ipmitool`, libvirt for labs, fake; the Redfish
+  read model; virtual media), `baremetal_lifecycle.rs` (state machine, single-use
+  commissioning token, inventory, auto-enrol), `baremetal_boot.rs` (dnsmasq proxyDHCP and
+  iPXE script rendering, embeds `contrib/metal/deploy.sh`), `baremetal_images.rs` (verified
+  image catalog), `baremetal_alloc.rs`, `baremetal_deploy.rs` (installer and image deploy),
+  `baremetal_profiles.rs` (profiles, one-step provision, top-up loop), `baremetal_discover.rs`
+  (BMC scan, bulk import), `host_post_join.rs` (networks and pools named on a token);
+  `controller/src/baremetal_sol.rs` (serial-over-LAN WebSocket). Routes are in
+  `api/baremetal.rs`, registered in `api/mod.rs`; boot/plan/report routes are public by design
+  (token-gated) and also on `enrollment_router`.
+- **Ramdisk and media**: `contrib/mkosi-defs/metal` + `scripts/metal/build-image.sh` (kernel,
+  initrd, squashfs; Linux build host only), `scripts/metal/build-ipxe-iso.sh` (virtual-media
+  ISOs), `contrib/metal/` (`machina-metal-run`, `deploy.sh`), served from `MACHINA_DIST_DIR`
+  by `api/dist.rs`; `machinactl dist publish-metal` keeps their checksums in `SHA256SUMS`.
+- **CLI**: `scripts/lib/metal-ctl.sh` (`machinactl metal ...`), `machinactl bootstrap`,
+  `machinactl host add --file`. Web: `web/src/pages/platform/PlatformBareMetal.tsx`.
+- **Migrations** 074 to 083 (pairs): BMC credentials, lifecycle, allocation, deployments,
+  images, written marker, profiles, token labels, BMC info, boot method.
+- **Rules that bit before**: BMC passwords are stored with `crypto::store_api_key` and read
+  with `load_api_key` (never log them; `ipmitool` gets `IPMI_PASSWORD`, not argv);
+  validate any address/user before it reaches a command line; deploys need the pinned TLS
+  join listener (a plain-http join leaves the agent serving on loopback); power calls are
+  idempotent and a boot override is followed by a power step; the libvirt BMC driver only
+  touches `metal-test-*` domains.
+- **Testing**: unit tests use a local mock Redfish server and a fake BMC for credentials
+  (see `baremetal_bmc.rs`, `baremetal_discover.rs`); end to end on a lab host with
+  sushy-tools (`quay.io/metal3-io/sushy-tools`, restrict `SUSHY_EMULATOR_ALLOWED_INSTANCES`)
+  and VirtualBMC (`quay.io/metal3-io/vbmc`) against throwaway `metal-test-*` VMs. Never
+  point a test at a real BMC or an existing VM, and never `rustfmt` a `mod.rs` (it
+  reformats every module it declares).
+
+---
+
 ## Extra Environment Variables
 
 **Controller**:

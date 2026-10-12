@@ -312,6 +312,8 @@ TLS is active only when `enabled=true` **and** both paths are non-empty.
 | `MACHINA_METAL_AUTO_ENROLL` | Controller: `1` records an unknown PXE-booting MAC as a bare-metal server and commissions it (default off; enable only on a provisioning network you control) | off |
 | `MACHINA_METAL_AUTODEPLOY_SECS` | Controller: seconds between bare-metal auto-deploy passes that top profiles up to their desired count (`0` = off) | 60 |
 | `MACHINA_METAL_IMAGE_MAX_BYTES` | Controller: largest OS image an import may download | 20 GiB |
+| `MACHINA_BMC_LIBVIRT_URI` / `MACHINA_BMC_LIBVIRT_PREFIX` / `MACHINA_BMC_LIBVIRT_ANY` | Controller, lab only: libvirt URI for `bmc_type=libvirt` servers (default `qemu:///system`); the domain-name prefix a libvirt "BMC" may touch (default `metal-test-`); `1` allows any domain | see description |
+| `MACHINA_IPMITOOL` | Controller: `ipmitool` binary used for IPMI power and the serial-over-LAN console | `ipmitool` |
 | `MACHINA_ENV_FILE` | `machinactl bootstrap`: env file to update (default `/etc/default/machina-platform`) | default |
 | `MACHINA_DB_MAX_CONNECTIONS` | PostgreSQL pool size | `20` (PostgreSQL build only) |
 | `NATS_URL` | Enables NATS task fan-out | `nats://127.0.0.1:4222` (optional) |

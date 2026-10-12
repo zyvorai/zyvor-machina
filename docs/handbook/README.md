@@ -97,6 +97,7 @@ See the full matrix in [admin-configuration.md](admin-configuration.md#1-deploym
 | [Administration & Configuration](admin-configuration.md) | Deploy/run models, ports, full `config.toml` + env-var reference, auth/RBAC, TLS, building from source, production checklist. |
 | [FAQ](faq.md) | 30+ real questions on auth, ports, deploy, VMs, consoles, backups, integrations. |
 | [Troubleshooting](troubleshooting.md) | Symptom-indexed fixes with real diagnostic commands (`machinactl health`, `journalctl`, `virsh`), including native eBPF. |
+| [Bare-metal provisioning](../baremetal-provisioning.md) | BMCs to joined hosts: discovery, commissioning, OS image catalog, image deploy, profiles, virtual media, serial console, join labels; API/CLI reference, security model, troubleshooting, verification status. |
 | [Operator runbook](runbook.md) | Procedures: install/upgrade, backup, sign-in, fleet playbooks (host down, HA, migration), eBPF enforcement and emergency isolation. |
 
 ---

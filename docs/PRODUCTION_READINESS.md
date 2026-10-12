@@ -130,6 +130,10 @@ What remains:
   automatic HA recovery will (correctly) not happen on a hard failure. `ha_allow_unfenced_recovery`
   (cluster setting, default off) is the explicit opt-out for **non-shared-storage** clusters.
   Not yet exercised end-to-end against real IPMI hardware — validate before relying on it.
+  The IPMI driver itself (power state read-back, idempotent power, non-default port, the
+  `cycle` fallback) has since been run through the deployed API against VirtualBMC on a lab
+  host ([claims.md](claims.md) C51), and the fencing password is encrypted at rest when
+  `MACHINA_API_KEY_MASTER_KEY` is set; neither replaces a test on your BMC.
 - **Migration/evacuation source-undefine — FIXED.** Maintenance evacuation and DRS rebalance
   now pass `undefine_source: true`, so the source domain is undefined on successful migration
   (libvirt does this atomically only on success) and can't autostart on the source while running
