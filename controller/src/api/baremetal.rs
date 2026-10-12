@@ -9,8 +9,8 @@ use serde::Deserialize;
 use crate::api::ApiError;
 use crate::auth::{require_admin, require_operator, AuthUser};
 use crate::engine::{
-    baremetal, baremetal_alloc, baremetal_boot, baremetal_deploy, baremetal_images,
-    baremetal_lifecycle, baremetal_profiles,
+    baremetal, baremetal_alloc, baremetal_boot, baremetal_deploy, baremetal_discover,
+    baremetal_images, baremetal_lifecycle, baremetal_profiles,
 };
 use crate::state::AppState;
 
@@ -655,4 +655,87 @@ pub async fn get_bmc_info(
             "no BMC details yet; POST .../bmc-info/refresh",
         )),
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DiscoverBody {
+    pub cidr: String,
+    #[serde(default)]
+    pub credentials: Vec<baremetal_discover::Credential>,
+    #[serde(default = "https")]
+    pub scheme: String,
+    #[serde(default)]
+    pub port: Option<u16>,
+    /// Register the BMCs that accepted a credential.
+    #[serde(default)]
+    pub import: bool,
+    #[serde(default = "bmc_prefix")]
+    pub hostname_prefix: String,
+    #[serde(default)]
+    pub zone: String,
+}
+
+fn https() -> String {
+    "https".into()
+}
+
+fn bmc_prefix() -> String {
+    "bmc-".into()
+}
+
+/// Scan a management range for Redfish BMCs, optionally registering the ones that accept a
+/// credential. At most 3 credentials are tried per BMC (account lockout), 512 addresses.
+pub async fn discover(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Json(body): Json<DiscoverBody>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&actor)?;
+    let found =
+        baremetal_discover::discover(&body.cidr, &body.credentials, &body.scheme, body.port)
+            .await
+            .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    let imported = if body.import {
+        baremetal_discover::import_discovered(
+            &state.pool,
+            &found,
+            &body.credentials,
+            &body.scheme,
+            &body.hostname_prefix,
+            &body.zone,
+        )
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))?
+    } else {
+        Vec::new()
+    };
+    Ok(Json(serde_json::json!({
+        "found": found,
+        "authenticated": found.iter().filter(|d| d.credential_index.is_some()).count(),
+        "imported": imported,
+    })))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ImportBody {
+    pub servers: Vec<baremetal::RegisterBaremetalBody>,
+}
+
+/// Register many servers at once; existing ones are skipped.
+pub async fn import_servers(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Json(body): Json<ImportBody>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&actor)?;
+    let rows = baremetal_discover::bulk_import(&state.pool, body.servers)
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    let count = |s: &str| rows.iter().filter(|r| r.status == s).count();
+    Ok(Json(serde_json::json!({
+        "created": count("created"),
+        "exists": count("exists"),
+        "errors": count("error"),
+        "rows": rows,
+    })))
 }
