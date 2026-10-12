@@ -601,7 +601,7 @@ What has actually run (details and exact wording in [claims.md](claims.md)):
 | PXE → commission → ready | VM, real iPXE, real ramdisk | physical NICs and firmware |
 | Image deploy and join | VM (BIOS and UEFI firmware): Ubuntu 26.04 written, booted, joined over pinned TLS, validated | physical disks and firmware |
 | Image catalog | 7 catalog images imported and checksum-verified (BSD layout, SHA-512) | `ubuntu-26.04-arm64` |
-| `bootstrap`, `host add --file --parallel`, labels, post-join networks and pools | two VMs and one VM | the offline bundle `--join`; a failure after SSH succeeds |
+| `bootstrap`, `host add --file --parallel`, labels, post-join networks and pools, offline bundle `--join`, a join that fails after SSH succeeds (token revoked, exit 1) | VMs | real nodes with real networks |
 | Serial console | pty round trip with a stand-in `ipmitool` | the WebSocket in a browser; a real BMC's SOL |
 | Auto-enrol, `bmc-set`, profile top-up | two empty VMs: enrolled, commissioned, BMC attached, deployed by an `auto_deploy` profile, joined | with physical machines |
 | Web panels (servers, images, profiles, BMC details, register form) | typecheck and 11 component tests with a mocked API (`PlatformBareMetal.test.tsx`) | in a browser |
