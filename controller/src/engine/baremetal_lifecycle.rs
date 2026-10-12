@@ -237,6 +237,32 @@ pub async fn accept_report(
     Ok(to)
 }
 
+/// A PXE-booting machine asks what to boot. Only a server that is being commissioned and
+/// whose MAC is registered gets an image; it receives a fresh one-time token (the issued
+/// one is stored hashed, so it cannot be put in a boot script). Anything else boots from disk.
+pub async fn boot_target(pool: &DbPool, mac: &str) -> anyhow::Result<Option<(Uuid, String)>> {
+    let Some(mac) = super::baremetal_boot::normalize_mac(mac) else {
+        return Ok(None);
+    };
+    let id: Option<Uuid> = crate::db::query_scalar(
+        "SELECT id FROM baremetal_servers WHERE mac_address = ? AND lifecycle = 'commissioning'",
+    )
+    .bind(&mac)
+    .fetch_optional(pool)
+    .await?;
+    let Some(id) = id else { return Ok(None) };
+    let token = new_token();
+    crate::db::query(
+        "UPDATE baremetal_servers SET commission_token_hash = ?
+         WHERE id = ? AND lifecycle = 'commissioning'",
+    )
+    .bind(token_hash(&token))
+    .bind(id)
+    .execute(pool)
+    .await?;
+    Ok(Some((id, token)))
+}
+
 pub async fn inventory(pool: &DbPool, id: Uuid) -> anyhow::Result<Option<Value>> {
     let row: Option<(String,)> =
         crate::db::query_as("SELECT report_json FROM baremetal_inventory WHERE server_id = ?")
@@ -316,6 +342,41 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(cores, 8);
+    }
+
+    #[tokio::test]
+    async fn boot_target_serves_only_a_commissioning_machine_by_mac() {
+        let pool = crate::db::testing::pool().await;
+        let id = server(&pool).await;
+        crate::db::query(
+            "UPDATE baremetal_servers SET mac_address = 'aa:bb:cc:dd:ee:ff' WHERE id = ?",
+        )
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert!(boot_target(&pool, "AA-BB-CC-DD-EE-FF")
+            .await
+            .unwrap()
+            .is_none());
+        begin_commissioning(&pool, id).await.unwrap();
+        let (got, token) = boot_target(&pool, "AA-BB-CC-DD-EE-FF")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(got, id);
+        assert!(boot_target(&pool, "11:22:33:44:55:66")
+            .await
+            .unwrap()
+            .is_none());
+        assert!(boot_target(&pool, "nonsense").await.unwrap().is_none());
+        // The minted token is the one that now works.
+        let r = accept_report(&pool, id, &token, &json!({})).await.unwrap();
+        assert_eq!(r, Lifecycle::Ready);
+        assert!(boot_target(&pool, "aa:bb:cc:dd:ee:ff")
+            .await
+            .unwrap()
+            .is_none());
     }
 
     #[tokio::test]

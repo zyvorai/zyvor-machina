@@ -67,10 +67,39 @@ The report is a JSON object: `cpu_cores`, `memory_mib`, `disks[]`, `nics[]`, `dm
 to `ready`; its cores and memory are copied onto the server. The token is single-use,
 only its SHA-256 is stored, and the report is limited to 256 KiB.
 
+## Network boot
+
+The controller renders the pieces; a site's boot host runs them.
+
+```
+GET /api/v1/baremetal/boot/dnsmasq.conf?subnet=10.20.0.0&tftp_root=/srv/tftp&interface=eth1  (admin)
+GET /api/v1/baremetal/boot/ipxe?mac=aa:bb:cc:dd:ee:ff     (no login: iPXE fetches it)
+GET /api/v1/baremetal/boot/commission.sh                  (no login: the image runs it)
+```
+
+- `dnsmasq.conf` is proxyDHCP + TFTP (`port=0`, `dhcp-range=<subnet>,proxy`). It never
+  hands out addresses, so it sits beside the site's DHCP server. Plain PXE clients get
+  `undionly.kpxe` / `ipxe.efi` / `ipxe-arm64.efi` from `tftp_root` (you supply those
+  iPXE binaries); iPXE clients are chained to `/boot/ipxe`.
+- `/boot/ipxe` serves the commissioning image only to a MAC registered on a server that
+  is in `commissioning`, with a fresh one-time token in the kernel command line. Any
+  other machine gets `exit` and boots its own disk. Anyone on the provisioning network
+  who knows a commissioning machine's MAC can fetch that script, as with any PXE
+  setup: keep the provisioning VLAN to the machines being provisioned (the
+  `BareMetalPxe` firewall profile).
+- The image is three files in `MACHINA_DIST_DIR`, served from `/dist/`:
+  `metal-vmlinuz`, `metal-initrd`, `metal-rootfs.squashfs`. The rootfs needs `python3`
+  and `lsblk`. `commission.sh --print` prints the report without posting it.
+- The commissioning script reports CPU, memory, disks (name, size, rotational, model,
+  serial), NICs (MAC, link, speed), DMI vendor/product/serial/BIOS and four basic
+  tests (cpu, memory, disks, network). It does not run a memory or disk burn-in.
+
+Register the PXE NIC's MAC with `mac_address` (and `zone`) on the server.
+
 ## Not done yet
 
-1. Boot service (proxyDHCP, TFTP, iPXE/HTTP boot) on a site agent.
-2. Commissioning image that produces the report above.
+1. A commissioning image build (kernel, initrd, rootfs). The script and the contract
+   are here; the image is not built or shipped.
 3. Zones, allocation, autoinstall/kickstart rendering, first-boot join through the
    existing enrollment token.
 4. Moving `hosts.ipmi_password` (fencing) to the same encrypted storage.

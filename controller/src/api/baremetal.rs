@@ -8,7 +8,7 @@ use serde::Deserialize;
 
 use crate::api::ApiError;
 use crate::auth::{require_admin, require_operator, AuthUser};
-use crate::engine::{baremetal, baremetal_lifecycle};
+use crate::engine::{baremetal, baremetal_boot, baremetal_lifecycle};
 use crate::state::AppState;
 
 pub async fn list_servers(
@@ -164,4 +164,81 @@ pub async fn commissioning_report(
         .await
         .map_err(|e| ApiError::forbidden(e.to_string()))?;
     Ok(Json(serde_json::json!({ "lifecycle": to.as_str() })))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BootQuery {
+    #[serde(default)]
+    pub mac: String,
+}
+
+fn text(body: String) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    (
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; charset=utf-8",
+        )],
+        body,
+    )
+        .into_response()
+}
+
+/// iPXE fetches this after chain-loading. A registered machine in `commissioning`
+/// boots the commissioning image; everything else is told to exit to its own disk.
+pub async fn boot_ipxe(
+    State(state): State<AppState>,
+    axum::extract::Query(q): axum::extract::Query<BootQuery>,
+) -> Result<axum::response::Response, ApiError> {
+    let base = state
+        .config
+        .public_base_url
+        .trim_end_matches('/')
+        .to_string();
+    match baremetal_lifecycle::boot_target(&state.pool, &q.mac)
+        .await
+        .map_err(|e| ApiError::internal(e.to_string()))?
+    {
+        Some((id, token)) => Ok(text(baremetal_boot::ipxe_commission_script(
+            &base,
+            id,
+            &token,
+            &format!("{base}/dist"),
+        ))),
+        None => Ok(text(baremetal_boot::ipxe_exit_script().to_string())),
+    }
+}
+
+pub async fn boot_commission_script() -> axum::response::Response {
+    text(baremetal_boot::COMMISSION_SCRIPT.to_string())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DnsmasqQuery {
+    pub subnet: String,
+    #[serde(default = "default_tftp_root")]
+    pub tftp_root: String,
+    #[serde(default)]
+    pub interface: String,
+}
+
+fn default_tftp_root() -> String {
+    "/srv/tftp".into()
+}
+
+/// The dnsmasq configuration for a site's boot host.
+pub async fn boot_dnsmasq(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    axum::extract::Query(q): axum::extract::Query<DnsmasqQuery>,
+) -> Result<axum::response::Response, ApiError> {
+    require_admin(&actor)?;
+    let conf = baremetal_boot::dnsmasq_conf(&baremetal_boot::BootConfig {
+        subnet: &q.subnet,
+        tftp_root: &q.tftp_root,
+        controller_url: &state.config.public_base_url,
+        interface: &q.interface,
+    })
+    .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    Ok(text(conf))
 }

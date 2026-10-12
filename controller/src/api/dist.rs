@@ -17,7 +17,15 @@ pub const FILES: &[&str] = &[
     "machina-agent.service",
     "machina-bpfd.service",
     "SHA256SUMS",
+    // Commissioning image for bare-metal PXE boot (large: streamed, not read into memory).
+    "metal-vmlinuz",
+    "metal-initrd",
+    "metal-rootfs.squashfs",
 ];
+
+fn is_large(name: &str) -> bool {
+    name.starts_with("metal-")
+}
 
 pub fn dir() -> std::path::PathBuf {
     std::env::var_os("MACHINA_DIST_DIR")
@@ -32,6 +40,33 @@ pub fn allowed(name: &str) -> bool {
 pub async fn serve(Path(name): Path<String>) -> Response {
     if !allowed(&name) {
         return (StatusCode::NOT_FOUND, "not found").into_response();
+    }
+    if is_large(&name) {
+        return match tokio::fs::File::open(dir().join(&name)).await {
+            Ok(f) => {
+                use tokio::io::AsyncReadExt;
+                let stream = futures_util::stream::unfold(f, |mut f| async move {
+                    let mut buf = vec![0u8; 256 * 1024];
+                    match f.read(&mut buf).await {
+                        Ok(0) | Err(_) => None,
+                        Ok(n) => {
+                            buf.truncate(n);
+                            Some((Ok::<_, std::io::Error>(bytes::Bytes::from(buf)), f))
+                        }
+                    }
+                });
+                (
+                    [(header::CONTENT_TYPE, "application/octet-stream")],
+                    Body::from_stream(stream),
+                )
+                    .into_response()
+            }
+            Err(_) => (
+                StatusCode::NOT_FOUND,
+                "commissioning image not published: copy it to MACHINA_DIST_DIR",
+            )
+                .into_response(),
+        };
     }
     match tokio::fs::read(dir().join(&name)).await {
         Ok(bytes) => (

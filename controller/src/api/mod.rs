@@ -682,6 +682,7 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/baremetal/servers/{id}/inventory",
             get(baremetal::server_inventory),
         )
+        .route("/api/v1/baremetal/boot/dnsmasq.conf", get(baremetal::boot_dnsmasq))
         .route(
             "/api/v1/baremetal/servers/{id}/provision",
             get(baremetal::server_provision),
@@ -2083,6 +2084,11 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/baremetal/commissioning/{id}/report",
             post(baremetal::commissioning_report),
+        )
+        .route("/api/v1/baremetal/boot/ipxe", get(baremetal::boot_ipxe))
+        .route(
+            "/api/v1/baremetal/boot/commission.sh",
+            get(baremetal::boot_commission_script),
         )
         .route("/api/v1/auth/login", post(crate::auth::login))
         .route("/ec2", post(ec2::query))

@@ -25,6 +25,10 @@ pub struct BaremetalServer {
     pub bmc_credentials_configured: bool,
     /// Outcome of the last failed live BMC call; empty when it succeeded.
     pub last_error: String,
+    /// new, commissioning, ready, allocated, deploying, deployed, retired or failed.
+    pub lifecycle: String,
+    pub zone: String,
+    pub mac_address: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -50,6 +54,11 @@ pub struct RegisterBaremetalBody {
     pub bmc_username: String,
     #[serde(default)]
     pub bmc_password: String,
+    /// MAC of the NIC the machine PXE-boots from; matches it to this record.
+    #[serde(default)]
+    pub mac_address: String,
+    #[serde(default)]
+    pub zone: String,
 }
 
 fn default_bmc_type() -> String {
@@ -77,7 +86,8 @@ pub async fn list_servers(pool: &DbPool) -> anyhow::Result<Vec<BaremetalServer>>
     let rows = crate::db::query_as::<_, BaremetalServer>(
         "SELECT id, hostname, bmc_address, bmc_type, state, cpu_cores, memory_mib,
                 firewall_profile, firewall_enabled, bmc_vlan, pxe_vlan, created_at,
-                (bmc_password_enc <> '') AS bmc_credentials_configured, last_error
+                (bmc_password_enc <> '') AS bmc_credentials_configured, last_error,
+                lifecycle, zone, mac_address
          FROM baremetal_servers ORDER BY hostname",
     )
     .fetch_all(pool)
@@ -89,6 +99,12 @@ pub async fn register(
     pool: &DbPool,
     body: &RegisterBaremetalBody,
 ) -> anyhow::Result<BaremetalServer> {
+    let mac = if body.mac_address.trim().is_empty() {
+        String::new()
+    } else {
+        super::baremetal_boot::normalize_mac(&body.mac_address)
+            .ok_or_else(|| anyhow::anyhow!("mac_address is not a MAC address"))?
+    };
     let kind = BmcKind::parse(&body.bmc_type)?;
     if kind != BmcKind::Fake && !body.bmc_address.trim().is_empty() {
         validate_address(&body.bmc_address)?;
@@ -103,8 +119,8 @@ pub async fn register(
         "INSERT INTO baremetal_servers
          (id, hostname, bmc_address, bmc_type, cpu_cores, memory_mib, state,
           firewall_profile, firewall_enabled, bmc_vlan, pxe_vlan,
-          bmc_username, bmc_password_enc)
-         VALUES (?, ?, ?, ?, ?, ?, 'registered', ?, ?, ?, ?, ?, ?)",
+          bmc_username, bmc_password_enc, mac_address, zone)
+         VALUES (?, ?, ?, ?, ?, ?, 'registered', ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(id)
     .bind(body.hostname.trim())
@@ -118,6 +134,8 @@ pub async fn register(
     .bind(body.pxe_vlan.trim())
     .bind(body.bmc_username.trim())
     .bind(password_enc)
+    .bind(mac)
+    .bind(body.zone.trim())
     .execute(pool)
     .await?;
 
@@ -131,7 +149,8 @@ pub async fn register(
     crate::db::query_as::<_, BaremetalServer>(
         "SELECT id, hostname, bmc_address, bmc_type, state, cpu_cores, memory_mib,
                 firewall_profile, firewall_enabled, bmc_vlan, pxe_vlan, created_at,
-                (bmc_password_enc <> '') AS bmc_credentials_configured, last_error
+                (bmc_password_enc <> '') AS bmc_credentials_configured, last_error,
+                lifecycle, zone, mac_address
          FROM baremetal_servers WHERE id = ?",
     )
     .bind(id)
@@ -213,7 +232,8 @@ pub async fn set_power(
     let row: BaremetalServer = crate::db::query_as(
         "SELECT id, hostname, bmc_address, bmc_type, state, cpu_cores, memory_mib,
                 firewall_profile, firewall_enabled, bmc_vlan, pxe_vlan, created_at,
-                (bmc_password_enc <> '') AS bmc_credentials_configured, last_error
+                (bmc_password_enc <> '') AS bmc_credentials_configured, last_error,
+                lifecycle, zone, mac_address
          FROM baremetal_servers WHERE id = ?",
     )
     .bind(id)
@@ -316,7 +336,8 @@ pub async fn provision_preview(pool: &DbPool, id: Uuid) -> anyhow::Result<Bareme
     let row: BaremetalServer = crate::db::query_as(
         "SELECT id, hostname, bmc_address, bmc_type, state, cpu_cores, memory_mib,
                 firewall_profile, firewall_enabled, bmc_vlan, pxe_vlan, created_at,
-                (bmc_password_enc <> '') AS bmc_credentials_configured, last_error
+                (bmc_password_enc <> '') AS bmc_credentials_configured, last_error,
+                lifecycle, zone, mac_address
          FROM baremetal_servers WHERE id = ?",
     )
     .bind(id)
@@ -365,6 +386,8 @@ mod tests {
             pxe_vlan: String::new(),
             bmc_username: user.into(),
             bmc_password: pass.into(),
+            mac_address: String::new(),
+            zone: String::new(),
         }
     }
 
