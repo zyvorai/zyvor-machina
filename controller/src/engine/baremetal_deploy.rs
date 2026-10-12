@@ -591,6 +591,8 @@ pub fn ipxe_deploy_script(
     let a = format!("{c}/dist");
     let cfg = format!("{c}/api/v1/baremetal/boot/install/{server_id}/{token}");
     let args = match kind {
+        // Image deploys use `ipxe_image_deploy_script` (the ramdisk), not an installer.
+        InstallKind::Image => String::new(),
         InstallKind::Autoinstall => {
             format!("ip=dhcp autoinstall ds=nocloud-net;s={cfg}/ url={a}/install-{os}.iso")
         }
