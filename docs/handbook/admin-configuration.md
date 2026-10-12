@@ -303,6 +303,8 @@ TLS is active only when `enabled=true` **and** both paths are non-empty.
 | `MACHINA_BPF_LINKER_BASE_URL` | `install.sh`: bpf-linker release download base (default `https://github.com/aya-rs/bpf-linker/releases/download`) | upstream |
 | `MACHINA_BMC_VERIFY_TLS` | Controller: verify Redfish BMC TLS certificates (default off: BMCs ship self-signed certificates) | off |
 | `MACHINA_BMC_CA_FILE` | Controller: PEM bundle of CAs trusted for Redfish BMC certificates (use with `MACHINA_BMC_VERIFY_TLS=1`) | unset |
+| `MACHINA_METAL_IPXE_ISO_URL` | Controller: URL of the iPXE ISO a BMC mounts for `virtual_media` servers (default `$MACHINA_PUBLIC_URL/dist/metal-ipxe.iso`, or `-uefi.iso`) | derived |
+| `MACHINA_METAL_NO_AUTO_POWER` | Controller: `1` stops commissioning and deploy from resetting/powering on the machine through its BMC after setting the boot override (you power it yourself) | off |
 | `MACHINA_METAL_ALLOW_HTTP_JOIN` | Controller: allow a bare-metal deploy to use the plain `http` join command when the TLS join listener is not enabled (lab only; the deployed agent will not become reachable) | off |
 | `MACHINA_BMC_POLL_SECS` | Controller: poll every BMC's real power state this often, in seconds (`0` = off; minimum 30) | 0 |
 | `MACHINA_BMC_SCAN_ANY` | Controller: let `baremetal/discover` scan non-private ranges (default: private ranges only; loopback and link-local are never scanned) | off |

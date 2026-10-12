@@ -695,6 +695,10 @@ pub fn router(state: AppState) -> Router {
             post(baremetal::refresh_bmc_info),
         )
         .route(
+            "/api/v1/baremetal/servers/{id}/virtual-media",
+            post(baremetal::server_virtual_media),
+        )
+        .route(
             "/api/v1/baremetal/servers/{id}/power-state",
             get(baremetal::server_power_state),
         )

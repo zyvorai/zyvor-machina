@@ -21,6 +21,9 @@ pub const FILES: &[&str] = &[
     "metal-vmlinuz",
     "metal-initrd",
     "metal-rootfs.squashfs",
+    // Tiny iPXE ISO the BMC mounts as virtual media (scripts/metal/build-ipxe-iso.sh).
+    "metal-ipxe.iso",
+    "metal-ipxe-uefi.iso",
 ];
 
 fn is_large(name: &str) -> bool {

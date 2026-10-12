@@ -31,6 +31,8 @@ pub struct BaremetalServer {
     pub lifecycle: String,
     pub zone: String,
     pub mac_address: String,
+    /// `pxe` or `virtual_media`.
+    pub boot_method: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -61,6 +63,14 @@ pub struct RegisterBaremetalBody {
     pub mac_address: String,
     #[serde(default)]
     pub zone: String,
+    /// `pxe` (default), `virtual_media` (the BMC mounts the BIOS iPXE ISO) or
+    /// `virtual_media_uefi` (the UEFI one); virtual media needs no DHCP/TFTP.
+    #[serde(default = "default_boot_method")]
+    pub boot_method: String,
+}
+
+fn default_boot_method() -> String {
+    "pxe".into()
 }
 
 fn default_bmc_type() -> String {
@@ -89,7 +99,7 @@ pub async fn list_servers(pool: &DbPool) -> anyhow::Result<Vec<BaremetalServer>>
         "SELECT id, hostname, bmc_address, bmc_type, state, cpu_cores, memory_mib,
                 firewall_profile, firewall_enabled, bmc_vlan, pxe_vlan, created_at,
                 (bmc_password_enc <> '') AS bmc_credentials_configured, last_error,
-                lifecycle, zone, mac_address
+                lifecycle, zone, mac_address, boot_method
          FROM baremetal_servers ORDER BY hostname",
     )
     .fetch_all(pool)
@@ -107,6 +117,12 @@ pub async fn register(
         super::baremetal_boot::normalize_mac(&body.mac_address)
             .ok_or_else(|| anyhow::anyhow!("mac_address is not a MAC address"))?
     };
+    if !matches!(
+        body.boot_method.as_str(),
+        "pxe" | "virtual_media" | "virtual_media_uefi"
+    ) {
+        anyhow::bail!("boot_method must be pxe, virtual_media or virtual_media_uefi");
+    }
     let kind = BmcKind::parse(&body.bmc_type)?;
     if kind != BmcKind::Fake && !body.bmc_address.trim().is_empty() {
         validate_address(&body.bmc_address)?;
@@ -124,8 +140,8 @@ pub async fn register(
         "INSERT INTO baremetal_servers
          (id, hostname, bmc_address, bmc_type, cpu_cores, memory_mib, state,
           firewall_profile, firewall_enabled, bmc_vlan, pxe_vlan,
-          bmc_username, bmc_password_enc, mac_address, zone)
-         VALUES (?, ?, ?, ?, ?, ?, 'registered', ?, ?, ?, ?, ?, ?, ?, ?)",
+          bmc_username, bmc_password_enc, mac_address, zone, boot_method)
+         VALUES (?, ?, ?, ?, ?, ?, 'registered', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(id)
     .bind(body.hostname.trim())
@@ -141,6 +157,7 @@ pub async fn register(
     .bind(password_enc)
     .bind(mac)
     .bind(body.zone.trim())
+    .bind(&body.boot_method)
     .execute(pool)
     .await?;
 
@@ -155,7 +172,7 @@ pub async fn register(
         "SELECT id, hostname, bmc_address, bmc_type, state, cpu_cores, memory_mib,
                 firewall_profile, firewall_enabled, bmc_vlan, pxe_vlan, created_at,
                 (bmc_password_enc <> '') AS bmc_credentials_configured, last_error,
-                lifecycle, zone, mac_address
+                lifecycle, zone, mac_address, boot_method
          FROM baremetal_servers WHERE id = ?",
     )
     .bind(id)
@@ -238,7 +255,7 @@ pub async fn set_power(
         "SELECT id, hostname, bmc_address, bmc_type, state, cpu_cores, memory_mib,
                 firewall_profile, firewall_enabled, bmc_vlan, pxe_vlan, created_at,
                 (bmc_password_enc <> '') AS bmc_credentials_configured, last_error,
-                lifecycle, zone, mac_address
+                lifecycle, zone, mac_address, boot_method
          FROM baremetal_servers WHERE id = ?",
     )
     .bind(id)
@@ -465,6 +482,101 @@ pub async fn set_boot_best_effort(pool: &DbPool, id: Uuid, device: BootDevice) -
     }
 }
 
+/// Where the controller's iPXE ISO is served from, for virtual-media boots.
+pub fn ipxe_iso_url(uefi: bool) -> String {
+    std::env::var("MACHINA_METAL_IPXE_ISO_URL").unwrap_or_else(|_| {
+        let base =
+            std::env::var("MACHINA_PUBLIC_URL").unwrap_or_else(|_| "http://127.0.0.1:5093".into());
+        let name = if uefi {
+            "metal-ipxe-uefi.iso"
+        } else {
+            "metal-ipxe.iso"
+        };
+        format!("{}/dist/{name}", base.trim_end_matches('/'))
+    })
+}
+
+async fn boot_method_of(pool: &DbPool, id: Uuid) -> String {
+    crate::db::query_scalar::<_, String>("SELECT boot_method FROM baremetal_servers WHERE id = ?")
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| "pxe".into())
+}
+
+/// Make the next boot reach the boot service: PXE once, or mount the iPXE ISO and boot the
+/// CD once. Best effort; the outcome is returned for the log.
+pub async fn boot_network_best_effort(pool: &DbPool, id: Uuid) -> String {
+    let prepared = prepare_boot_network(pool, id).await;
+    // The override only matters at the next boot: a machine that is on is reset, one that is
+    // off is powered on, so provisioning needs no separate power step. A machine that cannot
+    // be reached by BMC is left to the operator (the note says so).
+    if matches!(
+        std::env::var("MACHINA_METAL_NO_AUTO_POWER").ok().as_deref(),
+        Some("1" | "true" | "yes")
+    ) || prepared.contains("failed")
+        || prepared.contains("skipped")
+        || prepared.starts_with("no BMC")
+    {
+        return prepared;
+    }
+    match load_bmc(pool, id).await {
+        Ok(Some(c)) => match super::baremetal_bmc::power(&c.target(), PowerAction::Cycle).await {
+            Ok(m) => format!("{prepared}; {m}"),
+            Err(e) => format!("{prepared}; power step failed: {e}"),
+        },
+        _ => prepared,
+    }
+}
+
+async fn prepare_boot_network(pool: &DbPool, id: Uuid) -> String {
+    let method = boot_method_of(pool, id).await;
+    if !method.starts_with("virtual_media") {
+        return set_boot_best_effort(pool, id, BootDevice::Pxe).await;
+    }
+    let c = match load_bmc(pool, id).await {
+        Ok(Some(c)) => c,
+        Ok(None) => return "no BMC credentials: virtual media not mounted".into(),
+        Err(e) => return format!("virtual media skipped: {e}"),
+    };
+    let url = ipxe_iso_url(method == "virtual_media_uefi");
+    let mounted = super::baremetal_bmc::insert_media(&c.target(), &url).await;
+    let note = match mounted {
+        Ok(m) => m,
+        Err(e) => {
+            let _ = crate::db::query("UPDATE baremetal_servers SET last_error = ? WHERE id = ?")
+                .bind(format!("virtual media: {e}"))
+                .bind(id)
+                .execute(pool)
+                .await;
+            return format!("virtual media failed: {e}");
+        }
+    };
+    format!(
+        "{note}; {}",
+        set_boot_best_effort(pool, id, BootDevice::Cdrom).await
+    )
+}
+
+/// After the image is written: boot the disk, and take the virtual CD out first.
+pub async fn boot_disk_best_effort(pool: &DbPool, id: Uuid) -> String {
+    let mut note = String::new();
+    if boot_method_of(pool, id).await.starts_with("virtual_media") {
+        if let Ok(Some(c)) = load_bmc(pool, id).await {
+            note = match super::baremetal_bmc::eject_media(&c.target()).await {
+                Ok(m) => format!("{m}; "),
+                Err(e) => format!("eject failed: {e}; "),
+            };
+        }
+    }
+    format!(
+        "{note}{}",
+        set_boot_best_effort(pool, id, BootDevice::Disk).await
+    )
+}
+
 /// Read the BMC's identity, health, sensors, firmware and log (Redfish) and keep the snapshot.
 pub async fn refresh_bmc_info(
     pool: &DbPool,
@@ -551,7 +663,7 @@ pub async fn provision_preview(pool: &DbPool, id: Uuid) -> anyhow::Result<Bareme
         "SELECT id, hostname, bmc_address, bmc_type, state, cpu_cores, memory_mib,
                 firewall_profile, firewall_enabled, bmc_vlan, pxe_vlan, created_at,
                 (bmc_password_enc <> '') AS bmc_credentials_configured, last_error,
-                lifecycle, zone, mac_address
+                lifecycle, zone, mac_address, boot_method
          FROM baremetal_servers WHERE id = ?",
     )
     .bind(id)
@@ -602,6 +714,7 @@ mod tests {
             bmc_password: pass.into(),
             mac_address: String::new(),
             zone: String::new(),
+            boot_method: "pxe".into(),
         }
     }
 

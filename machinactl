@@ -1164,7 +1164,12 @@ cmd_dist() {
             for f in metal-vmlinuz metal-initrd metal-rootfs.squashfs; do
                 install -m 0644 "$from/$f" "$dest/$f"
             done
-            (cd "$dest" && sha256sum metal-vmlinuz metal-initrd metal-rootfs.squashfs > SHA256SUMS.metal)
+            # Optional: the iPXE ISOs for virtual-media boots (scripts/metal/build-ipxe-iso.sh).
+            local isos=()
+            for f in metal-ipxe.iso metal-ipxe-uefi.iso; do
+                if [[ -f $from/$f ]]; then install -m 0644 "$from/$f" "$dest/$f"; isos+=("$f"); fi
+            done
+            (cd "$dest" && sha256sum metal-vmlinuz metal-initrd metal-rootfs.squashfs "${isos[@]}" > SHA256SUMS.metal)
             # SHA256SUMS = everything except old metal lines, plus the new ones.
             (cd "$dest" && { [[ -f SHA256SUMS ]] && grep -v ' metal-' SHA256SUMS || true; cat SHA256SUMS.metal; } > SHA256SUMS.new && mv SHA256SUMS.new SHA256SUMS)
             ok "bare-metal ramdisk published to $dest (served at /dist/)"
@@ -1199,8 +1204,8 @@ cmd_bootstrap() {
         url="http://$ip:5093"
         info "no --public-url: using $url (nodes must be able to reach it)"
     fi
-    [[ $url =~ ^https?://[A-Za-z0-9._:\[\]-]+$ ]] || { err "invalid --public-url: $url"; exit 1; }
-    [[ $tls =~ ^[A-Za-z0-9._:\[\]-]+$ ]] || { err "invalid --tls-addr: $tls"; exit 1; }
+    [[ $url =~ ^https?://[][A-Za-z0-9._:-]+$ ]] || { err "invalid --public-url: $url"; exit 1; }
+    [[ $tls =~ ^[][A-Za-z0-9._:-]+$ ]] || { err "invalid --tls-addr: $tls"; exit 1; }
     [[ -z $sans || $sans =~ ^[A-Za-z0-9._,:-]+$ ]] || { err "invalid --tls-sans"; exit 1; }
     step "Configuring the controller ($envf)"
     mkdir -p "$(dirname "$envf")"

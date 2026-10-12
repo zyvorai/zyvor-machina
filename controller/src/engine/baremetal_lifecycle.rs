@@ -132,9 +132,7 @@ pub async fn begin_commissioning(pool: &DbPool, id: Uuid) -> anyhow::Result<Stri
         .execute(pool)
         .await?;
     // The next boot must be PXE even if the machine has an OS on disk.
-    let note =
-        super::baremetal::set_boot_best_effort(pool, id, super::baremetal_bmc::BootDevice::Pxe)
-            .await;
+    let note = super::baremetal::boot_network_best_effort(pool, id).await;
     tracing::info!("commissioning {id}: {note}");
     Ok(token)
 }

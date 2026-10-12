@@ -429,9 +429,7 @@ pub async fn begin_deploy(
     .execute(pool)
     .await?;
     // The next boot must be PXE (the deploy ramdisk), whatever is on the disk now.
-    let note =
-        super::baremetal::set_boot_best_effort(pool, id, super::baremetal_bmc::BootDevice::Pxe)
-            .await;
+    let note = super::baremetal::boot_network_best_effort(pool, id).await;
     tracing::info!("deploy {id}: {note}");
     Ok(kind)
 }
@@ -567,12 +565,7 @@ pub async fn report_deploy(
             .execute(pool)
             .await?;
             // Boot the new OS next, even if the firmware prefers the network.
-            let note = super::baremetal::set_boot_best_effort(
-                pool,
-                id,
-                super::baremetal_bmc::BootDevice::Disk,
-            )
-            .await;
+            let note = super::baremetal::boot_disk_best_effort(pool, id).await;
             tracing::info!("deploy {id} written: {note}");
         }
         "failed" => {
