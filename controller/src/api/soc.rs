@@ -1,6 +1,7 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
 
+use crate::db::DbPool;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Extension;
@@ -8,13 +9,12 @@ use axum::Json;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::db::DbPool;
 use uuid::Uuid;
 
 use crate::api::ApiError;
 use crate::auth::{require_admin, require_operator, AuthUser};
 use crate::engine::soc::siem::{
-    elastic_bulk, forward_replay, qradar_rest, sentinel_dcr, splunk_hec,
+    elastic_bulk, forward_replay, qradar_rest, splunk_hec, webhook_json,
 };
 use crate::engine::soc::{asm, detection, run_cycle};
 use crate::state::AppState;
@@ -181,11 +181,13 @@ pub async fn patch_alert(
     require_operator(&actor)?;
     let mut tx = state.pool.begin().await?;
     if let Some(status) = &body.status {
-        crate::db::query("UPDATE soc_alerts SET status = ?, updated_at = datetime('now') WHERE id = ?")
-            .bind(status)
-            .bind(id)
-            .execute(&mut *tx)
-            .await?;
+        crate::db::query(
+            "UPDATE soc_alerts SET status = ?, updated_at = datetime('now') WHERE id = ?",
+        )
+        .bind(status)
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
     }
     if let Some(assignee) = &body.assigned_to {
         crate::db::query(
@@ -330,11 +332,12 @@ pub async fn delete_rule(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     require_admin(&actor)?;
-    let deleted = crate::db::query("DELETE FROM soc_detection_rules WHERE id = ? AND builtin = FALSE")
-        .bind(id)
-        .execute(&state.pool)
-        .await?
-        .rows_affected();
+    let deleted =
+        crate::db::query("DELETE FROM soc_detection_rules WHERE id = ? AND builtin = FALSE")
+            .bind(id)
+            .execute(&state.pool)
+            .await?
+            .rows_affected();
     if deleted == 0 {
         return Err(ApiError::not_found("rule not found or is built-in"));
     }
@@ -489,7 +492,7 @@ pub async fn test_integration(
             splunk_hec::test_connection(&row.config_json, &state.config.controller_id).await?
         }
         "elastic_bulk" => elastic_bulk::test_connection(&row.config_json).await?,
-        "sentinel_dcr" => sentinel_dcr::test_connection(&row.config_json).await?,
+        "webhook_json" => webhook_json::test_connection(&row.config_json).await?,
         "qradar_rest" => qradar_rest::test_connection(&row.config_json).await?,
         other => {
             return Err(ApiError::bad_request(format!(

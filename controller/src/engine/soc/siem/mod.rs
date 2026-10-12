@@ -3,12 +3,12 @@
 
 pub mod elastic_bulk;
 pub mod qradar_rest;
-pub mod sentinel_dcr;
 pub mod splunk_hec;
+pub mod webhook_json;
 
+use crate::db::DbPool;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
-use crate::db::DbPool;
 use uuid::Uuid;
 
 #[derive(Debug, sqlx::FromRow)]
@@ -20,10 +20,7 @@ pub struct IntegrationRow {
     pub config_json: Value,
 }
 
-pub async fn forward_all_integrations(
-    pool: &DbPool,
-    controller_id: &str,
-) -> anyhow::Result<usize> {
+pub async fn forward_all_integrations(pool: &DbPool, controller_id: &str) -> anyhow::Result<usize> {
     let rows: Vec<IntegrationRow> = crate::db::query_as(
         "SELECT id, integration_type, name, enabled, config_json FROM soc_integrations WHERE enabled = TRUE",
     )
@@ -35,8 +32,15 @@ pub async fn forward_all_integrations(
         let n = match row.integration_type.as_str() {
             "splunk_hec" => splunk_hec::forward(pool, &row, controller_id).await?,
             "elastic_bulk" => elastic_bulk::forward(pool, &row, controller_id).await?,
-            "sentinel_dcr" => sentinel_dcr::forward(pool, &row, controller_id).await?,
+            "webhook_json" => webhook_json::forward(pool, &row, controller_id).await?,
             "qradar_rest" => qradar_rest::forward(pool, &row, controller_id).await?,
+            "sentinel_dcr" => {
+                tracing::warn!(
+                    "soc integration `sentinel_dcr` was removed (local-first); \
+                     point a `webhook_json` or `elastic_bulk` integration at a local collector instead"
+                );
+                0
+            }
             other => {
                 tracing::warn!("unknown soc integration type: {other}");
                 0

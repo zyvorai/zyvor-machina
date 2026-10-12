@@ -134,6 +134,45 @@ pub async fn atlas_metrics_summary(
         .map(Json)
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ForecastQuery {
+    #[serde(default)]
+    pub minutes: Option<i64>,
+}
+
+/// Atlas capacity projection (`days_to_full`, `growth_bytes_per_day`).
+pub async fn atlas_forecast(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Query(q): Query<ForecastQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_operator(&actor)?;
+    client(&state)?
+        .forecast(q.minutes.unwrap_or(1440))
+        .await
+        .map_err(atlas_error)
+        .map(Json)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AlertQuery {
+    #[serde(default)]
+    pub state: Option<String>,
+}
+
+pub async fn atlas_alerts(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Query(q): Query<AlertQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_operator(&actor)?;
+    client(&state)?
+        .list_alerts(q.state.as_deref())
+        .await
+        .map_err(atlas_error)
+        .map(Json)
+}
+
 pub async fn atlas_policies(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthUser>,

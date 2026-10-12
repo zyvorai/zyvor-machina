@@ -31,10 +31,11 @@ pub async fn prometheus_metrics(
             .fetch_one(&state.pool)
             .await
             .unwrap_or(0);
-    let offline: i64 = crate::db::query_scalar("SELECT COUNT(*) FROM hosts WHERE state = 'offline'")
-        .fetch_one(&state.pool)
-        .await
-        .unwrap_or(0);
+    let offline: i64 =
+        crate::db::query_scalar("SELECT COUNT(*) FROM hosts WHERE state = 'offline'")
+            .fetch_one(&state.pool)
+            .await
+            .unwrap_or(0);
 
     #[derive(sqlx::FromRow)]
     struct VmMetricRow {
@@ -88,6 +89,7 @@ pub async fn prometheus_metrics(
         ));
     }
     body.push_str(&crate::engine::observability::prometheus_slo_gauges(&state.pool).await);
+    body.push_str(&crate::engine::atlas_bridge::prometheus_gauges(&state.config).await);
     Ok((
         [(
             axum::http::header::CONTENT_TYPE,

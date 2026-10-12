@@ -77,13 +77,9 @@ export default function PlatformSoc() {
   const [elasticKey, setElasticKey] = useState('')
   const [elasticIndex, setElasticIndex] = useState('logs-machina.soc')
   const [elasticEnabled, setElasticEnabled] = useState(false)
-  const [sentinelDce, setSentinelDce] = useState('')
-  const [sentinelDcr, setSentinelDcr] = useState('')
-  const [sentinelStream, setSentinelStream] = useState('')
-  const [sentinelTenant, setSentinelTenant] = useState('')
-  const [sentinelClientId, setSentinelClientId] = useState('')
-  const [sentinelSecret, setSentinelSecret] = useState('')
-  const [sentinelEnabled, setSentinelEnabled] = useState(false)
+  const [webhookUrl, setWebhookUrl] = useState('')
+  const [webhookToken, setWebhookToken] = useState('')
+  const [webhookEnabled, setWebhookEnabled] = useState(false)
   const [qradarUrl, setQradarUrl] = useState('')
   const [qradarToken, setQradarToken] = useState('')
   const [qradarLogSource, setQradarLogSource] = useState('')
@@ -145,14 +141,10 @@ export default function PlatformSoc() {
         setElasticIndex(String(elastic.config.index ?? 'logs-machina.soc'))
         setElasticEnabled(elastic.enabled)
       }
-      const sentinel = ints.find((i) => i.integration_type === 'sentinel_dcr')
-      if (sentinel?.config) {
-        setSentinelDce(String(sentinel.config.dce_endpoint ?? ''))
-        setSentinelDcr(String(sentinel.config.dcr_immutable_id ?? ''))
-        setSentinelStream(String(sentinel.config.stream_name ?? ''))
-        setSentinelTenant(String(sentinel.config.tenant_id ?? ''))
-        setSentinelClientId(String(sentinel.config.client_id ?? ''))
-        setSentinelEnabled(sentinel.enabled)
+      const webhook = ints.find((i) => i.integration_type === 'webhook_json')
+      if (webhook?.config) {
+        setWebhookUrl(String(webhook.config.url ?? ''))
+        setWebhookEnabled(webhook.enabled)
       }
       const qradar = ints.find((i) => i.integration_type === 'qradar_rest')
       if (qradar?.config) {
@@ -242,21 +234,17 @@ export default function PlatformSoc() {
     }
   }
 
-  const saveSentinel = async () => {
+  const saveWebhook = async () => {
     try {
-      await patchSocIntegration('sentinel_dcr', {
-        enabled: sentinelEnabled,
+      await patchSocIntegration('webhook_json', {
+        enabled: webhookEnabled,
         config_json: {
-          dce_endpoint: sentinelDce,
-          dcr_immutable_id: sentinelDcr,
-          stream_name: sentinelStream,
-          tenant_id: sentinelTenant,
-          client_id: sentinelClientId,
-          client_secret: sentinelSecret,
+          url: webhookUrl,
+          bearer_token: webhookToken,
         },
       })
-      toast.success('Sentinel integration saved')
-      setSentinelSecret('')
+      toast.success('Webhook integration saved')
+      setWebhookToken('')
       void load()
     } catch (e: unknown) {
       toast.error(formatUserError(e))
@@ -308,7 +296,7 @@ export default function PlatformSoc() {
 
   const splunkStatus = integrations.find((i) => i.integration_type === 'splunk_hec')
   const elasticStatus = integrations.find((i) => i.integration_type === 'elastic_bulk')
-  const sentinelStatus = integrations.find((i) => i.integration_type === 'sentinel_dcr')
+  const webhookStatus = integrations.find((i) => i.integration_type === 'webhook_json')
   const qradarStatus = integrations.find((i) => i.integration_type === 'qradar_rest')
 
   return (
@@ -740,44 +728,31 @@ export default function PlatformSoc() {
             </div>
           </MacGlassPanel>
 
-          <MacGlassPanel title="Microsoft Sentinel (DCR)">
-            {sentinelStatus && (
-              <p className={`px-3 pt-3 text-xs ${statusToneClass(integrationStatusLabel(sentinelStatus).tone)}`}>
-                {integrationStatusLabel(sentinelStatus).text}
+          <MacGlassPanel title="JSON webhook (local collector)">
+            {webhookStatus && (
+              <p className={`px-3 pt-3 text-xs ${statusToneClass(integrationStatusLabel(webhookStatus).tone)}`}>
+                {integrationStatusLabel(webhookStatus).text}
               </p>
             )}
             <div className="p-3 space-y-3">
+              <p className="text-xs text-[var(--text-muted)]">
+                POSTs events as NDJSON to your own collector (Vector, Fluent Bit, Loki proxy, Wazuh, Graylog). Nothing leaves the site unless you point it elsewhere.
+              </p>
               <label className="block text-sm">
-                <span className="text-[var(--text-muted)] text-xs">DCE endpoint</span>
-                <input className="input w-full mt-1 text-sm" value={sentinelDce} onChange={(e) => setSentinelDce(e.target.value)} />
+                <span className="text-[var(--text-muted)] text-xs">Collector URL</span>
+                <input className="input w-full mt-1 text-sm" value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} placeholder="http://10.0.0.5:8686/events" />
               </label>
               <label className="block text-sm">
-                <span className="text-[var(--text-muted)] text-xs">DCR immutable ID</span>
-                <input className="input w-full mt-1 text-sm" value={sentinelDcr} onChange={(e) => setSentinelDcr(e.target.value)} />
-              </label>
-              <label className="block text-sm">
-                <span className="text-[var(--text-muted)] text-xs">Stream name</span>
-                <input className="input w-full mt-1 text-sm" value={sentinelStream} onChange={(e) => setSentinelStream(e.target.value)} />
-              </label>
-              <label className="block text-sm">
-                <span className="text-[var(--text-muted)] text-xs">Tenant ID</span>
-                <input className="input w-full mt-1 text-sm" value={sentinelTenant} onChange={(e) => setSentinelTenant(e.target.value)} />
-              </label>
-              <label className="block text-sm">
-                <span className="text-[var(--text-muted)] text-xs">Client ID</span>
-                <input className="input w-full mt-1 text-sm" value={sentinelClientId} onChange={(e) => setSentinelClientId(e.target.value)} />
-              </label>
-              <label className="block text-sm">
-                <span className="text-[var(--text-muted)] text-xs">Client secret (leave blank to keep)</span>
-                <input className="input w-full mt-1 text-sm" type="password" autoComplete="off" value={sentinelSecret} onChange={(e) => setSentinelSecret(e.target.value)} placeholder="••••••••" />
+                <span className="text-[var(--text-muted)] text-xs">Bearer token (leave blank to keep)</span>
+                <input className="input w-full mt-1 text-sm" type="password" autoComplete="off" value={webhookToken} onChange={(e) => setWebhookToken(e.target.value)} placeholder="••••••••" />
               </label>
               <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={sentinelEnabled} onChange={(e) => setSentinelEnabled(e.target.checked)} />
-                Enable Sentinel forwarder
+                <input type="checkbox" checked={webhookEnabled} onChange={(e) => setWebhookEnabled(e.target.checked)} />
+                Enable webhook forwarder
               </label>
               <div className="flex flex-wrap gap-2">
-                <button type="button" className="btn-primary text-sm" onClick={() => void saveSentinel()}>Save</button>
-                <button type="button" className="btn-secondary text-sm" onClick={() => void testSocIntegration('sentinel_dcr').then((r) => toast.success(r.message)).catch((e: unknown) => toast.error(formatUserError(e)))}>Test</button>
+                <button type="button" className="btn-primary text-sm" onClick={() => void saveWebhook()}>Save</button>
+                <button type="button" className="btn-secondary text-sm" onClick={() => void testSocIntegration('webhook_json').then((r) => toast.success(r.message)).catch((e: unknown) => toast.error(formatUserError(e)))}>Test</button>
               </div>
             </div>
           </MacGlassPanel>

@@ -291,6 +291,27 @@ impl AtlasClient {
         self.get("/metrics/summary").await
     }
 
+    /// Least-squares capacity projection (`days_to_full`, `growth_bytes_per_day`, ...)
+    /// over the last `minutes` of Atlas' persisted history.
+    pub async fn forecast(&self, minutes: i64) -> anyhow::Result<serde_json::Value> {
+        self.get(&format!(
+            "/metrics/forecast?minutes={}",
+            minutes.clamp(1, 20160)
+        ))
+        .await
+    }
+
+    /// Alerts raised by Atlas' monitor worker; `state` is e.g. `open`.
+    pub async fn list_alerts(&self, state: Option<&str>) -> anyhow::Result<serde_json::Value> {
+        match state {
+            Some(st) => {
+                self.get(&format!("/alerts?state={}", urlencoding::encode(st)))
+                    .await
+            }
+            None => self.get("/alerts").await,
+        }
+    }
+
     pub async fn list_policies(&self) -> anyhow::Result<serde_json::Value> {
         self.get("/policies").await
     }
@@ -634,4 +655,69 @@ pub async fn status(cfg: &ControllerConfig) -> AtlasStatus {
 pub fn require_client(cfg: &ControllerConfig) -> anyhow::Result<AtlasClient> {
     AtlasClient::from_config(cfg)?
         .ok_or_else(|| anyhow::anyhow!("Atlas storage integration disabled (ATLAS_ENABLED=0)"))
+}
+
+/// Prometheus gauges for the Atlas pools this controller is attached to, appended to
+/// `/api/v1/metrics/prometheus` so a decision engine (Zyntra) or Grafana reads storage
+/// headroom from one scrape. Empty when the integration is off; bounded to a few seconds
+/// so a dead Atlas cannot stall the whole scrape.
+pub async fn prometheus_gauges(cfg: &ControllerConfig) -> String {
+    let Ok(Some(client)) = AtlasClient::from_config(cfg) else {
+        return String::new();
+    };
+    let probe = async {
+        let up = client.version().await.is_ok();
+        let mut out = format!(
+            "# HELP machina_atlas_up Atlas gateway reachable (1) or not (0)\n\
+             # TYPE machina_atlas_up gauge\n\
+             machina_atlas_up {}\n",
+            u8::from(up)
+        );
+        if !up {
+            return out;
+        }
+        if let Ok(f) = client.forecast(1440).await {
+            let num = |k: &str| f.get(k).and_then(|v| v.as_f64());
+            for (key, name, help) in [
+                (
+                    "raw_capacity_bytes",
+                    "machina_atlas_capacity_raw_bytes",
+                    "Atlas raw capacity (bytes)",
+                ),
+                (
+                    "used_capacity_bytes",
+                    "machina_atlas_capacity_used_bytes",
+                    "Atlas used capacity (bytes)",
+                ),
+                (
+                    "growth_bytes_per_day",
+                    "machina_atlas_growth_bytes_per_day",
+                    "Atlas growth rate (bytes/day)",
+                ),
+                (
+                    "days_to_full",
+                    "machina_atlas_days_to_full",
+                    "Projected days until Atlas capacity is full (absent when not growing)",
+                ),
+            ] {
+                if let Some(v) = num(key) {
+                    out.push_str(&format!(
+                        "# HELP {name} {help}\n# TYPE {name} gauge\n{name} {v}\n"
+                    ));
+                }
+            }
+        }
+        if let Ok(alerts) = client.list_alerts(Some("open")).await {
+            let n = alerts.as_array().map(|a| a.len()).unwrap_or(0);
+            out.push_str(&format!(
+                "# HELP machina_atlas_alerts_open Open Atlas alerts\n\
+                 # TYPE machina_atlas_alerts_open gauge\n\
+                 machina_atlas_alerts_open {n}\n"
+            ));
+        }
+        out
+    };
+    tokio::time::timeout(Duration::from_secs(4), probe)
+        .await
+        .unwrap_or_default()
 }

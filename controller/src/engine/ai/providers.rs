@@ -1,8 +1,8 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
 
-use serde::{Deserialize, Serialize};
 use crate::db::DbPool;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::crypto;
@@ -156,6 +156,11 @@ pub async fn create_provider(
     pool: &DbPool,
     body: &CreateProviderBody,
 ) -> anyhow::Result<AiProviderRow> {
+    if body.kind.trim() == "azure_openai" {
+        anyhow::bail!(
+            "azure_openai is no longer supported (local-first); use ollama, vllm or openai_compatible"
+        );
+    }
     let stored_key = crypto::store_api_key(body.api_key.trim())?;
     let mut tx = pool.begin().await?;
     if body.is_default {
@@ -218,10 +223,11 @@ pub async fn patch_provider(
     id: Uuid,
     body: &PatchProviderBody,
 ) -> anyhow::Result<AiProviderRow> {
-    let exists: bool = crate::db::query_scalar("SELECT EXISTS(SELECT 1 FROM ai_providers WHERE id = ?)")
-        .bind(id)
-        .fetch_one(pool)
-        .await?;
+    let exists: bool =
+        crate::db::query_scalar("SELECT EXISTS(SELECT 1 FROM ai_providers WHERE id = ?)")
+            .bind(id)
+            .fetch_one(pool)
+            .await?;
     if !exists {
         anyhow::bail!("provider not found");
     }
@@ -370,10 +376,16 @@ pub async fn resolve_for_provider(
     let Some((pid, kind, base_url, org_id, deployment_name, stored_key)) = row else {
         return legacy_resolve(pool).await;
     };
-    if stored_key.is_empty() {
-        return Ok(None);
-    }
-    let api_key = crypto::load_api_key(&stored_key)?;
+    // A local endpoint (Ollama, vLLM, llama.cpp) needs no key; only hosted
+    // kinds are unusable without one.
+    let api_key = if stored_key.is_empty() {
+        if !super::llm::uses_local_endpoint(&kind) {
+            return Ok(None);
+        }
+        String::new()
+    } else {
+        crypto::load_api_key(&stored_key)?
+    };
 
     let model: String = if let Some(mid) = model_id.filter(|s| !s.is_empty()) {
         mid.to_string()
@@ -384,7 +396,13 @@ pub async fn resolve_for_provider(
         .bind(pid)
         .fetch_optional(pool)
         .await?
-        .unwrap_or_else(|| "gpt-4o-mini".into())
+        .unwrap_or_else(|| {
+            if super::llm::uses_local_endpoint(&kind) {
+                "llama3".into()
+            } else {
+                "gpt-4o-mini".into()
+            }
+        })
     };
 
     Ok(Some(ResolvedProvider {

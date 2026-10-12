@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub enum CloudProvider {
     Aws,
+    /// No longer probed (no `az` shell-out); kept so older stored snapshots still parse.
     Azure,
     Gcp,
     Unknown,
@@ -46,11 +47,32 @@ pub struct CloudFirewallInventory {
     pub open_ports: Vec<OpenPort>,
 }
 
+/// Env switch for the public-cloud probe. Off by default: Machina is local-first and
+/// must not spawn `aws`/`gcloud` (which would pick up ambient cloud credentials) just
+/// because a firewall overview was requested.
+const CLOUD_PROBE_ENV: &str = "MACHINA_FIREWALL_CLOUD_PROBE";
+
+fn cloud_probe_enabled() -> bool {
+    matches!(
+        std::env::var(CLOUD_PROBE_ENV).ok().as_deref(),
+        Some("1" | "true" | "yes")
+    )
+}
+
 pub fn gather_cloud_inventory() -> CloudFirewallInventory {
-    if let Some(inv) = read_aws_security_groups() {
-        return inv;
+    if !cloud_probe_enabled() {
+        return CloudFirewallInventory {
+            provider: CloudProvider::Unknown,
+            reachable: false,
+            summary: format!(
+                "Cloud firewall probe is off (local-first). Host firewalls are inventoried \
+                 locally; set {CLOUD_PROBE_ENV}=1 to also read AWS/GCP security groups"
+            ),
+            security_groups: vec![],
+            open_ports: vec![],
+        };
     }
-    if let Some(inv) = read_azure_nsg() {
+    if let Some(inv) = read_aws_security_groups() {
         return inv;
     }
     if let Some(inv) = read_gcp_firewall_rules() {
@@ -59,9 +81,9 @@ pub fn gather_cloud_inventory() -> CloudFirewallInventory {
     CloudFirewallInventory {
         provider: CloudProvider::Unknown,
         reachable: false,
-        summary:
-            "No cloud CLI credentials detected — configure AWS/Azure/GCP CLI on controller host"
-                .into(),
+        summary: "No cloud CLI credentials detected — configure the AWS/GCP CLI on the \
+                  controller host"
+            .into(),
         security_groups: vec![],
         open_ports: vec![],
     }
@@ -280,34 +302,6 @@ fn read_aws_security_groups() -> Option<CloudFirewallInventory> {
         summary: format!("{} AWS security group rules", rules.len()),
         security_groups: rules,
         open_ports,
-    })
-}
-
-fn read_azure_nsg() -> Option<CloudFirewallInventory> {
-    let out = run_cmd("az", &["network", "nsg", "list", "--output", "json"]).ok()?;
-    let groups: serde_json::Value = serde_json::from_str(&out).ok()?;
-    let arr = groups.as_array()?;
-    let mut rules = Vec::new();
-    for g in arr {
-        let id = g.get("id")?.as_str()?.to_string();
-        let name = g.get("name")?.as_str()?.to_string();
-        rules.push(CloudSecurityGroupRule {
-            provider: CloudProvider::Azure,
-            group_id: id,
-            group_name: name,
-            direction: "inbound".into(),
-            protocol: "mixed".into(),
-            port_range: "*".into(),
-            source: "azure-nsg".into(),
-            description: Some("Use az network nsg rule list for detail".into()),
-        });
-    }
-    Some(CloudFirewallInventory {
-        provider: CloudProvider::Azure,
-        reachable: !rules.is_empty(),
-        summary: format!("{} Azure NSGs discovered", rules.len()),
-        security_groups: rules,
-        open_ports: vec![],
     })
 }
 

@@ -466,7 +466,7 @@ pub async fn zeus_firewall_status() -> serde_json::Value {
         "feature": "zeus-firewall",
         "phase": 3,
         "ai_id": "AI-172",
-        "backends": ["firewalld", "ufw", "nftables", "iptables", "k8s_network_policy", "aws", "azure", "gcp"],
+        "backends": ["firewalld", "ufw", "nftables", "iptables", "k8s_network_policy"],
         "ready": true
     })
 }

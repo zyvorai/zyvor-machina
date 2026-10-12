@@ -44,8 +44,20 @@ Thin proxy over the Atlas gateway, plus VM-oriented orchestration:
 - `POST /atlas/volumes/{id}/snapshots` · `GET /atlas/snapshots`
 - `POST /atlas/snapshots/{id}/clone` · `/restore` · `DELETE /atlas/snapshots/{id}[?force]`
 - `GET|POST /atlas/buckets` · `GET|POST /atlas/backups` · `DELETE /atlas/backups/{id}` · `POST /atlas/restore-jobs`
+- `GET /atlas/forecast[?minutes=1440]` — capacity projection (`days_to_full`, `growth_bytes_per_day`)
+- `GET /atlas/alerts[?state=open]` — alerts from Atlas' monitor worker
 - `GET /atlas/jobs` · `GET /atlas/jobs/{id}`
 - `GET|POST /atlas/vms/{id}/volumes` · `POST /atlas/vms/{id}/snapshot` · `POST /atlas/vms/{id}/backup`
+
+### Prometheus gauges
+
+With `ATLAS_ENABLED=1`, `GET /api/v1/metrics/prometheus` also carries `machina_atlas_up`,
+`machina_atlas_capacity_raw_bytes`, `machina_atlas_capacity_used_bytes`,
+`machina_atlas_growth_bytes_per_day`, `machina_atlas_days_to_full` (absent while capacity is
+not growing) and `machina_atlas_alerts_open`. The Atlas probe is bounded to 4 s, so a dead
+gateway shows `machina_atlas_up 0` instead of stalling the scrape. A decision engine such as
+Zyntra (`packs/virtualization` in the zyntra repo) reads storage headroom from this one scrape.
+Unit-tested only (not yet scraped against a live Atlas).
 
 Errors propagate the upstream Atlas status (4xx pass through; Atlas 5xx → 502); an
 unreachable gateway is a typed `503 atlas_unavailable`.

@@ -22,9 +22,10 @@ import {
 import { useToastContext } from '../../contexts/ToastContext'
 import { formatUserError } from '../../utils/apiError'
 
+// Local engines first: Machina is local-first and works without any hosted key.
 const PROVIDER_KINDS = [
-  'openai', 'anthropic', 'google', 'xai', 'deepseek', 'mistral', 'meta', 'qwen',
-  'azure_openai', 'ollama', 'vllm', 'openai_compatible',
+  'ollama', 'vllm', 'openai_compatible',
+  'openai', 'anthropic', 'google', 'xai', 'deepseek', 'mistral',
 ]
 
 const TASK_CLASS_LABELS: Record<string, string> = {
@@ -154,7 +155,7 @@ export default function PlatformAiProviders({ embedded }: { embedded?: boolean }
           <select className="input" aria-label="Provider kind" value={kind} onChange={(e) => setKind(e.target.value)}>
             {PROVIDER_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
           </select>
-          <input aria-label="Base URL" className="input md:col-span-2" placeholder="Base URL (optional — Ollama/vLLM/Azure)" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
+          <input aria-label="Base URL" className="input md:col-span-2" placeholder="Base URL (Ollama http://127.0.0.1:11434, vLLM, llama.cpp)" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
           <input aria-label="Default model ID" className="input" placeholder="gpt-4o-mini" value={modelId} onChange={(e) => setModelId(e.target.value)} />
           <input aria-label="API key" className="input" type="password" autoComplete="off" placeholder="API key" value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
         </div>

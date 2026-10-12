@@ -6,6 +6,7 @@ import ReactDOM from 'react-dom/client'
 import './i18n'
 import App from './App'
 import AppErrorBoundary from './components/AppErrorBoundary'
+import './styles/fonts.css'
 import './styles/main.css'
 import './styles/netra-look.css'
 

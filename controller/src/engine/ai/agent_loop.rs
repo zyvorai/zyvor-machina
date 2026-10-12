@@ -9,11 +9,11 @@
 //! approved actions go through the existing audited executors.
 //!
 //! Provider-native tool calling is implemented for Anthropic and OpenAI-compatible endpoints (OpenAI,
-//! Azure OpenAI, Ollama, vLLM, …). Other providers return a clear error instead of silently degrading.
+//! Ollama, vLLM, llama.cpp, …). Other providers return a clear error instead of silently degrading.
 
+use crate::db::DbPool;
 use serde::Serialize;
 use serde_json::{json, Value};
-use crate::db::DbPool;
 use uuid::Uuid;
 
 use super::actions::{self, CreateActionBody};
@@ -196,10 +196,11 @@ async fn resolve_vm(pool: &DbPool, vm: &str) -> anyhow::Result<(Uuid, String)> {
             return Ok((id, name));
         }
     }
-    let row: Option<(Uuid, String)> = crate::db::query_as("SELECT id, name FROM vms WHERE name = ?")
-        .bind(vm)
-        .fetch_optional(pool)
-        .await?;
+    let row: Option<(Uuid, String)> =
+        crate::db::query_as("SELECT id, name FROM vms WHERE name = ?")
+            .bind(vm)
+            .fetch_optional(pool)
+            .await?;
     row.ok_or_else(|| anyhow::anyhow!("no machine named '{vm}'"))
 }
 
@@ -618,11 +619,7 @@ async fn chat_turn(resolved: &ResolvedProvider, msgs: &[Msg]) -> anyhow::Result<
                 .ok_or_else(|| anyhow::anyhow!("unexpected response from the AI provider"))
         }
         _ => {
-            let model = if resolved.kind == "azure_openai" && !resolved.deployment_name.is_empty() {
-                resolved.deployment_name.clone()
-            } else {
-                resolved.model_id.clone()
-            };
+            let model = resolved.model_id.clone();
             let tools: Vec<Value> = specs
                 .iter()
                 .map(|(n, d, s)| {
@@ -696,6 +693,9 @@ pub async fn run_streaming(
     }
     if resolved.api_key.is_empty() && !super::llm::uses_local_endpoint(&resolved.kind) {
         anyhow::bail!("The configured AI provider has no API key");
+    }
+    if let Some(why) = super::llm::unusable_kind(&resolved) {
+        anyhow::bail!("The configured AI provider cannot be used: {why}");
     }
     if let Err(e) = super::llm::validate_base_url(&resolved.base_url) {
         anyhow::bail!("{e}");

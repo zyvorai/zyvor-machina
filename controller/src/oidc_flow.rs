@@ -179,14 +179,22 @@ pub async fn complete_login(
     Ok((username, role, token))
 }
 
-// require_https: true — the controller has always required an HTTPS issuer,
-// preserved as-is (the daemon's own discovery fetch does not require this).
+// require_https: true unless MACHINA_OIDC_ALLOW_HTTP=1 — the controller has always required
+// an HTTPS issuer (the daemon's own discovery fetch does not). The flag lets a lab or air-gapped
+// site use a plain-HTTP local IdP (Keycloak, Dex) on a trusted network.
+fn oidc_require_https() -> bool {
+    !matches!(
+        std::env::var("MACHINA_OIDC_ALLOW_HTTP").ok().as_deref(),
+        Some("1" | "true" | "yes")
+    )
+}
+
 async fn fetch_discovery(
     issuer: &str,
 ) -> anyhow::Result<machina_core::oidc::OidcDiscoveryDocument> {
     let client =
         machina_core::oidc::oidc_http_client().map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    machina_core::oidc::fetch_discovery(&client, issuer, true)
+    machina_core::oidc::fetch_discovery(&client, issuer, oidc_require_https())
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))
 }

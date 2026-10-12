@@ -727,6 +727,8 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/atlas/clusters", get(atlas::atlas_clusters))
         .route("/api/v1/atlas/pools", get(atlas::atlas_pools))
         .route("/api/v1/atlas/policies", get(atlas::atlas_policies))
+        .route("/api/v1/atlas/forecast", get(atlas::atlas_forecast))
+        .route("/api/v1/atlas/alerts", get(atlas::atlas_alerts))
         .route(
             "/api/v1/atlas/metrics/summary",
             get(atlas::atlas_metrics_summary),
