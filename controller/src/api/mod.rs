@@ -695,6 +695,10 @@ pub fn router(state: AppState) -> Router {
             post(baremetal::refresh_bmc_info),
         )
         .route(
+            "/api/v1/baremetal/servers/{id}/bmc",
+            axum::routing::put(baremetal::set_bmc),
+        )
+        .route(
             "/api/v1/baremetal/servers/{id}/sol-token",
             post(baremetal::sol_token),
         )

@@ -809,3 +809,30 @@ pub async fn sol_token(
         "ws_path": format!("/ws/v1/baremetal/{id}/sol?token={token}"),
     })))
 }
+
+/// Attach or change a server's BMC details (an auto-enrolled machine has none).
+pub async fn set_bmc(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<uuid::Uuid>,
+    Json(body): Json<baremetal::SetBmcBody>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    require_admin(&actor)?;
+    baremetal::set_bmc(&state.pool, id, &body)
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))?;
+    let _ = crate::db::query(
+        "INSERT INTO audit_logs (id, actor, action, resource_type, detail)
+         VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(uuid::Uuid::new_v4())
+    .bind(&actor.username)
+    .bind("baremetal.bmc.set")
+    .bind("baremetal_server")
+    .bind(serde_json::json!({ "server_id": id, "bmc_type": body.bmc_type }))
+    .execute(&state.pool)
+    .await;
+    Ok(Json(
+        serde_json::json!({ "id": id, "bmc_type": body.bmc_type }),
+    ))
+}

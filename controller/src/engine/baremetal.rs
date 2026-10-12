@@ -107,6 +107,89 @@ pub async fn list_servers(pool: &DbPool) -> anyhow::Result<Vec<BaremetalServer>>
     Ok(rows)
 }
 
+/// New BMC details for an existing server (an auto-enrolled machine has none).
+#[derive(Debug, Deserialize)]
+pub struct SetBmcBody {
+    pub bmc_type: String,
+    #[serde(default)]
+    pub bmc_address: String,
+    #[serde(default)]
+    pub bmc_username: String,
+    /// Empty keeps the stored password.
+    #[serde(default)]
+    pub bmc_password: String,
+    /// Optional: `pxe`, `virtual_media` or `virtual_media_uefi`.
+    #[serde(default)]
+    pub boot_method: String,
+}
+
+/// Set a server's BMC type, address, login and (optionally) boot method. The password is
+/// stored encrypted; leaving it empty keeps the one already stored.
+pub async fn set_bmc(pool: &DbPool, id: Uuid, body: &SetBmcBody) -> anyhow::Result<()> {
+    let kind = BmcKind::parse(&body.bmc_type)?;
+    let address = body.bmc_address.trim();
+    if kind != BmcKind::Fake && !address.is_empty() {
+        validate_address(address)?;
+    }
+    if kind == BmcKind::Libvirt {
+        super::baremetal_bmc::libvirt_name_allowed(address)?;
+    }
+    if !body.bmc_username.is_empty() {
+        super::baremetal_bmc::validate_username(body.bmc_username.trim())?;
+    }
+    if !body.boot_method.is_empty()
+        && !matches!(
+            body.boot_method.as_str(),
+            "pxe" | "virtual_media" | "virtual_media_uefi"
+        )
+    {
+        anyhow::bail!("boot_method must be pxe, virtual_media or virtual_media_uefi");
+    }
+    let exists: Option<Uuid> =
+        crate::db::query_scalar("SELECT id FROM baremetal_servers WHERE id = ?")
+            .bind(id)
+            .fetch_optional(pool)
+            .await?;
+    if exists.is_none() {
+        anyhow::bail!("server not found");
+    }
+    crate::db::query(
+        "UPDATE baremetal_servers SET bmc_type = ?, bmc_address = ?, bmc_username = ?,
+                last_error = '' WHERE id = ?",
+    )
+    .bind(kind_name(kind))
+    .bind(address)
+    .bind(body.bmc_username.trim())
+    .bind(id)
+    .execute(pool)
+    .await?;
+    if !body.bmc_password.is_empty() {
+        let enc = crate::engine::ai::crypto::store_api_key(&body.bmc_password)?;
+        crate::db::query("UPDATE baremetal_servers SET bmc_password_enc = ? WHERE id = ?")
+            .bind(enc)
+            .bind(id)
+            .execute(pool)
+            .await?;
+    }
+    if !body.boot_method.is_empty() {
+        crate::db::query("UPDATE baremetal_servers SET boot_method = ? WHERE id = ?")
+            .bind(&body.boot_method)
+            .bind(id)
+            .execute(pool)
+            .await?;
+    }
+    Ok(())
+}
+
+fn kind_name(k: BmcKind) -> &'static str {
+    match k {
+        BmcKind::Redfish => "redfish",
+        BmcKind::Ipmi => "ipmi",
+        BmcKind::Libvirt => "libvirt",
+        BmcKind::Fake => "fake",
+    }
+}
+
 pub async fn register(
     pool: &DbPool,
     body: &RegisterBaremetalBody,
@@ -765,6 +848,75 @@ mod tests {
             now.iter().find(|x| x.id == s.id).unwrap().state,
             "registered"
         );
+    }
+
+    #[tokio::test]
+    async fn bmc_details_can_be_attached_to_a_server_that_had_none() {
+        let pool = crate::db::testing::pool().await;
+        // An auto-enrolled machine: a MAC and nothing else.
+        let id = crate::engine::baremetal_lifecycle::auto_enroll(&pool, "aa:bb:cc:00:00:07")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(load_bmc(&pool, id).await.unwrap().is_none());
+        let body = |t: &str, a: &str, u: &str, p: &str, m: &str| SetBmcBody {
+            bmc_type: t.into(),
+            bmc_address: a.into(),
+            bmc_username: u.into(),
+            bmc_password: p.into(),
+            boot_method: m.into(),
+        };
+        // Refused: unknown type, a hostile address, an unknown boot method.
+        assert!(set_bmc(&pool, id, &body("amt", "10.0.0.5", "a", "b", ""))
+            .await
+            .is_err());
+        assert!(
+            set_bmc(&pool, id, &body("ipmi", "-oProxyCommand=x", "a", "b", ""))
+                .await
+                .is_err()
+        );
+        assert!(
+            set_bmc(&pool, id, &body("ipmi", "10.0.0.5", "a", "b", "tape"))
+                .await
+                .is_err()
+        );
+        assert!(set_bmc(
+            &pool,
+            Uuid::new_v4(),
+            &body("ipmi", "10.0.0.5", "a", "b", "")
+        )
+        .await
+        .is_err());
+
+        set_bmc(
+            &pool,
+            id,
+            &body("ipmi", "10.0.0.5:623", "admin", "pw", "virtual_media"),
+        )
+        .await
+        .unwrap();
+        let c = load_bmc(&pool, id).await.unwrap().unwrap();
+        assert_eq!(c.kind, BmcKind::Ipmi);
+        assert_eq!(
+            (c.address.as_str(), c.username.as_str(), c.password.as_str()),
+            ("10.0.0.5:623", "admin", "pw")
+        );
+        // An empty password keeps the stored one; the boot method is untouched when omitted.
+        set_bmc(&pool, id, &body("ipmi", "10.0.0.6", "root", "", ""))
+            .await
+            .unwrap();
+        let c = load_bmc(&pool, id).await.unwrap().unwrap();
+        assert_eq!(
+            (c.address.as_str(), c.username.as_str(), c.password.as_str()),
+            ("10.0.0.6", "root", "pw")
+        );
+        let bm: String =
+            crate::db::query_scalar("SELECT boot_method FROM baremetal_servers WHERE id = ?")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(bm, "virtual_media");
     }
 
     #[tokio::test]
