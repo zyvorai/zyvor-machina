@@ -604,7 +604,7 @@ What has actually run (details and exact wording in [claims.md](claims.md)):
 | `bootstrap`, `host add --file --parallel`, labels, post-join networks and pools | two VMs and one VM | the offline bundle `--join`; a failure after SSH succeeds |
 | Serial console | pty round trip with a stand-in `ipmitool` | the WebSocket in a browser; a real BMC's SOL |
 | Auto-enrol, `bmc-set`, profile top-up | two empty VMs: enrolled, commissioned, BMC attached, deployed by an `auto_deploy` profile, joined | with physical machines |
-| Web panels | typecheck only | in a browser |
+| Web panels (servers, images, profiles, BMC details, register form) | typecheck and 11 component tests with a mocked API (`PlatformBareMetal.test.tsx`) | in a browser |
 
 ## Not done
 

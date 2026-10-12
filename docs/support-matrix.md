@@ -61,6 +61,11 @@ mkosi (ramdisk) or git/make/gcc/xorriso (iPXE ISOs).
 
 ## Browsers and languages
 
+The web test suite (vitest, 73 files, 364 tests) needs Node 22 or newer for the jsdom
+component tests: Node 20 fails to start the jsdom worker (`markAsUncloneable` in undici),
+which silently skips those files. Run it as `npx -y node@22 ./node_modules/vitest/vitest.mjs run`
+where the system Node is older.
+
 The UI is English with partial Spanish (`en`, `es`). Dates and numbers go through
 `web/src/utils/localeFormat.ts`; most pages still call the browser's `toLocale*`
 directly. Right-to-left layout is not implemented (the document `dir` is set, the CSS
