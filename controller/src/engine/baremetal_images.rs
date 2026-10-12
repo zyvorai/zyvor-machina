@@ -8,6 +8,7 @@
 //! URL with an explicit checksum.
 
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256, Sha512};
@@ -422,6 +423,42 @@ fn max_bytes() -> u64 {
         .unwrap_or(20 * 1024 * 1024 * 1024)
 }
 
+fn retry_pause(attempt: u32) -> Duration {
+    if cfg!(test) {
+        Duration::from_millis(20)
+    } else {
+        Duration::from_secs(5 * u64::from(attempt))
+    }
+}
+
+/// One transfer attempt: stream `url` to `part`, hashing as it goes. Returns (hex digest, bytes).
+async fn download(
+    client: &reqwest::Client,
+    url: &str,
+    part: &Path,
+    algo: Algo,
+    limit: u64,
+) -> anyhow::Result<(String, u64)> {
+    use tokio::io::AsyncWriteExt;
+    let mut resp = client.get(url).send().await?.error_for_status()?;
+    if resp.content_length().is_some_and(|n| n > limit) {
+        anyhow::bail!("image is larger than MACHINA_METAL_IMAGE_MAX_BYTES ({limit})");
+    }
+    let mut f = tokio::fs::File::create(part).await?;
+    let mut h = Hasher::new(algo);
+    let mut size: u64 = 0;
+    while let Some(chunk) = resp.chunk().await? {
+        size += chunk.len() as u64;
+        if size > limit {
+            anyhow::bail!("image exceeds MACHINA_METAL_IMAGE_MAX_BYTES ({limit})");
+        }
+        h.update(&chunk);
+        f.write_all(&chunk).await?;
+    }
+    f.flush().await?;
+    Ok((h.finish(), size))
+}
+
 async fn run_import(
     pool: &DbPool,
     id: Uuid,
@@ -429,7 +466,6 @@ async fn run_import(
     rel: &str,
     p: &Plan,
 ) -> anyhow::Result<()> {
-    use tokio::io::AsyncWriteExt;
     let client = reqwest::Client::builder()
         .connect_timeout(std::time::Duration::from_secs(20))
         .build()?;
@@ -454,25 +490,25 @@ async fn run_import(
 
     tokio::fs::create_dir_all(dir).await?;
     let part = dir.join(format!("{rel}.part"));
-    let mut resp = client.get(&p.url).send().await?.error_for_status()?;
     let limit = max_bytes();
-    if resp.content_length().is_some_and(|n| n > limit) {
-        anyhow::bail!("image is larger than MACHINA_METAL_IMAGE_MAX_BYTES ({limit})");
-    }
-    let mut f = tokio::fs::File::create(&part).await?;
-    let mut h = Hasher::new(p.algo);
-    let mut size: u64 = 0;
-    while let Some(chunk) = resp.chunk().await? {
-        size += chunk.len() as u64;
-        if size > limit {
-            anyhow::bail!("image exceeds MACHINA_METAL_IMAGE_MAX_BYTES ({limit})");
+    // A mirror can drop a long download. Retry the transfer a few times with a pause; a
+    // checksum mismatch below is not retried (the bytes arrived, they are wrong).
+    const ATTEMPTS: u32 = 3;
+    let mut attempt = 0;
+    let (got, size) = loop {
+        attempt += 1;
+        match download(&client, &p.url, &part, p.algo, limit).await {
+            Ok(v) => break v,
+            Err(e)
+                if attempt < ATTEMPTS
+                    && !e.to_string().contains("MACHINA_METAL_IMAGE_MAX_BYTES") =>
+            {
+                tracing::warn!("image {rel}: attempt {attempt} failed: {e:#}; retrying");
+                tokio::time::sleep(retry_pause(attempt)).await;
+            }
+            Err(e) => return Err(e),
         }
-        h.update(&chunk);
-        f.write_all(&chunk).await?;
-    }
-    f.flush().await?;
-    drop(f);
-    let got = h.finish();
+    };
     if got != expected {
         let _ = tokio::fs::remove_file(&part).await;
         anyhow::bail!(
@@ -579,6 +615,42 @@ mod tests {
             }
         });
         format!("http://{addr}/disk.img")
+    }
+
+    /// First connection promises the whole body and drops after half of it; the second is whole.
+    async fn serve_flaky(body: &'static [u8]) -> String {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = l.local_addr().unwrap();
+        tokio::spawn(async move {
+            for n in 0..2 {
+                let Ok((mut s, _)) = l.accept().await else {
+                    return;
+                };
+                let mut buf = [0u8; 2048];
+                let _ = s.read(&mut buf).await;
+                let head = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                );
+                let _ = s.write_all(head.as_bytes()).await;
+                let part = if n == 0 { body.len() / 2 } else { body.len() };
+                let _ = s.write_all(&body[..part]).await;
+            }
+        });
+        format!("http://{addr}/disk.img")
+    }
+
+    #[tokio::test]
+    async fn a_dropped_transfer_is_retried_and_still_verified() {
+        let pool = crate::db::testing::pool().await;
+        let dir = std::env::temp_dir().join(format!("machina-img-{}", Uuid::new_v4().simple()));
+        let body: &'static [u8] = b"0123456789 a long enough body to be cut in half by the server";
+        let good = hex::encode(Sha256::digest(body));
+        let url = serve_flaky(body).await;
+        import_to(&pool, &dir, url, good).await.unwrap();
+        assert_eq!(std::fs::read(dir.join("t-disk.img")).unwrap(), body);
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     async fn import_to(
