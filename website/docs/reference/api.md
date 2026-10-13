@@ -70,6 +70,16 @@ Generated specs live in the repository:
 Clients: the [TypeScript SDK](https://github.com/zyvorai/zyvor-machina/blob/main/sdk/typescript/README.md), the
 [Terraform provider](https://github.com/zyvorai/zyvor-machina/blob/main/terraform/machina/README.md) and `machinactl`.
 
+## VPC forwarding
+
+Peering, route and network-ACL endpoints under `/api/v1/cloud/…` report `forwarding_active`; see
+[VPC forwarding](../core-concepts/vpc-forwarding.md).
+
+## Migration gateway
+
+`/api/v1/transiva/*` forwards provider discovery and migration preview, submit and batch to Transiva/h2kvm:
+[Transiva migration gateway](transiva-api.md).
+
 ## Bare metal
 
 Provisioning endpoints under `/api/v1/baremetal` are listed in [Bare-metal API and CLI](bare-metal-api.md).

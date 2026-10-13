@@ -25,6 +25,8 @@ from a handful of Rust services on plain Linux.
 | `+ machina-controller` and an agent per host | A fleet: HA failover with fencing, DRS, live migration, Fleet Cloud, Zyra AI |
 | `+ machina-bpfd` on each host | eBPF load balancing, Kubernetes CNI, DDoS shield, VM isolation and flow visibility |
 | `+ BMC addresses` of machines with no OS | [Bare-metal provisioning](core-concepts/bare-metal.md): discover, commission, deploy an image, join |
+| `+ VPCs` that must reach each other or the internet | [VPC forwarding and network ACLs](core-concepts/vpc-forwarding.md) |
+| `+ a production site` | [Production hardening](operations/production-hardening.md): strict profile, key rollover, audit retention |
 
 See [Architecture](core-concepts/architecture.md) for how they connect.
 

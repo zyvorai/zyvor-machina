@@ -45,6 +45,7 @@ eBPF datapath (`machina-bpfd`) and a React web UI. The public site with the same
 | Live migration actuator | [migration/live-actuator.md](migration/live-actuator.md) |
 | Certification matrix | [platform-cert-matrix.md](platform-cert-matrix.md) |
 | Compliance hardening | [compliance-hardening.md](compliance-hardening.md) |
+| Production profile, key rollover, audit retention, qualification gates | [../website/docs/operations/production-hardening.md](../website/docs/operations/production-hardening.md) |
 | Packaging and remote builds | [PACKAGE_BINARY_REMOTE.md](PACKAGE_BINARY_REMOTE.md), [CLIENT_BUNDLE_POLICY.md](CLIENT_BUNDLE_POLICY.md), [macos-build.md](macos-build.md) |
 | Observability | [guides/observability.md](guides/observability.md) |
 
@@ -125,4 +126,5 @@ Machina's native eBPF stack (`machina-bpfd`, `machina-cni`) replaces Cilium, Tet
 longer integrates with any of them.
 
 - [VPC foundations and elastic compute](cloud-vpc-elastic-compute.md) — project-owned isolated subnets, IPAM, launch templates and instance groups.
+- [Cloud fabric](cloud-fabric.md) — VPC peering, internet-gateway and blackhole forwarding and network ACLs enforced on the hosts, over the WireGuard overlay.
 - [EC2-compatible API](cloud-ec2-api.md) — the EC2, Auto Scaling, ELBv2 and alarm query endpoints: a per-action table (real, recorded, plan-only, refused), what is unit-tested and what has been run. [Using stock clients](cloud-ec2-clients.md) covers the aws cli, boto3 and Terraform.

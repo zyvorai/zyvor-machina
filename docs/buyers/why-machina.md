@@ -26,7 +26,7 @@ API, a CLI and an EC2-compatible endpoint, so `awscli`, boto3 and your existing 
   ([site readiness](../CUSTOMER_SITE_READINESS.md)).
 - **Written, tested, not yet run live:** Elastic IPs, NAT gateway, instance metadata service, project-scoped API keys, load
   balancer health checks. They have unit tests in CI; we will not call them proven until the live run.
-- **Not built:** cross-host VPCs and a real internet-gateway datapath. Multi-host failover needs a host-loss drill at your site.
+- **Not yet proven:** VPC peering, internet-gateway routes and network ACLs are enforced on the hosts, but cross-host forwarding has not been run end to end (claim C52). Multi-host failover needs a host-loss drill at your site.
 
 ## Who it is for, and what they ask
 **Infrastructure lead.** *How long to value?* Install, first VM and a working browser console in an afternoon
