@@ -11,8 +11,8 @@ can show; check each vendor's current documentation and pricing before you decid
 | **Plain libvirt and scripts** | You have outgrown `virsh` scripts and want one API, UI, audit and fleet view | A handful of VMs on one host that never change |
 
 ## What Machina does not do today
-Cross-host VPC forwarding proven on real traffic (peering, gateway routes and ACLs are enforced on the hosts, but not yet run across
-hosts), per-interface security groups and a managed database or queue service. Multi-host failover is built and needs a host-loss drill on your hardware before you rely on it
+Internet-gateway egress and guest-VM ACLs proven on real traffic (peering, blackhole routes and ACLs are enforced on the hosts and
+were run across two hosts with test traffic), per-interface security groups and a managed database or queue service. Multi-host failover is built and needs a host-loss drill on your hardware before you rely on it
 ([ledger](../claims.md)).
 
 ## How to find out for sure

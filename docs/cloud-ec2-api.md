@@ -672,7 +672,7 @@ Run `scripts/ec2/boto3_elbv2.py` against a controller to exercise it with the re
 
 ## Known gaps
 Things a client may expect that Machina does not do (each is refused or absent, not silently ignored):
-- IMDSv2 session tokens, IPv6 forwarding and ACLs, transit routing through a peer, and multi-host Elastic IP failover. Cross-host peering forwarding is unit-tested but not yet run end to end.
+- IMDSv2 session tokens, IPv6 forwarding and ACLs, transit routing through a peer, and multi-host Elastic IP failover. Cross-host peering has been run on two hosts with netns traffic; gateway egress to a real uplink has not.
 - Egress-only gateways, VPC endpoints, transit gateways and IPv6 (describes of the first two answer empty).
 - CloudWatch: only the six alarm and statistics actions; no `PutMetricData`, `ListMetrics`, dashboards or log groups.
 - Auto Scaling: lifecycle hooks, scheduled actions, instance refresh, warm pools, notification configurations, load balancer attachment,

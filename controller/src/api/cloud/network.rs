@@ -790,6 +790,8 @@ pub async fn delete_route(
     }
     audit(&mut tx, &actor, "cloud.route.delete", rid).await?;
     tx.commit().await?;
+    // Withdraw forwarding now; the 30 s drift loop would take up to half a minute.
+    let _ = crate::engine::cloud_fabric::converge_vpc(&state.pool, id).await;
     Ok(Json(json!({"deleted":true})))
 }
 pub async fn plan(

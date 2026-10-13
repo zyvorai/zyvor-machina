@@ -1,9 +1,10 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
 
-//! Network ACLs on `POST /ec2`. They are **stored plans**: the entries are kept, listed and validated exactly as AWS does,
-//! but no host filters traffic by them (the XML carries `forwardingActive=false`). Every VPC has a default ACL (rule 100
-//! allow, rule 32767 deny, both directions) that each subnet starts out associated with.
+//! Network ACLs on `POST /ec2`. Entries are kept, listed and validated exactly as AWS does and are enforced on the
+//! hosts as a stateless nftables chain (`engine/cloud_fabric.rs`); every change converges the VPC's host at once.
+//! Every VPC has a default ACL (rule 100 allow, rule 32767 deny, both directions) that each subnet starts out
+//! associated with.
 
 use std::collections::BTreeMap;
 
@@ -234,7 +235,8 @@ pub async fn create_network_acl_entry(state: &AppState, actor: &AuthUser, p: &Pa
         .bind(e.to)
         .execute(&state.pool)
         .await?;
-    Ok("<return>true</return><forwardingActive>false</forwardingActive>".into())
+    let forwarding = crate::engine::cloud_fabric::converge_vpc(&state.pool, vpc).await.is_ok();
+    Ok(format!("<return>true</return><forwardingActive>{forwarding}</forwardingActive>"))
 }
 
 pub async fn replace_network_acl_entry(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
@@ -258,6 +260,7 @@ pub async fn replace_network_acl_entry(state: &AppState, actor: &AuthUser, p: &P
     if done == 0 {
         return Err(bad("InvalidNetworkAclEntry.NotFound", format!("There is no entry with rule number {}", e.number)));
     }
+    let _ = crate::engine::cloud_fabric::converge_vpc(&state.pool, vpc).await;
     Ok("<return>true</return>".into())
 }
 
@@ -285,6 +288,7 @@ pub async fn delete_network_acl_entry(state: &AppState, actor: &AuthUser, p: &Pa
     if done == 0 {
         return Err(bad("InvalidNetworkAclEntry.NotFound", format!("There is no entry with rule number {number}")));
     }
+    let _ = crate::engine::cloud_fabric::converge_vpc(&state.pool, vpc).await;
     Ok("<return>true</return>".into())
 }
 
@@ -302,6 +306,7 @@ pub async fn replace_network_acl_association(state: &AppState, actor: &AuthUser,
     let id = Uuid::new_v4();
     crate::db::query("DELETE FROM ec2_acl_assocs WHERE id = ?").bind(assoc).execute(&state.pool).await?;
     crate::db::query("INSERT INTO ec2_acl_assocs (id, acl_id, subnet_id) VALUES (?, ?, ?)").bind(id).bind(acl).bind(subnet).execute(&state.pool).await?;
+    let _ = crate::engine::cloud_fabric::converge_vpc(&state.pool, vpc).await;
     Ok(format!("<newAssociationId>{}</newAssociationId>", ec2_id(Kind::NetworkAclAssociation, id)))
 }
 

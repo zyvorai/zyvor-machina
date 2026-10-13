@@ -47,6 +47,10 @@ pub struct AclRule {
 pub struct HostConfig {
     pub peer_routes: Vec<PeerRoute>,
     pub peer_ingress: Vec<PeerRoute>,
+    /// Peered VPCs that live on this same host: forwarded bridge to bridge, no
+    /// WireGuard hop. One-sided like the others: each direction needs its route.
+    #[serde(default)]
+    pub local_routes: Vec<PeerRoute>,
     pub internet_routes: Vec<InternetRoute>,
     pub blackholes: Vec<BlackholeRoute>,
     pub acls: Vec<AclRule>,
@@ -119,6 +123,16 @@ pub async fn desired_for_host(pool: &DbPool, host: Uuid) -> anyhow::Result<HostC
             requester
         };
         let remote_host = vpc_host(pool, remote_vpc).await?;
+        if local_host == remote_host {
+            // Both VPCs live on one host: nothing crosses machina-wg.
+            if local_host == host {
+                out.local_routes.push(PeerRoute {
+                    source,
+                    destination,
+                });
+            }
+            continue;
+        }
         if local_host == host {
             out.peer_routes.push(PeerRoute {
                 source: source.clone(),
@@ -173,6 +187,16 @@ pub async fn desired_for_host(pool: &DbPool, host: Uuid) -> anyhow::Result<HostC
             requester
         };
         let remote_host = vpc_host(pool, remote_vpc).await?;
+        if local_host == remote_host {
+            // Both VPCs live on one host: nothing crosses machina-wg.
+            if local_host == host {
+                out.local_routes.push(PeerRoute {
+                    source,
+                    destination,
+                });
+            }
+            continue;
+        }
         if local_host == host {
             out.peer_routes.push(PeerRoute {
                 source: source.clone(),
@@ -267,6 +291,9 @@ pub async fn desired_for_host(pool: &DbPool, host: Uuid) -> anyhow::Result<HostC
     out.peer_ingress
         .sort_by(|a, b| (&a.source, &a.destination).cmp(&(&b.source, &b.destination)));
     out.peer_ingress.dedup();
+    out.local_routes
+        .sort_by(|a, b| (&a.source, &a.destination).cmp(&(&b.source, &b.destination)));
+    out.local_routes.dedup();
     out.internet_routes
         .sort_by(|a, b| (&a.source, &a.destination).cmp(&(&b.source, &b.destination)));
     out.internet_routes.dedup();
