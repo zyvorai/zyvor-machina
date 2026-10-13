@@ -8,6 +8,8 @@
 - **Convergence.** Native route delete, EC2 network-ACL entry create/replace/delete and association change, and
   internet-gateway attach/detach now converge the hosts when the call returns instead of waiting up to 30 s.
   `CreateNetworkAclEntry` reports the real `forwardingActive`.
+- **Verified (same host).** After the fix, two peered VPCs on one host forward bridge to bridge; ACL, blackhole and
+  route-delete changes converge in about 2 s (previously 6-27 s).
 - **Verified.** Cross-host peering over WireGuard, ACL deny/allow and blackhole routes passed with real packets on
   two hosts; claim C52 is now `verified (cross-host, netns)`. Not run: gateway egress, IPv6, ACLs against guest VMs.
 
