@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-10-13 — Cloud fabric, production profile, ARM64 packages, Transiva gateway
+
+See [docs/cloud-fabric.md](docs/cloud-fabric.md) and
+[Production hardening](website/docs/operations/production-hardening.md). Claims C52 to C55 (#166).
+
+- **VPC forwarding.** Accepted peerings, internet-gateway routes and blackholes are installed on the hosts and EC2
+  network ACLs are rendered into an early nftables chain (`machina_cloud_acl`, priority -250) with an implicit deny.
+  Convergence is immediate on a route or peering change and every 30 s for drift. Peering reuses the `machina-wg`
+  overlay: `AllowedIPs` (source ownership) are separate from the installed routes, IPv4 and IPv6 are programmed
+  correctly, and a peering turns the overlay on without touching the VM-network-policy setting.
+- **Honest status.** Peering accept and route calls return `forwarding_active` / `forwardingActive` from the real apply
+  instead of a permanent `false`; instance and interface targets stay stored plans. The EC2 action table is
+  regenerated (peering, internet gateway and ACL actions are no longer `plan`).
+- **Security lifecycle.** `MACHINA_SECURITY_PROFILE=production` preflight, `MACHINA_API_KEY_MASTER_KEY_FILE`,
+  `MACHINA_JWT_PREVIOUS_SECRETS` rollover, `MACHINA_AUDIT_RETENTION_DAYS` (daily, leader only), and
+  `machina-bpfd --require-programs` / `MACHINA_BPF_REQUIRED`.
+- **Transiva gateway.** `/api/v1/transiva/{status,providers,migrations/preview,submit,batch}`.
+- **ARM64.** Native arm64 CI, architecture-neutral nfpm packages, `build-release.sh --arch`, dual-architecture release
+  workflow with per-architecture SBOM and checksums.
+- **Qualification gates.** `scripts/qualification/*` and `scripts/compliance/generate-evidence.py`; not run in CI.
+- **Verification.** Compiled, unit-tested (agent 72, bpf 152, controller 531) and installed on a lab host; a
+  single-host peering, route and ACL-hook run passed. Cross-host peering, gateway egress, ACL filtering of real
+  traffic, arm64 and the qualification scripts have not run.
+
 ## 2026-10-12 — Bare-metal provisioning: BMCs to joined hosts
 
 See [docs/baremetal-provisioning.md](docs/baremetal-provisioning.md). Claims C49 to C51.

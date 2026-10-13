@@ -10,7 +10,8 @@ description: Host, OS and network requirements for Machina.
 
 - A 64-bit Linux host with hardware virtualization (Intel VT-x or AMD-V) enabled, so `/dev/kvm` exists.
 - x86_64 or aarch64. The installer picks the matching QEMU system emulator (`qemu-system-x86` or `qemu-system-arm`)
-  plus `qemu-utils`.
+  plus `qemu-utils`. Release packages are published for both `amd64` and `arm64`; the arm64 packages are built on
+  native runners and have not yet been run on a production arm64 host.
 - libvirt (`libvirtd`). The daemon talks to `qemu:///system` by default.
 - Enough disk for guest images under the libvirt storage pools you configure.
 

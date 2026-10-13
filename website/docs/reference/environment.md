@@ -20,7 +20,13 @@ environment variables from their env files.
 | `MACHINA_AGENT_CA`, `MACHINA_AGENT_CLIENT_CERT`, `MACHINA_AGENT_CLIENT_KEY` | unset | mTLS to agents |
 | `MACHINA_JWT_SECRET` | random per process | JWT signing secret; set it for sessions that survive restarts |
 | `MACHINA_ALLOW_DEV_SECRETS` | unset | Allow the well-known development secret (never in production) |
-| `MACHINA_API_KEY_MASTER_KEY` | unset | 64-hex-char AES-256-GCM key for stored LLM provider keys (`openssl rand -hex 32`) |
+| `MACHINA_API_KEY_MASTER_KEY` | unset | 64-hex-char AES-256-GCM key for stored LLM provider and BMC secrets (`openssl rand -hex 32`) |
+| `MACHINA_API_KEY_MASTER_KEY_FILE` | unset | Path to a root-readable file holding that key; read first, so the key stays out of the environment |
+| `MACHINA_JWT_PREVIOUS_SECRETS` | unset | Comma-separated earlier signing secrets, accepted for verification only (rollover) |
+| `MACHINA_SECURITY_PROFILE` | `development` | `production` enables the strict preflight ([Production hardening](../operations/production-hardening.md)) |
+| `MACHINA_AUDIT_RETENTION_DAYS` | `365` | Days of `audit_logs` kept; clamped to 7-3650, `0` keeps everything |
+| `MACHINA_BPF_REQUIRED` | unset (set `true` by the packaged bpfd unit) | bpfd refuses to start without its embedded eBPF object |
+| `MACHINA_TRANSIVA_URL`, `MACHINA_TRANSIVA_API_KEY`, `MACHINA_TRANSIVA_TIMEOUT_SECS` | `http://127.0.0.1:5070`, unset, `60` | [Transiva migration gateway](transiva-api.md) |
 | `MACHINA_PUBLIC_URL` | `http://127.0.0.1:5093` | Public controller URL |
 | `MACHINA_WEB_URL` | `http://127.0.0.1:5173` | Web UI URL used in links |
 | `MACHINA_DAEMON_URL` | — | How the controller reaches the daemon |

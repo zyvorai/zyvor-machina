@@ -99,6 +99,9 @@ export const WHY = [
 export type News = {title: string; body: string};
 
 export const WHATS_NEW: News[] = [
+  {title: 'VPC forwarding and ACLs', body: 'Peering, internet-gateway and blackhole routes and stateless network ACLs are enforced on the hosts, over the WireGuard overlay between them.'},
+  {title: 'Production profile', body: 'A strict, opt-in startup check, key rollover for JWT and master keys, audit retention and a mandatory eBPF datapath.'},
+  {title: 'ARM64 packages', body: 'DEB, RPM and tar bundles for amd64 and arm64, built and tested on native runners.'},
   {title: 'EC2-compatible API', body: 'Point awscli, boto3 and Terraform at the controller: 288 actions, each applied, recorded or refused by name.'},
   {title: 'PostgreSQL controller', body: 'Run the controller on PostgreSQL for large fleets or several controllers; one command migrates an SQLite site.'},
   {title: 'FluxVM backend', body: 'FluxVM VMs sit next to libvirt VMs, with eBPF networking, live migration and HA across hosts.'},
