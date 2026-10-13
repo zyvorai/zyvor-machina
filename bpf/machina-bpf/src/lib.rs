@@ -25,6 +25,7 @@ pub mod netpol;
 pub mod pcapng;
 pub mod policy;
 pub mod rtnl;
+pub mod startup;
 pub mod tracefs;
 pub mod vmintel;
 

@@ -27,6 +27,9 @@ struct Args {
     /// Print kernel feature detection and exit.
     #[arg(long)]
     probe: bool,
+    /// Refuse to start if this binary was built without the embedded eBPF object.
+    #[arg(long, env = "MACHINA_BPF_REQUIRED", default_value_t = false)]
+    require_programs: bool,
 }
 
 #[cfg(target_os = "linux")]
@@ -45,10 +48,15 @@ async fn main() -> anyhow::Result<()> {
             serde_json::to_string_pretty(&serde_json::json!({
                 "features": f,
                 "programs_compiled": machina_bpf::loader::programs_compiled(),
+                "programs_required": args.require_programs,
             }))?
         );
         return Ok(());
     }
+    machina_bpf::startup::require_programs(
+        args.require_programs,
+        machina_bpf::loader::programs_compiled(),
+    )?;
     machina_bpf::server::run(machina_bpf::server::Config {
         socket: args.socket,
         state_dir: args.state_dir,

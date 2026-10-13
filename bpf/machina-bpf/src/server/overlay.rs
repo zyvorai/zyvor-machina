@@ -336,7 +336,11 @@ impl OverlayRuntime {
             )?;
         }
 
-        let routes: BTreeSet<String> = cfg.peers.iter().flat_map(|p| p.prefixes.clone()).collect();
+        let routes: BTreeSet<String> = cfg
+            .peers
+            .iter()
+            .flat_map(|p| if p.routes.is_empty() { p.prefixes.clone() } else { p.routes.clone() })
+            .collect();
         for fam in ["-4", "-6"] {
             for r in ov::parse_routes(&run("ip", &[fam, "route", "show", "dev", IFACE])?) {
                 let keep = routes.contains(&r)
@@ -347,7 +351,8 @@ impl OverlayRuntime {
             }
         }
         for r in &routes {
-            run("ip", &["route", "replace", r, "dev", IFACE])?;
+            let fam = if r.contains(':') { "-6" } else { "-4" };
+            run("ip", &[fam, "route", "replace", r, "dev", IFACE])?;
         }
         let blackhole: Vec<String> = cfg
             .fleet_prefixes
@@ -357,11 +362,13 @@ impl OverlayRuntime {
             .collect();
         for r in std::mem::take(&mut self.unreachable) {
             if !blackhole.contains(&r) {
-                let _ = run("ip", &["route", "del", "unreachable", &r]);
+                let fam = if r.contains(':') { "-6" } else { "-4" };
+            let _ = run("ip", &[fam, "route", "del", "unreachable", &r]);
             }
         }
         for r in &blackhole {
-            run("ip", &["route", "replace", "unreachable", r])?;
+            let fam = if r.contains(':') { "-6" } else { "-4" };
+            run("ip", &[fam, "route", "replace", "unreachable", r])?;
         }
         self.unreachable = blackhole;
 
@@ -390,7 +397,8 @@ impl OverlayRuntime {
 
     fn teardown(&mut self) {
         for r in std::mem::take(&mut self.unreachable) {
-            let _ = run("ip", &["route", "del", "unreachable", &r]);
+            let fam = if r.contains(':') { "-6" } else { "-4" };
+            let _ = run("ip", &[fam, "route", "del", "unreachable", &r]);
         }
         if iface_exists() {
             if let Err(e) = run("ip", &["link", "del", IFACE]) {

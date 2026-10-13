@@ -18,6 +18,7 @@ Environment=MACHINA_BPFD_SOCKET_GROUP=
 Environment=MACHINA_BPFD_SOCK=/run/machina-bpf/bpfd.sock
 Environment=MACHINA_BPFD_STATE_DIR=/var/lib/machina/bpf
 Environment=RUST_LOG=machina_bpf=info
+Environment=MACHINA_BPF_REQUIRED=true
 
 ExecStart=/usr/local/bin/machina-bpfd
 Restart=always
