@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-13 (later) — Same-host peering, immediate convergence, cross-host verification
+
+- **Fixed:** two peered VPCs on the **same host** never forwarded (the rules only matched `machina-wg`) while the API
+  reported `forwarding_active: true`. The controller now emits `local_routes` and the agent forwards between the
+  bridges, one-sided like the other routes.
+- **Convergence.** Native route delete, EC2 network-ACL entry create/replace/delete and association change, and
+  internet-gateway attach/detach now converge the hosts when the call returns instead of waiting up to 30 s.
+  `CreateNetworkAclEntry` reports the real `forwardingActive`.
+- **Verified.** Cross-host peering over WireGuard, ACL deny/allow and blackhole routes passed with real packets on
+  two hosts; claim C52 is now `verified (cross-host, netns)`. Not run: gateway egress, IPv6, ACLs against guest VMs.
+
 ## 2026-10-13 — Cloud fabric, production profile, ARM64 packages, Transiva gateway
 
 See [docs/cloud-fabric.md](docs/cloud-fabric.md) and

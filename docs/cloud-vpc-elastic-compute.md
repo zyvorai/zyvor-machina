@@ -22,7 +22,7 @@ This is not AWS/Azure/GCP API compatibility or a complete hyperscaler clone.
 There are no transit/VPN gateways, private endpoints, managed databases or IPv6
 forwarding in this release. Peering, internet-gateway and blackhole routes and
 network ACLs are enforced on the hosts ([cloud-fabric.md](cloud-fabric.md));
-cross-host forwarding has not been run end to end. Existing Fleet Cloud security groups remain advisory; this change does
+cross-host peering has been run on two hosts with test traffic (claim C52). Existing Fleet Cloud security groups remain advisory; this change does
 not claim to activate them. Use the separate VM network policy service where
 appropriate, accounting for its enforcement lease and preview maturity.
 

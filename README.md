@@ -60,7 +60,7 @@ CPU scaling, and the explicit routing/peering limitations.
 | **Plain-English policies** | Describe a VM network policy in words; Zyvor drafts the YAML, dry-runs it against past traffic and applies it after approval. |
 | **Project isolation** | Fleet Cloud projects are isolated from each other by default, with per-project egress allowlists and egress IPs that Machina adds to the host and announces itself. |
 | **Encrypted cross-host overlay** | WireGuard between hypervisors; VM traffic keeps its identity across hosts, so isolation holds even on NAT networks. |
-| **VPC forwarding and ACLs** | Peering, internet-gateway and blackhole routes and stateless network ACLs enforced on the hosts, with `forwardingActive` reported by the EC2 API. Single-host verified; cross-host not yet run. [Guide →](docs/cloud-fabric.md) |
+| **VPC forwarding and ACLs** | Peering, internet-gateway and blackhole routes and stateless network ACLs enforced on the hosts, with `forwardingActive` reported by the EC2 API. Run on two hosts with real packets; gateway egress and guest-VM ACLs not yet run. [Guide →](docs/cloud-fabric.md) |
 | **Production profile** | Opt-in strict startup preflight, master key from a file, JWT key rollover, bounded audit retention, mandatory eBPF datapath, amd64 and arm64 packages. [Guide →](website/docs/operations/production-hardening.md) |
 | **Transiva gateway** | Provider discovery and VM migration preview, submit and batch through `/api/v1/transiva/*`. |
 | **Segmentation evidence** | Export a sealed (SHA-256) JSON or Markdown report of policies, the reachability matrix and denied traffic for audits. |

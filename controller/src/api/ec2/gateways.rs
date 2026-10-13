@@ -105,6 +105,7 @@ pub async fn attach_internet_gateway(state: &AppState, actor: &AuthUser, p: &Par
         return Err(bad("InvalidParameterValue", "the VPC already has an internet gateway attached"));
     }
     crate::db::query("UPDATE ec2_internet_gateways SET vpc_id = ? WHERE id = ?").bind(vpc).bind(igw).execute(&state.pool).await?;
+    let _ = crate::engine::cloud_fabric::converge_vpc(&state.pool, vpc).await;
     Ok("<return>true</return>".into())
 }
 
@@ -122,6 +123,7 @@ pub async fn detach_internet_gateway(state: &AppState, actor: &AuthUser, p: &Par
     if done == 0 {
         return Err(bad("Gateway.NotAttached", "the internet gateway is not attached to that VPC"));
     }
+    let _ = crate::engine::cloud_fabric::converge_vpc(&state.pool, vpc).await;
     Ok("<return>true</return>".into())
 }
 

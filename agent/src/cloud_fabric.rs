@@ -73,6 +73,10 @@ pub struct Config {
     /// connectivity.
     #[serde(default)]
     pub peer_ingress: Vec<PeerRoute>,
+    /// Peered VPCs on this same host: forwarded between their bridges without
+    /// a WireGuard hop. One-sided: each direction needs its own route.
+    #[serde(default)]
+    pub local_routes: Vec<PeerRoute>,
     #[serde(default)]
     pub internet_routes: Vec<InternetRoute>,
     #[serde(default)]
@@ -85,6 +89,7 @@ pub struct Config {
 pub struct SyncResult {
     pub peer_routes: usize,
     pub peer_ingress: usize,
+    pub local_routes: usize,
     pub internet_routes: usize,
     pub blackholes: usize,
     pub acl_rules: usize,
@@ -138,7 +143,12 @@ fn iface(s: &str) -> bool {
 }
 
 pub fn validate(cfg: &Config) -> Result<(), String> {
-    for r in cfg.peer_routes.iter().chain(&cfg.peer_ingress) {
+    for r in cfg
+        .peer_routes
+        .iter()
+        .chain(&cfg.peer_ingress)
+        .chain(&cfg.local_routes)
+    {
         v4_cidr(&r.source)?;
         v4_cidr(&r.destination)?;
         if r.destination == "0.0.0.0/0" {
@@ -317,6 +327,23 @@ pub fn plan_forward(cfg: &Config, default_uplink: Option<&str>) -> Result<Vec<St
                 WG_IFACE,
                 "-j",
                 "DROP",
+            ],
+        ));
+    }
+    for r in &cfg.local_routes {
+        out.push(step(
+            "iptables",
+            &[
+                "-t",
+                "filter",
+                "-A",
+                FWD_CHAIN,
+                "-s",
+                &r.source,
+                "-d",
+                &r.destination,
+                "-j",
+                "ACCEPT",
             ],
         ));
     }
@@ -564,6 +591,7 @@ pub fn sync(payload: &Value) -> Result<SyncResult, String> {
 
     if !cfg.peer_routes.is_empty()
         || !cfg.peer_ingress.is_empty()
+        || !cfg.local_routes.is_empty()
         || !cfg.internet_routes.is_empty()
     {
         std::fs::write("/proc/sys/net/ipv4/ip_forward", "1")
@@ -579,6 +607,7 @@ pub fn sync(payload: &Value) -> Result<SyncResult, String> {
     Ok(SyncResult {
         peer_routes: cfg.peer_routes.len(),
         peer_ingress: cfg.peer_ingress.len(),
+        local_routes: cfg.local_routes.len(),
         internet_routes: cfg.internet_routes.len(),
         blackholes: cfg.blackholes.len(),
         acl_rules: cfg.acls.len(),
@@ -599,6 +628,7 @@ mod tests {
                 source: "10.30.0.0/16".into(),
                 destination: "10.10.0.0/16".into(),
             }],
+            local_routes: Vec::new(),
             internet_routes: vec![InternetRoute {
                 source: "10.10.1.0/24".into(),
                 destination: "0.0.0.0/0".into(),
@@ -631,6 +661,40 @@ mod tests {
                 },
             ],
         }
+    }
+
+    #[test]
+    fn same_host_peering_is_forwarded_between_bridges_one_sided() {
+        let c = Config {
+            local_routes: vec![PeerRoute {
+                source: "10.211.0.0/16".into(),
+                destination: "10.212.0.0/16".into(),
+            }],
+            ..Config::default()
+        };
+        validate(&c).unwrap();
+        let text = plan_forward(&c, None)
+            .unwrap()
+            .iter()
+            .map(|s| format!("{} {}", s.program, s.args.join(" ")))
+            .collect::<Vec<_>>()
+            .join("\n");
+        // No WireGuard interface in the rule, and only the configured direction.
+        assert!(text.contains("-A MACHINA_VPC_FWD -s 10.211.0.0/16 -d 10.212.0.0/16 -j ACCEPT"));
+        assert!(!text.contains("-s 10.212.0.0/16 -d 10.211.0.0/16"));
+        let line = text
+            .lines()
+            .find(|l| l.contains("-s 10.211.0.0/16 -d 10.212.0.0/16"))
+            .unwrap();
+        assert!(!line.contains("machina-wg"));
+        let bad = Config {
+            local_routes: vec![PeerRoute {
+                source: "10.211.0.0/16".into(),
+                destination: "0.0.0.0/0".into(),
+            }],
+            ..Config::default()
+        };
+        assert!(validate(&bad).is_err());
     }
 
     #[test]

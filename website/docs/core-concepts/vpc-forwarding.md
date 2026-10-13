@@ -10,10 +10,11 @@ Fleet Cloud VPCs are more than stored objects. Peering routes, Internet Gateway 
 network ACLs are reconciled into each host's datapath, so a route that says "forward" actually forwards and an ACL
 that says "deny" actually drops.
 
-:::caution Verification status
-The planner, the nftables rendering and the controller reconciler are unit-tested. A single-host live run
-(peering, route, ACL hook, route removal) has passed. **Cross-host peering over WireGuard, Internet Gateway egress and
-ACL filtering of real guest traffic have not been run end to end yet.** See the claims ledger (`docs/claims.md`, C52).
+:::note Verification status
+Cross-host peering over WireGuard has been run on two real hosts with network namespaces on the subnet bridges: no
+route blocks, routes in both directions forward (ping and TCP), a missing return route blocks, ingress and egress ACL
+denies and blackhole routes block, and removing the routes blocks again. **Not yet run: Internet Gateway egress,
+IPv6, and ACLs against real guest VMs.** See the claims ledger (`docs/claims.md`, C52).
 :::
 
 ## What is enforced
@@ -28,6 +29,8 @@ ACL filtering of real guest traffic have not been run end to end yet.** See the 
 
 ## How a peering becomes traffic
 
+0. **Where the VPCs live.** Each VPC belongs to one host. Peered VPCs on different hosts talk over `machina-wg`; peered
+   VPCs on the **same** host are forwarded directly between their bridges. The rules are the same one-sided kind.
 1. **Request and accept.** A peering needs an explicit request and acceptance by the target project. Accepting it
    makes each VPC's CIDR an *allowed source* from the other (WireGuard `AllowedIPs`), but routes **nothing**.
 2. **Route.** Traffic flows only once a route table has a route whose target is the peering. The destination must fit
@@ -60,8 +63,10 @@ so it runs before libvirt, iptables-compat, Elastic IP and NAT rules and cannot 
 
 ## Convergence
 
-A route, peering or ACL change converges the VPC's hosts immediately. A 30-second reconciler repairs drift (for
-example a rule flushed by hand). The EC2 compatibility API reports the result: `DescribeVpcPeeringConnections`
+Route and peering changes, ACL entry changes, Internet Gateway attach and detach converge the VPC's hosts as soon as
+the API call returns. A 30-second reconciler repairs drift (for example a rule flushed by hand) and picks up anything
+changed by another path, so a change made that way takes up to about 30 seconds. The WireGuard overlay is brought up
+for the first peering route and torn down after the last one. The EC2 compatibility API reports the result: `DescribeVpcPeeringConnections`
 shows `active` with `forwardingActive=true` once a route exists, and `CreateRoute`/`ReplaceRoute` return
 `forwardingActive` for the call.
 
