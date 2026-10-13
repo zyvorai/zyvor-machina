@@ -349,6 +349,14 @@ Controller-side pipeline that takes a machine from a BMC address to a joined hos
 - `MACHINA_CONTROLLER_ID` — unique instance ID
 - `MACHINA_DAEMON_URL` — URL the controller uses to reach the daemon
 - `MACHINA_API_KEY_MASTER_KEY` — 64-char hex (32 bytes) AES-256-GCM master key for encrypting LLM provider API keys at rest. Unset = plaintext (dev/legacy). Generate: `openssl rand -hex 32`
+- `MACHINA_API_KEY_MASTER_KEY_FILE` — path to a root-readable file holding that key (systemd credential / Vault agent); read first, falls back to the env var
+- `MACHINA_JWT_PREVIOUS_SECRETS` — comma-separated earlier signing secrets accepted for verification only (zero-downtime rollover; tokens are always issued with the current secret)
+- `MACHINA_AUDIT_RETENTION_DAYS` — audit_logs retention enforced by a leader-only daily job (default 365, clamped 7..3650, `0` keeps forever; `engine/security_retention.rs`)
+- `MACHINA_SECURITY_PROFILE=production` — opt-in `scripts/production-preflight.sh` (run by the packaged controller unit's `ExecStartPre`): refuses auth bypass/dev secrets, requires a 32+ char JWT secret, master key, controller→agent mTLS files and `MACHINA_BPF_REQUIRED`
+- `MACHINA_BPF_REQUIRED=1` (bpfd `--require-programs`) — bpfd refuses to start without the embedded eBPF object; set in `contrib/machina-bpfd.service`
+- Cloud fabric (`engine/cloud_fabric.rs` + `agent/src/cloud_fabric.rs`, agent op `cloud.fabric.sync`): VPC peering / Internet Gateway / blackhole forwarding and EC2 NACLs (nftables table `machina_cloud_acl`, priority -250) reconciled per host on route/peering change and every 30 s; peerings reuse the `machina-wg` overlay (`VmOverlayPeer.routes` separates installed routes from `prefixes`, `VmOverlay.direct_routes`). Unit-tested and live-checked single-host only; cross-host WireGuard peering is not yet verified.
+- Transiva / h2kvm gateway: `/api/v1/transiva/{status,providers,migrations/preview,migrations/submit,migrations/batch}` (`api/transiva.rs`)
+- Release packages are built per architecture (`build-release.sh --arch amd64|arm64`, `arm64.yml` CI); qualification gates live in `scripts/qualification/` and are not run in CI
 - `MACHINA_NETPOL_PROJECT_APPROVAL=1` — every project network change (isolation, egress allowlist/IPs) becomes a two-person `vm_netpol.project` approval
 - `MACHINA_NETPOL_EGRESS_MANAGE=0` — hosts no longer add missing project egress IPs to their uplink (default on: bpfd adds a `/32`/`/128`, announces it with GARP / unsolicited NA, removes only what it added); `MACHINA_NETPOL_EGRESS_INTERFACE` — interface for them instead of the default route's
 - WireGuard overlay (`netpol overlay enable --fleet`, `/api/v1/vm-network-policies/overlay`) is a DB setting, not an env var: needs `wireguard-tools` on every host and UDP 51871 between them; keys stay in bpfd's state dir and are set over netlink (Ubuntu's AppArmor profile blocks `wg` reading keys outside `/etc/wireguard`)

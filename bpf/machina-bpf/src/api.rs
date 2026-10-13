@@ -1184,8 +1184,22 @@ pub struct VmOverlayPeer {
     pub public_key: String,
     /// `address:port` the peer listens on.
     pub endpoint: String,
-    /// The peer's fleet prefixes; also the only sources accepted from it.
+    /// Prefixes accepted from this peer by WireGuard (source ownership).
     pub prefixes: Vec<String>,
+    /// Destination prefixes installed through this peer. Empty means `prefixes`
+    /// for backward compatibility. Keeping this separate lets an accepted VPC
+    /// peering establish source ownership without routing traffic until a route
+    /// table actually selects the peer.
+    #[serde(default)]
+    pub routes: Vec<String>,
+}
+
+/// One direct routed pair admitted through the overlay guard. Used by Fleet
+/// Cloud VPC peering; normal VM-overlay traffic still requires fleet-address DNAT.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct VmOverlayRoute {
+    pub source: String,
+    pub destination: String,
 }
 
 /// The WireGuard overlay between hosts: VM traffic to another host's fleet
@@ -1209,6 +1223,9 @@ pub struct VmOverlay {
     pub mappings: Vec<VmOverlayMap>,
     #[serde(default)]
     pub peers: Vec<VmOverlayPeer>,
+    /// Direct routed VPC source/destination pairs allowed to cross machina-wg.
+    #[serde(default)]
+    pub direct_routes: Vec<VmOverlayRoute>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]

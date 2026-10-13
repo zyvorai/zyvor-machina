@@ -182,6 +182,8 @@ async fn main() -> anyhow::Result<()> {
     machina_controller::engine::alarms::spawn(state.clone());
     machina_controller::engine::eip::spawn(state.clone());
     machina_controller::engine::natgw::spawn(state.clone());
+    machina_controller::engine::cloud_fabric::spawn(state.clone());
+    machina_controller::engine::security_retention::spawn(state.clone());
     machina_controller::engine::lb_health::spawn(state.clone());
     machina_controller::engine::imds::spawn(state.clone());
     machina_controller::engine::preempt::spawn(state.clone());

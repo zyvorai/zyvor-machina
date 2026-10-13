@@ -15,18 +15,21 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
-VERSION="" BIN_DIR="" WEB_DIR="" OUT="$REPO/dist/release"
+VERSION="" BIN_DIR="" WEB_DIR="" OUT="$REPO/dist/release" ARCH=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --version) VERSION="$2"; shift 2 ;;
         --bin-dir) BIN_DIR="$2"; shift 2 ;;
         --web-dir) WEB_DIR="$2"; shift 2 ;;
         --out) OUT="$2"; shift 2 ;;
+        --arch) ARCH="$2"; shift 2 ;;
         -h|--help) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
 [ -n "$VERSION" ] && [ -n "$BIN_DIR" ] && [ -n "$WEB_DIR" ] || { echo "need --version, --bin-dir and --web-dir" >&2; exit 2; }
+if [ -z "$ARCH" ]; then case "$(uname -m)" in x86_64) ARCH=amd64 ;; aarch64|arm64) ARCH=arm64 ;; *) echo "unsupported package architecture: $(uname -m)" >&2; exit 2 ;; esac; fi
+case "$ARCH" in amd64|arm64) ;; *) echo "--arch must be amd64 or arm64" >&2; exit 2 ;; esac
 # deb/rpm versions: a leading v is dropped and pre-release dashes become tildes so 1.0.0-rc1 sorts before 1.0.0.
 VERSION="${VERSION#v}"
 REL_VERSION="$VERSION"   # tarball/SBOM names keep the plain version
@@ -47,6 +50,7 @@ rm -rf "$STAGE" && mkdir -p "$STAGE"/{bin,units,etc,doc,scripts,web,bundle}
 for b in machina-daemon machina-controller machina-agent machina-bpfd; do install -m 0755 "$BIN_DIR/$b" "$STAGE/bin/$b"; done
 install -m 0755 "$REPO/machinactl" "$STAGE/bin/machinactl"
 install -m 0755 "$REPO/scripts/preflight.sh" "$STAGE/bin/machina-preflight"
+install -m 0755 "$REPO/scripts/production-preflight.sh" "$STAGE/bin/production-preflight"
 install -m 0755 "$REPO/scripts/db/machina-db.sh" "$STAGE/bin/machina-db"
 if [ -x "$BIN_DIR/machina-dbtool" ]; then install -m 0755 "$BIN_DIR/machina-dbtool" "$STAGE/bin/machina-dbtool"; HAVE_DBTOOL=1; else HAVE_DBTOOL=0; fi
 # the controller's PostgreSQL build ships next to the default one when it was built (make release-pg)
@@ -84,7 +88,8 @@ done
 export STAGE
 for n in machina machina-controller machina-agent; do
     # nfpm does not expand variables inside file paths, so render ${STAGE} ourselves (VERSION it expands itself).
-    sed "s#\${STAGE}#$STAGE#g" "$REPO/packaging/nfpm/$n.yaml" >"$STAGE/nfpm-$n.yaml"
+    sed -e "s#\${STAGE}#$STAGE#g" -e "s#\${ARCH}#$ARCH#g" "$REPO/packaging/nfpm/$n.yaml" >"$STAGE/nfpm-$n.yaml"
+    if [ "$ARCH" = arm64 ]; then sed -i.bak 's/qemu-system-x86/qemu-system-arm/g' "$STAGE/nfpm-$n.yaml" && rm -f "$STAGE/nfpm-$n.yaml.bak"; fi
     if [ "$n" = machina-controller ] && [ "$HAVE_DBTOOL" = 1 ]; then
         sed -i.bak "/dst: \/usr\/bin\/machina-db\$/{n;a\\
   - src: $STAGE/bin/machina-dbtool\\
@@ -106,7 +111,7 @@ for n in machina machina-controller machina-agent; do
 done
 
 # ── offline bundle ─────────────────────────────────────────────────────────────
-B="$STAGE/bundle/machina-$REL_VERSION-linux-amd64"
+B="$STAGE/bundle/machina-$REL_VERSION-linux-$ARCH"
 mkdir -p "$B"/{bin,units,etc,web,lib}
 cp "$STAGE"/bin/* "$B/bin/"
 cp "$STAGE"/units/* "$B/units/"
@@ -119,12 +124,12 @@ cp "$REPO/packaging/bundle/install.sh" "$B/install.sh"
 cp "$STAGE/doc/LICENSE" "$STAGE/doc/INSTALL.md" "$B/"
 echo "$REL_VERSION" >"$B/VERSION"
 ( cd "$B" && find . -type f ! -name MANIFEST.sha256 -print0 | sort -z | xargs -0 shasum -a 256 >MANIFEST.sha256 )
-COPYFILE_DISABLE=1 tar -C "$STAGE/bundle" -czf "$OUT/machina-$REL_VERSION-linux-amd64.tar.gz" "machina-$REL_VERSION-linux-amd64"
+COPYFILE_DISABLE=1 tar -C "$STAGE/bundle" -czf "$OUT/machina-$REL_VERSION-linux-$ARCH.tar.gz" "machina-$REL_VERSION-linux-$ARCH"
 
 # ── SBOM and checksums ─────────────────────────────────────────────────────────
-python3 "$HERE/gen-sbom.py" "$REL_VERSION" "$OUT/machina-$REL_VERSION.sbom.cdx.json"
+python3 "$HERE/gen-sbom.py" "$REL_VERSION" "$OUT/machina-$REL_VERSION-$ARCH.sbom.cdx.json"
 rm -rf "$STAGE"
-( cd "$OUT" && shasum -a 256 $(ls | grep -E '\.(deb|rpm|tar\.gz|json)$' | sort) >SHA256SUMS )
+( cd "$OUT" && shasum -a 256 $(ls | grep -E '\.(deb|rpm|tar\.gz|json)$' | sort) >"SHA256SUMS-$ARCH" )
 echo
 echo "Release $REL_VERSION written to $OUT:"
 ( cd "$OUT" && ls -lh | awk 'NR>1 {print "  " $5 "  " $9}' )

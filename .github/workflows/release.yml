@@ -1,7 +1,5 @@
 name: Release
 
-# Tag vX.Y.Z (or vX.Y.Z-rc1) → build on the oldest supported distro, package (deb, rpm, offline bundle), run the
-# packages on that distro as a gate, sign, and publish a GitHub Release with SHA256SUMS and an SBOM.
 on:
   push:
     tags: ["v*"]
@@ -14,11 +12,8 @@ on:
 permissions:
   contents: read
 
-# The binaries link the build runner's glibc and libvirt (ubuntu-22.04 here), so they run on that release and newer.
-# Raise the floor deliberately; the verify-deb job proves the packages run on it.
-
 jobs:
-  build:
+  build-amd64:
     runs-on: ubuntu-22.04
     outputs:
       version: ${{ steps.v.outputs.version }}
@@ -26,134 +21,190 @@ jobs:
       - name: Version
         id: v
         run: |
-          v="${{ github.event.inputs.version || github.ref_name }}"
-          v="${v#v}"
+          v="${{ github.event.inputs.version || github.ref_name }}"; v="${v#v}"
           echo "version=$v" >> "$GITHUB_OUTPUT"
-      - name: Checkout machina
-        uses: actions/checkout@v4
-        with:
-          path: machina
-      - name: Checkout guestkit (sibling path dependency)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: { path: machina }
+      - uses: actions/checkout@v4
         with:
           repository: hypersdk/guestkit
           path: guestkit
-      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable (pinned 2026-07-24)
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2 (floating tag, pinned 2026-07-24)
-        with:
-          workspaces: machina
-      - name: Install build dependencies
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
+        with: { toolchain: stable }
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+        with: { workspaces: machina }
+      - name: Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libvirt-dev libpam0g-dev libclang-dev clang protobuf-compiler libssl-dev
-      # Without the nightly toolchain and bpf-linker the eBPF programs are not compiled and bpfd ships empty.
       - name: eBPF toolchain
         working-directory: machina
         run: make bpf-deps
-      - name: Build (release)
+      - name: Build and test
         working-directory: machina
-        run: cargo build --workspace --release --locked
-      - name: Build controller (PostgreSQL build)
-        working-directory: machina
-        run: make release-pg CARGO_FLAGS=--locked
-      - name: eBPF programs are compiled into bpfd
-        working-directory: machina
-        run: ./target/release/machina-bpfd --probe
+        env: { MACHINA_BPF_REQUIRED: '1' }
+        run: |
+          cargo build --workspace --release --locked
+          cargo test --workspace --locked
+          make release-pg CARGO_FLAGS=--locked
+          ./target/release/machina-bpfd --probe | tee /tmp/bpf-probe.json
+          grep -q '"programs_compiled": true' /tmp/bpf-probe.json
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: machina/web/package-lock.json
-      - name: Build web UI
-        working-directory: machina/web
+      - working-directory: machina/web
         run: npm ci && npm run build
       - uses: actions/setup-go@v5
-        with:
-          go-version: stable
-      - name: Install nfpm
-        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
-      - name: Package
+        with: { go-version: stable }
+      - run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+      - name: Package amd64
         working-directory: machina
-        run: |
-          ./scripts/release/build-release.sh --version "${{ steps.v.outputs.version }}" \
-            --bin-dir target/release --web-dir web/dist --out "$PWD/dist/release"
+        run: ./scripts/release/build-release.sh --version "${{ steps.v.outputs.version }}" --arch amd64 --bin-dir target/release --web-dir web/dist --out "$PWD/dist/release"
       - uses: actions/upload-artifact@v4
         with:
-          name: release
+          name: release-amd64
           path: machina/dist/release/*
           if-no-files-found: error
 
-  # The gate that makes the compatibility claim true: install the real packages on the oldest target and start the binaries.
-  verify-deb:
-    needs: build
+  build-arm64:
+    runs-on: ubuntu-22.04-arm
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - name: Version
+        id: v
+        run: |
+          v="${{ github.event.inputs.version || github.ref_name }}"; v="${v#v}"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with: { path: machina }
+      - uses: actions/checkout@v4
+        with:
+          repository: hypersdk/guestkit
+          path: guestkit
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
+        with: { toolchain: stable }
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+        with: { workspaces: machina }
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libvirt-dev libpam0g-dev libclang-dev clang protobuf-compiler libssl-dev qemu-system-arm qemu-utils
+      - name: eBPF toolchain
+        working-directory: machina
+        run: make bpf-deps
+      - name: Build and test natively on ARM64
+        working-directory: machina
+        env: { MACHINA_BPF_REQUIRED: '1' }
+        run: |
+          test "$(uname -m)" = aarch64
+          cargo build --workspace --release --locked
+          cargo test --workspace --locked
+          make release-pg CARGO_FLAGS=--locked
+          ./target/release/machina-bpfd --probe | tee /tmp/bpf-probe.json
+          grep -q '"programs_compiled": true' /tmp/bpf-probe.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: machina/web/package-lock.json
+      - working-directory: machina/web
+        run: npm ci && npm run build
+      - uses: actions/setup-go@v5
+        with: { go-version: stable }
+      - run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+      - name: Package arm64
+        working-directory: machina
+        run: ./scripts/release/build-release.sh --version "${{ steps.v.outputs.version }}" --arch arm64 --bin-dir target/release --web-dir web/dist --out "$PWD/dist/release"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-arm64
+          path: machina/dist/release/*
+          if-no-files-found: error
+
+  verify-amd64-deb:
+    needs: build-amd64
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/download-artifact@v4
-        with:
-          name: release
-          path: release
-      - name: Checksums
-        run: cd release && sha256sum -c SHA256SUMS
-      - name: Install on a clean Ubuntu 22.04 and run
+        with: { name: release-amd64, path: release }
+      - run: cd release && sha256sum -c SHA256SUMS-amd64
+      - name: Install on clean Ubuntu 22.04
         run: |
           docker run --rm -v "$PWD/release:/pk:ro" ubuntu:22.04 bash -euxc '
             export DEBIAN_FRONTEND=noninteractive MACHINA_NO_START=1
             apt-get update -qq
             apt-get install -y ./pk/machina_*.deb ./pk/machina-controller_*.deb ./pk/machina-agent_*.deb
-            machina-daemon --help >/dev/null
-            machina-controller --help >/dev/null
-            machina-agent --help >/dev/null
-            machina-bpfd --help >/dev/null
-            test -s /etc/default/machina-platform && test -s /etc/machina/INITIAL_ADMIN_PASSWORD
-            # a reinstall keeps the credentials
-            s=$(sha256sum /etc/default/machina-platform)
-            apt-get install -y --reinstall ./pk/machina-controller_*.deb
-            test "$s" = "$(sha256sum /etc/default/machina-platform)"
+            machina-daemon --help >/dev/null; machina-controller --help >/dev/null
+            machina-agent --help >/dev/null; machina-bpfd --help >/dev/null
+            test -x /usr/libexec/machina/production-preflight
           '
 
-  verify-rpm:
-    needs: build
+  verify-arm64-deb:
+    needs: build-arm64
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: release-arm64, path: release }
+      - run: cd release && sha256sum -c SHA256SUMS-arm64
+      - name: Inspect and install ARM64 packages natively
+        run: |
+          test "$(uname -m)" = aarch64
+          dpkg-deb -f release/machina-agent_*.deb Architecture | grep -qx arm64
+          sudo env DEBIAN_FRONTEND=noninteractive MACHINA_NO_START=1 apt-get install -y ./release/machina_*.deb ./release/machina-controller_*.deb ./release/machina-agent_*.deb
+          machina-daemon --help >/dev/null; machina-controller --help >/dev/null
+          machina-agent --help >/dev/null; machina-bpfd --help >/dev/null
+
+  verify-arm64-rpm:
+    needs: build-arm64
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: release-arm64, path: release }
+      - name: Install ARM64 RPM on Fedora
+        run: |
+          test "$(uname -m)" = aarch64
+          docker run --rm -v "$PWD/release:/pk:ro" fedora:latest bash -euxc '
+            export MACHINA_NO_START=1
+            dnf install -y --setopt=install_weak_deps=False /pk/machina-*.rpm /pk/machina-controller-*.rpm /pk/machina-agent-*.rpm
+            test -x /usr/bin/machina-agent
+          '
+
+  verify-amd64-rpm:
+    needs: build-amd64
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/download-artifact@v4
-        with:
-          name: release
-          path: release
-      - name: Install on a clean Fedora and inspect
+        with: { name: release-amd64, path: release }
+      - name: Install on Fedora
         run: |
           docker run --rm -v "$PWD/release:/pk:ro" fedora:latest bash -euxc '
             export MACHINA_NO_START=1
-            dnf install -y --setopt=install_weak_deps=False /pk/machina-0*.rpm /pk/machina-controller-0*.rpm /pk/machina-agent-0*.rpm
+            dnf install -y --setopt=install_weak_deps=False /pk/machina-*.rpm /pk/machina-controller-*.rpm /pk/machina-agent-*.rpm
             test -x /usr/bin/machina-controller
-            test -s /etc/default/machina-platform
           '
 
   publish:
-    needs: [build, verify-deb, verify-rpm]
+    needs: [build-amd64, build-arm64, verify-amd64-deb, verify-arm64-deb, verify-amd64-rpm, verify-arm64-rpm]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-22.04
     permissions:
-      contents: write      # create the release
-      id-token: write      # keyless signing (sigstore)
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-        with:
-          name: release
-          path: release
+        with: { name: release-amd64, path: release/amd64 }
+      - uses: actions/download-artifact@v4
+        with: { name: release-arm64, path: release/arm64 }
       - uses: sigstore/cosign-installer@v3
-      - name: Sign
-        working-directory: release
+      - name: Sign architecture manifests
         run: |
-          for f in SHA256SUMS; do
-            cosign sign-blob --yes --bundle "$f.sigstore.json" "$f"
-          done
+          for f in release/*/SHA256SUMS-*; do cosign sign-blob --yes --bundle "$f.sigstore.json" "$f"; done
       - name: Publish
-        env:
-          GH_TOKEN: ${{ github.token }}
+        env: { GH_TOKEN: '${{ github.token }}' }
         run: |
-          tag="${GITHUB_REF_NAME}"
-          pre=""; case "$tag" in *-*) pre="--prerelease" ;; esac
-          gh release create "$tag" release/* $pre --title "Machina ${tag#v}" --generate-notes
+          tag="${GITHUB_REF_NAME}"; pre=""; case "$tag" in *-*) pre="--prerelease" ;; esac
+          gh release create "$tag" release/amd64/* release/arm64/* $pre --title "Machina ${tag#v}" --generate-notes

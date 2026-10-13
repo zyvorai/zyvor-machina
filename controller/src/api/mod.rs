@@ -83,6 +83,7 @@ mod task_failures;
 mod tasks;
 mod templates;
 mod topology;
+mod transiva;
 mod upgrade;
 mod users;
 mod vm_libvirt;
@@ -1701,6 +1702,11 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/migrations",
             get(migration_jobs::list_migration_jobs),
         )
+        .route("/api/v1/transiva/status", get(transiva::status))
+        .route("/api/v1/transiva/providers", get(transiva::providers))
+        .route("/api/v1/transiva/migrations/preview", post(transiva::preview))
+        .route("/api/v1/transiva/migrations/submit", post(transiva::submit))
+        .route("/api/v1/transiva/migrations/batch", post(transiva::batch))
         .route("/api/v1/fence/events", get(fence::list_fence_events))
         .route("/api/v1/audit", get(audit::list_audit_logs))
         .route("/api/v1/tasks/failures", get(task_failures::summary))

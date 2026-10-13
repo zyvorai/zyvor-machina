@@ -228,6 +228,7 @@ pub fn plan(
                     public_key: keys.get(o)?.clone(),
                     endpoint: endpoint(addr, s.port)?,
                     prefixes: prefixes.get(o)?.clone(),
+                    routes: prefixes.get(o)?.clone(),
                 })
             })
             .collect();
@@ -240,6 +241,7 @@ pub fn plan(
                 fleet_prefixes: vec![s.prefix4.clone(), s.prefix6.clone()],
                 mappings,
                 peers,
+                direct_routes: Vec::new(),
             },
         );
     }
@@ -352,7 +354,13 @@ pub async fn reconcile(
     host_addrs: &BTreeMap<String, String>,
     vms: &[NetpolVm],
 ) {
-    let s = settings(pool).await;
+    let mut s = settings(pool).await;
+    // Fleet Cloud VPC peering uses the same authenticated WireGuard fabric.
+    // It activates the runtime overlay without changing the user's VM-network-
+    // policy preference; removing the last peering route tears it back down.
+    if !s.enabled && super::cloud_fabric::needs_overlay(pool).await.unwrap_or(false) {
+        s.enabled = true;
+    }
     if !s.enabled {
         if IDLE.load(Ordering::Relaxed) {
             return;
@@ -390,7 +398,11 @@ pub async fn reconcile(
         })
         .collect();
     let keys = KEYS.lock().unwrap_or_else(|e| e.into_inner()).clone();
-    let plans = plan(&s, &mut alloc, &pairs, vms, &keys);
+    let mut plans = plan(&s, &mut alloc, &pairs, vms, &keys);
+    match super::cloud_fabric::overlay_policy(pool).await {
+        Ok(policy) => super::cloud_fabric::decorate_overlay(&mut plans, &policy),
+        Err(e) => tracing::warn!("cloud fabric overlay policy: {e:#}"),
+    }
     save_allocations(pool, &before, &alloc).await;
     for h in hosts {
         let Some(cfg) = plans.get(&h.id) else {
