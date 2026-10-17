@@ -42,7 +42,7 @@ jobs:
         run: make bpf-deps
       - name: Build and test
         working-directory: machina
-        env: { MACHINA_BPF_REQUIRED: '1' }
+        env: { MACHINA_BPF_REQUIRED: 'true' }
         run: |
           cargo build --workspace --release --locked
           cargo test --workspace --locked
@@ -97,7 +97,7 @@ jobs:
         run: make bpf-deps
       - name: Build and test natively on ARM64
         working-directory: machina
-        env: { MACHINA_BPF_REQUIRED: '1' }
+        env: { MACHINA_BPF_REQUIRED: 'true' }
         run: |
           test "$(uname -m)" = aarch64
           cargo build --workspace --release --locked

@@ -30,7 +30,7 @@ jobs:
       - name: Build and unit tests on native ARM64
         working-directory: machina
         env:
-          MACHINA_BPF_REQUIRED: '1'
+          MACHINA_BPF_REQUIRED: 'true'
         run: |
           cargo build --workspace --release --locked
           cargo test --workspace --locked
