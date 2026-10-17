@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.3.0 — 2026-10-17
+
+Everything merged since v0.2.1 (#140 to #171). The detailed entries are the dated sections below.
+
+- **Cloud fabric.** VPC peering, internet-gateway and blackhole routes and EC2 network ACLs are programmed on the
+  hosts, including same-host peerings, with immediate convergence (#166, #168).
+- **Production profile and security lifecycle.** `MACHINA_SECURITY_PROFILE=production` preflight, API-key master key
+  file, JWT secret rollover, audit retention, `machina-bpfd --require-programs` (#166).
+- **ARM64.** Native arm64 CI and a dual-architecture release workflow with per-architecture SBOM and checksums (#166).
+- **Transiva gateway.** `/api/v1/transiva/*` status, providers, preview, submit and batch (#166).
+- **Bare-metal provisioning.** BMC discovery, Redfish and IPMI control, virtual media, SOL console, verified OS
+  images, image deploy, profiles and zero-touch join (#145 to #165).
+- **Local-first and air-gap.** Azure touchpoints removed, keyless local LLM, Atlas reachability and headroom checks,
+  mirror overrides for k3s, Kata and Firecracker (#140 to #143).
+- **Fixes and docs.** Fencing IPMI passwords encrypted at rest (#150); leaving-Nutanix guide (#170, #171); website,
+  README and claims updates.
+
 ## 2026-10-13 (later) — Same-host peering, immediate convergence, cross-host verification
 
 - **Fixed:** two peered VPCs on the **same host** never forwarded (the rules only matched `machina-wg`) while the API
