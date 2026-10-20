@@ -12,7 +12,7 @@ function defaultDockPathsForTier(tier: PlatformDesktopTier = loadPlatformDesktop
 }
 
 function savePlatformDockPaths(paths: string[]) {
-  localStorage.setItem(DOCK_KEY, JSON.stringify(paths))
+  try { localStorage.setItem(DOCK_KEY, JSON.stringify(paths)) } catch { /* storage unavailable or full */ }
   window.dispatchEvent(new CustomEvent(PLATFORM_DOCK_CHANGED_EVENT))
 }
 

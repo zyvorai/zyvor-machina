@@ -18,7 +18,7 @@ pub async fn list_recommendations(
     let rows = compute_recommendations(&state.pool)
         .await
         .map_err(|e| ApiError::internal(e.to_string()))?;
-    let _ = persist_recommendations(&state.pool, &rows).await;
+    // Read-only: GET must not supersede/insert rows. DRS and POST /refresh persist.
     Ok(Json(rows))
 }
 
@@ -27,5 +27,11 @@ pub async fn refresh_recommendations(
     Extension(actor): Extension<AuthUser>,
 ) -> Result<Json<Vec<PlacementRecommendationRow>>, ApiError> {
     require_operator(&actor)?;
-    list_recommendations(State(state)).await
+    let rows = compute_recommendations(&state.pool)
+        .await
+        .map_err(|e| ApiError::internal(e.to_string()))?;
+    if let Err(e) = persist_recommendations(&state.pool, &rows).await {
+        tracing::warn!("persist placement recommendations: {e:#}");
+    }
+    Ok(Json(rows))
 }
