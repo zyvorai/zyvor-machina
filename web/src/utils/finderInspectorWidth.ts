@@ -15,5 +15,5 @@ export function loadFinderInspectorWidth(): number {
 }
 
 export function saveFinderInspectorWidth(width: number) {
-  localStorage.setItem(KEY, String(width))
+  try { localStorage.setItem(KEY, String(width)) } catch { /* storage unavailable or full */ }
 }
