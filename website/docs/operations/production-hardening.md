@@ -57,7 +57,7 @@ its own SBOM and `SHA256SUMS-<arch>`. `scripts/release/build-release.sh --arch a
 ## Qualification gates
 
 Some claims cannot be proven by unit tests. These scripts collect the evidence on real infrastructure and are **not**
-run in CI:
+run in CI (see `scripts/qualification/README.md` for the environment of each, the exit codes and how to record a result):
 
 | Script | Proves |
 | --- | --- |
@@ -67,6 +67,12 @@ run in CI:
 | `scripts/qualification/transiva-live.sh` | Machina to Transiva/h2kvm gateway |
 | `scripts/qualification/aws-conformance.py` | boto3 calls against the EC2 and ELBv2 endpoints |
 | `scripts/qualification/scale.py` | Controller latency under concurrent load |
+| `scripts/qualification/k3s-fleet-live.sh` | A fleet k3s cluster created, checked, optionally upgraded and deleted on real hosts |
+| `scripts/qualification/backup-replication-live.sh` | A real backup copied to a real S3 bucket, checksummed, fetched back and verified |
+| `scripts/qualification/iscsi-live.sh` | iSCSI discovery, login, LUN attach and detach against a real array |
+| `scripts/qualification/vgpu-live.sh` | A vGPU partition created, attached, pinning the VM, detached and removed |
+| `scripts/qualification/trusted-launch-live.sh` | A Secure Boot + vTPM VM accepted by libvirt and started with signed firmware |
+| `scripts/qualification/witness-drill.sh` | HA pauses without marking hosts offline while the witness is cut, and resumes |
 | `scripts/compliance/generate-evidence.py` | A manifest of SBOMs, hashes and signatures |
 
 ## Not claimed
