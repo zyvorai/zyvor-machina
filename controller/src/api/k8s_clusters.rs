@@ -5,7 +5,7 @@
 //! and delete are asynchronous: the call records the intent and returns the cluster, a background
 //! task does the work on the hosts, and the client polls `GET /api/v1/k8s-clusters/{id}`.
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::header;
 use axum::response::IntoResponse;
 use axum::{Extension, Json};
@@ -108,7 +108,12 @@ async fn host_exists(state: &AppState, id: Uuid) -> Result<(), ApiError> {
 pub struct CreateBody {
     pub name: String,
     pub version: String,
-    pub server_host_id: Uuid,
+    /// A single-server cluster's server. Use `server_host_ids` for an HA control plane.
+    #[serde(default)]
+    pub server_host_id: Option<Uuid>,
+    /// An HA control plane: 3 or 5 servers (odd, for etcd quorum). The first bootstraps the cluster.
+    #[serde(default)]
+    pub server_host_ids: Option<Vec<Uuid>>,
     #[serde(default)]
     pub agent_host_ids: Vec<Uuid>,
     #[serde(default)]
@@ -128,7 +133,22 @@ pub async fn create(
     if body.agent_host_ids.len() > 50 {
         return Err(ApiError::bad_request("at most 50 agent nodes per request"));
     }
-    let mut all = vec![body.server_host_id];
+    let servers: Vec<Uuid> = match (body.server_host_id, body.server_host_ids.clone()) {
+        (Some(_), Some(_)) => {
+            return Err(ApiError::bad_request(
+                "give server_host_id or server_host_ids, not both",
+            ))
+        }
+        (Some(one), None) => vec![one],
+        (None, Some(many)) => many,
+        (None, None) => return Err(ApiError::bad_request("a server host is required")),
+    };
+    if !engine::valid_server_count(servers.len()) {
+        return Err(ApiError::bad_request(
+            "a control plane is 1 server, or 3 or 5 for HA (etcd needs an odd number)",
+        ));
+    }
+    let mut all = servers.clone();
     all.extend(&body.agent_host_ids);
     let unique: std::collections::HashSet<_> = all.iter().collect();
     if unique.len() != all.len() {
@@ -139,7 +159,7 @@ pub async fn create(
     }
 
     let cluster_id = Uuid::new_v4();
-    let server_node = Uuid::new_v4();
+    let server_nodes: Vec<(Uuid, Uuid)> = servers.iter().map(|h| (Uuid::new_v4(), *h)).collect();
     let agents: Vec<(Uuid, Uuid)> = body
         .agent_host_ids
         .iter()
@@ -162,7 +182,9 @@ pub async fn create(
         }
         other => other.into(),
     })?;
-    for (node_id, host_id, role) in std::iter::once((server_node, body.server_host_id, "server"))
+    for (node_id, host_id, role) in server_nodes
+        .iter()
+        .map(|(n, h)| (*n, *h, "server"))
         .chain(agents.iter().map(|(n, h)| (*n, *h, "agent")))
     {
         crate::db::query(
@@ -182,7 +204,7 @@ pub async fn create(
         "k8s_cluster.create",
         "k8s_cluster",
         Some(cluster_id),
-        serde_json::json!({ "name": body.name, "version": body.version, "nodes": all.len() }),
+        serde_json::json!({ "name": body.name, "version": body.version, "nodes": all.len(), "servers": servers.len() }),
     )
     .await?;
 
@@ -191,7 +213,8 @@ pub async fn create(
         engine::ProvisionPlan {
             cluster_id,
             version: body.version.clone(),
-            server: (server_node, body.server_host_id),
+            server: server_nodes[0],
+            extra_servers: server_nodes[1..].to_vec(),
             agents,
             install_url,
         },
@@ -287,10 +310,18 @@ pub async fn add_node(
     load(&state, id).await.map(Json)
 }
 
+#[derive(Debug, Default, Deserialize)]
+pub struct RemoveQuery {
+    /// Skip draining the node first (pods on it are lost, not rescheduled).
+    #[serde(default)]
+    pub force: bool,
+}
+
 pub async fn remove_node(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthUser>,
     Path((id, node_id)): Path<(Uuid, Uuid)>,
+    Query(q): Query<RemoveQuery>,
 ) -> Result<Json<ClusterDetail>, ApiError> {
     require_admin(&actor)?;
     require_enabled()?;
@@ -304,7 +335,7 @@ pub async fn remove_node(
     .ok_or_else(|| ApiError::not_found("node not found"))?;
     if node.role == "server" {
         return Err(ApiError::bad_request(
-            "the server node cannot be removed on its own; delete the cluster",
+            "a control-plane server cannot be removed on its own; delete the cluster",
         ));
     }
     write_audit(
@@ -313,12 +344,12 @@ pub async fn remove_node(
         "k8s_cluster.remove_node",
         "k8s_cluster",
         Some(id),
-        serde_json::json!({ "host_id": node.host_id }),
+        serde_json::json!({ "host_id": node.host_id, "force": q.force }),
     )
     .await?;
     let st = state.clone();
     tokio::spawn(async move {
-        let _ = engine::remove_node(&st, node_id, node.host_id).await;
+        let _ = engine::remove_node(&st, node_id, node.host_id, !q.force).await;
     });
     load(&state, id).await.map(Json)
 }
@@ -328,6 +359,9 @@ pub struct UpgradeBody {
     pub version: String,
     #[serde(default)]
     pub install_url: Option<String>,
+    /// Skip draining each node before it is upgraded.
+    #[serde(default)]
+    pub skip_drain: bool,
 }
 
 pub async fn upgrade(
@@ -357,7 +391,7 @@ pub async fn upgrade(
         "k8s_cluster.upgrade",
         "k8s_cluster",
         Some(id),
-        serde_json::json!({ "from": detail.cluster.version, "to": body.version }),
+        serde_json::json!({ "from": detail.cluster.version, "to": body.version, "skip_drain": body.skip_drain }),
     )
     .await?;
     tokio::spawn(engine::upgrade(
@@ -365,6 +399,7 @@ pub async fn upgrade(
         id,
         body.version,
         install_url,
+        body.skip_drain,
     ));
     load(&state, id).await.map(Json)
 }

@@ -36,7 +36,9 @@ export default function PlatformK8sClusters() {
   const [name, setName] = useState('')
   const [version, setVersion] = useState('v1.31.4+k3s1')
   const [serverHost, setServerHost] = useState('')
+  const [extraServers, setExtraServers] = useState<string[]>([])
   const [agentHosts, setAgentHosts] = useState<string[]>([])
+  const [skipDrain, setSkipDrain] = useState(false)
   const [newVersion, setNewVersion] = useState('')
   const [addHost, setAddHost] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -91,7 +93,14 @@ export default function PlatformK8sClusters() {
   }
 
   const create = () => act('Cluster creation started', () =>
-    createK8sCluster({ name: name.trim(), version: version.trim(), server_host_id: serverHost, agent_host_ids: agentHosts }))
+    createK8sCluster({
+      name: name.trim(),
+      version: version.trim(),
+      ...(extraServers.length > 0
+        ? { server_host_ids: [serverHost, ...extraServers] }
+        : { server_host_id: serverHost }),
+      agent_host_ids: agentHosts,
+    }))
 
   return (
     <PlatformPageChrome
@@ -115,6 +124,15 @@ export default function PlatformK8sClusters() {
             </select>
             <select
               className="input text-sm"
+              aria-label="Extra control-plane servers (HA)"
+              multiple
+              value={extraServers}
+              onChange={(e) => setExtraServers(Array.from(e.target.selectedOptions).map((o) => o.value))}
+            >
+              {hosts.filter((h) => h.id !== serverHost).map((h) => <option key={h.id} value={h.id}>{h.hostname}</option>)}
+            </select>
+            <select
+              className="input text-sm"
               aria-label="Agent hosts"
               multiple
               value={agentHosts}
@@ -123,7 +141,10 @@ export default function PlatformK8sClusters() {
               {hosts.filter((h) => h.id !== serverHost).map((h) => <option key={h.id} value={h.id}>{h.hostname}</option>)}
             </select>
           </div>
-          <button type="button" className="btn-primary text-sm mt-3 flex items-center gap-1.5" disabled={!name.trim() || !serverHost} onClick={() => void create()}>
+          <p className="text-xs text-[var(--text-muted)] mt-2">
+            Pick 2 or 4 extra servers for an HA control plane (3 or 5 in total, embedded etcd); none for a single server.
+          </p>
+          <button type="button" className="btn-primary text-sm mt-3 flex items-center gap-1.5" disabled={!name.trim() || !serverHost || ![0, 2, 4].includes(extraServers.length)} onClick={() => void create()}>
             <Plus className="w-4 h-4" /> Create cluster
           </button>
         </MacGlassPanel>
@@ -179,7 +200,10 @@ export default function PlatformK8sClusters() {
             </ul>
             <div className="flex flex-wrap gap-3 mt-3">
               <input className="input text-sm" aria-label="Upgrade to version" placeholder="Upgrade to v1.31.5+k3s1" value={newVersion} onChange={(e) => setNewVersion(e.target.value)} />
-              <button type="button" className="btn-secondary text-sm" disabled={!newVersion.trim() || selected.status !== 'ready'} onClick={() => void act('Upgrade started', () => upgradeK8sCluster(selected.id, newVersion.trim()))}>
+              <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                <input type="checkbox" checked={skipDrain} onChange={(e) => setSkipDrain(e.target.checked)} /> Skip drain
+              </label>
+              <button type="button" className="btn-secondary text-sm" disabled={!newVersion.trim() || selected.status !== 'ready'} onClick={() => void act('Upgrade started', () => upgradeK8sCluster(selected.id, newVersion.trim(), skipDrain))}>
                 Upgrade
               </button>
               <select className="input text-sm" aria-label="Add a node" value={addHost} onChange={(e) => setAddHost(e.target.value)}>
@@ -190,7 +214,7 @@ export default function PlatformK8sClusters() {
                 Add node
               </button>
             </div>
-            <p className="text-xs text-[var(--text-muted)] mt-2">Upgrades go server first, then one agent at a time. There is no node drain yet.</p>
+            <p className="text-xs text-[var(--text-muted)] mt-2">Upgrades go servers first, then one agent at a time; each node is drained and uncordoned unless you skip it.</p>
           </MacGlassPanel>
         )}
       </OperatingSurfaceLayout>

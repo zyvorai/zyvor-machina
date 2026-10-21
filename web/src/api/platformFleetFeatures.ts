@@ -77,15 +77,25 @@ export const getK8sCluster = (id: string) => platformFetch<K8sClusterDetail>(`/a
 export const createK8sCluster = (body: {
   name: string
   version: string
-  server_host_id: string
+  /** One server (SQLite datastore). */
+  server_host_id?: string
+  /** An HA control plane: 3 or 5 servers; the first bootstraps. */
+  server_host_ids?: string[]
   agent_host_ids: string[]
 }) => platformFetch<K8sClusterDetail>('/api/v1/k8s-clusters', json('POST', body))
 export const addK8sNode = (id: string, host_id: string) =>
   platformFetch<K8sClusterDetail>(`/api/v1/k8s-clusters/${id}/nodes`, json('POST', { host_id }))
-export const removeK8sNode = (id: string, nodeId: string) =>
-  platformFetch<K8sClusterDetail>(`/api/v1/k8s-clusters/${id}/nodes/${nodeId}`, json('DELETE'))
-export const upgradeK8sCluster = (id: string, version: string) =>
-  platformFetch<K8sClusterDetail>(`/api/v1/k8s-clusters/${id}/upgrade`, json('POST', { version }))
+/** Drains the node first unless `force` is set (pods on a forced removal are lost). */
+export const removeK8sNode = (id: string, nodeId: string, force = false) =>
+  platformFetch<K8sClusterDetail>(
+    `/api/v1/k8s-clusters/${id}/nodes/${nodeId}${force ? '?force=true' : ''}`,
+    json('DELETE'),
+  )
+export const upgradeK8sCluster = (id: string, version: string, skipDrain = false) =>
+  platformFetch<K8sClusterDetail>(
+    `/api/v1/k8s-clusters/${id}/upgrade`,
+    json('POST', { version, skip_drain: skipDrain }),
+  )
 export const deleteK8sCluster = (id: string) =>
   platformFetch<K8sClusterDetail>(`/api/v1/k8s-clusters/${id}`, json('DELETE'))
 /** Downloads the admin kubeconfig (YAML), so it is saved as a file rather than parsed as JSON. */

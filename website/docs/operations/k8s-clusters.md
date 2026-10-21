@@ -37,17 +37,27 @@ curl -sk -X POST   .../k8s-clusters/<id>/upgrade -d '{"version":"v1.31.5+k3s1"}'
 curl -sk -X DELETE .../k8s-clusters/<id>
 ```
 
+`upgrade` takes `"skip_drain": true` and node removal takes `?force=true` to skip the drain.
+
 Cluster status is `provisioning`, `ready`, `upgrading`, `deleting` or `error` (with the reason in `message`). Node status is `pending`,
-`ready`, `removing` or `error`. Upgrades go server first, then agents one at a time, and stop at the first failure.
+`ready`, `removing` or `error`. Upgrades go servers first (the bootstrap server leading), then agents, one node at a time, and stop at the first failure. Each node
+is **drained** (`kubectl drain --ignore-daemonsets --delete-emptydir-data`, run on another ready server) before it is upgraded and
+**uncordoned** after; a drain that fails stops the upgrade before that node is touched. A single-server cluster cannot drain its
+own server, so that node is upgraded in place. Removing an agent drains it first and deletes its Node object afterwards. There is no
+`--force`: a pod no controller manages blocks the drain instead of being deleted.
+
+A control plane is **one server** (SQLite) or an **HA control plane of 3 or 5 servers** with embedded etcd: pass `server_host_ids`
+(the first bootstraps with `--cluster-init`, the others join it) instead of `server_host_id`. An even number is refused because etcd
+needs an odd quorum.
 
 The server host needs an `address` recorded (the API URL is `https://<address>:6443`, and the address is added as a TLS SAN).
 Pass `install_url` to use an internal mirror of the installer script on an [air-gapped site](./air-gapped.md).
 
 ## Limits
 
-- **One server per cluster** (SQLite datastore). No HA control plane yet.
+- **Control-plane size is fixed at creation** (1, 3 or 5 servers). Servers cannot be added or removed afterwards; delete and recreate.
 - Work runs in the controller process. A controller restart during an operation leaves the cluster in `provisioning`, `upgrading` or
   `deleting`: delete it (or retry) once the hosts are checked.
-- No node drain before upgrade or removal, no rollback, no CNI choice (k3s defaults), no web UI.
+- No rollback and no CNI choice (k3s defaults). Draining waits for pod disruption budgets; a stuck drain fails after 10 minutes.
 - Hosts need `curl`, `sh` and systemd, and reach the installer and the k3s release downloads (or your mirror).
 - Not yet run against real hosts: see claims C61.

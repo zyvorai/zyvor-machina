@@ -114,16 +114,50 @@ async fn target(state: &AppState, host_id: Uuid) -> anyhow::Result<Target> {
     })
 }
 
+/// A node as the ordering and drain rules see it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NodeInfo {
+    pub id: Uuid,
+    pub host_id: Uuid,
+    pub role: String,
+    pub status: String,
+}
+
+/// Upgrade order: control-plane servers first (oldest first, so the bootstrap server leads), then
+/// agents. `nodes` must already be ordered by creation.
+pub fn upgrade_order(nodes: &[NodeInfo]) -> Vec<NodeInfo> {
+    let servers = nodes.iter().filter(|n| n.role == "server");
+    let agents = nodes.iter().filter(|n| n.role != "server");
+    servers.chain(agents).cloned().collect()
+}
+
+/// The host that should run `kubectl drain` for `target`: the first ready server that is not the
+/// target itself. None for a single-server cluster's own server, which has nowhere to drain to.
+pub fn drain_host(nodes: &[NodeInfo], target: Uuid) -> Option<Uuid> {
+    nodes
+        .iter()
+        .find(|n| n.role == "server" && n.status == "ready" && n.id != target)
+        .map(|n| n.host_id)
+}
+
+/// Valid control-plane sizes: one server (SQLite), or an odd HA set for etcd quorum.
+pub fn valid_server_count(n: usize) -> bool {
+    matches!(n, 1 | 3 | 5)
+}
+
 pub struct ProvisionPlan {
     pub cluster_id: Uuid,
     pub version: String,
-    pub server: (Uuid, Uuid), // (node row id, host id)
+    pub server: (Uuid, Uuid), // (node row id, host id): the bootstrap server
+    /// Extra control-plane servers (HA). Empty for a single-server cluster.
+    pub extra_servers: Vec<(Uuid, Uuid)>,
     pub agents: Vec<(Uuid, Uuid)>,
     pub install_url: String,
 }
 
-/// Install the server, store its token and kubeconfig, then join each agent in turn. The first
-/// failure marks the cluster `error` and stops; nodes already installed stay (remove or retry).
+/// Install the bootstrap server (with embedded etcd when more servers follow), store its token and
+/// kubeconfig, join the other servers, then each agent, one at a time. The first failure marks the
+/// cluster `error` and stops; nodes already installed stay (remove or retry).
 pub async fn provision(state: AppState, plan: ProvisionPlan) {
     let pool = &state.pool;
     let id = plan.cluster_id;
@@ -140,6 +174,7 @@ pub async fn provision(state: AppState, plan: ProvisionPlan) {
                 node_name: node_name.clone(),
                 advertise_address: t.address.trim().to_string(),
                 install_url: plan.install_url.clone(),
+                cluster_init: !plan.extra_servers.is_empty(),
                 ..Default::default()
             },
         )
@@ -157,6 +192,22 @@ pub async fn provision(state: AppState, plan: ProvisionPlan) {
         .await?;
         set_node(pool, server_node, "ready", "", &plan.version).await;
 
+        for (node_id, host_id) in &plan.extra_servers {
+            if let Err(e) = join_node(
+                &state,
+                id,
+                *node_id,
+                *host_id,
+                &plan.version,
+                &plan.install_url,
+                "join_server",
+            )
+            .await
+            {
+                set_node(pool, *node_id, "error", &e.to_string(), "").await;
+                return Err(e.context("joining a server node failed"));
+            }
+        }
         for (node_id, host_id) in &plan.agents {
             if let Err(e) = join_agent(
                 &state,
@@ -178,7 +229,7 @@ pub async fn provision(state: AppState, plan: ProvisionPlan) {
         Ok(()) => set_cluster(pool, id, "ready", "").await,
         Err(e) => {
             tracing::warn!(cluster = %id, "k3s cluster provision failed: {e:#}");
-            // Mark the server node too when it never became ready.
+            // Mark the bootstrap server too when it never became ready.
             let _ = crate::db::query(
                 "UPDATE k8s_cluster_nodes SET status = 'error', message = ?
                  WHERE id = ? AND status = 'pending'",
@@ -201,6 +252,28 @@ pub async fn join_agent(
     version: &str,
     install_url: &str,
 ) -> anyhow::Result<()> {
+    join_node(
+        state,
+        cluster_id,
+        node_id,
+        host_id,
+        version,
+        install_url,
+        "join_agent",
+    )
+    .await
+}
+
+/// Join one host with `action` (`join_agent` or `join_server`).
+async fn join_node(
+    state: &AppState,
+    cluster_id: Uuid,
+    node_id: Uuid,
+    host_id: Uuid,
+    version: &str,
+    install_url: &str,
+    action: &str,
+) -> anyhow::Result<()> {
     let (api_url, token_enc): (String, String) =
         crate::db::query_as("SELECT api_url, token_enc FROM k8s_clusters WHERE id = ?")
             .bind(cluster_id)
@@ -214,11 +287,16 @@ pub async fn join_agent(
     agent_client::k3s_node(
         &t.addr,
         K3sNodeCall {
-            action: "join_agent".into(),
+            action: action.into(),
             version: version.to_string(),
             server_url: api_url,
             token,
             node_name: node_name_for(&t.hostname),
+            advertise_address: if action == "join_server" {
+                t.address.trim().to_string()
+            } else {
+                String::new()
+            },
             install_url: install_url.to_string(),
             ..Default::default()
         },
@@ -228,21 +306,85 @@ pub async fn join_agent(
     Ok(())
 }
 
-/// Re-run the installer at `version` on the server first, then each agent, one at a time. Stops at
-/// the first failure and records it; nodes already upgraded stay upgraded.
-pub async fn upgrade(state: AppState, cluster_id: Uuid, version: String, install_url: String) {
+async fn cluster_nodes(pool: &DbPool, cluster_id: Uuid) -> anyhow::Result<Vec<NodeInfo>> {
+    let rows: Vec<(Uuid, Uuid, String, String)> = crate::db::query_as(
+        "SELECT id, host_id, role, status FROM k8s_cluster_nodes WHERE cluster_id = ? ORDER BY created_at",
+    )
+    .bind(cluster_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, host_id, role, status)| NodeInfo {
+            id,
+            host_id,
+            role,
+            status,
+        })
+        .collect())
+}
+
+/// Run a kubectl action (`drain`, `uncordon`, `delete_node`) for `node_name` on a server host.
+async fn kubectl_on(
+    state: &AppState,
+    host_id: Uuid,
+    action: &str,
+    node_name: &str,
+) -> anyhow::Result<()> {
+    let t = target(state, host_id).await?;
+    agent_client::k3s_node(
+        &t.addr,
+        K3sNodeCall {
+            action: action.into(),
+            node_name: node_name.into(),
+            ..Default::default()
+        },
+    )
+    .await?;
+    Ok(())
+}
+
+/// Re-run the installer at `version`: servers first (the bootstrap server leading), then agents,
+/// one node at a time. Each node is drained first and uncordoned after, unless `skip_drain` is set
+/// or it is the only server (nothing to drain it from). A failed drain stops the upgrade before
+/// that node is touched. Nodes already upgraded stay upgraded.
+pub async fn upgrade(
+    state: AppState,
+    cluster_id: Uuid,
+    version: String,
+    install_url: String,
+    skip_drain: bool,
+) {
     let pool = &state.pool;
     let run = async {
-        let nodes: Vec<(Uuid, Uuid, String)> = crate::db::query_as(
-            "SELECT id, host_id, role FROM k8s_cluster_nodes
-             WHERE cluster_id = ? AND status = 'ready'
-             ORDER BY CASE WHEN role = 'server' THEN 0 ELSE 1 END, created_at",
-        )
-        .bind(cluster_id)
-        .fetch_all(pool)
-        .await?;
-        for (node_id, host_id, _role) in nodes {
-            let t = target(&state, host_id).await?;
+        let all = cluster_nodes(pool, cluster_id).await?;
+        let ready: Vec<NodeInfo> = all
+            .iter()
+            .filter(|n| n.status == "ready")
+            .cloned()
+            .collect();
+        for node in upgrade_order(&ready) {
+            let t = target(&state, node.host_id).await?;
+            let name = node_name_for(&t.hostname);
+            // Drain from another ready server, if there is one.
+            let drainer = if skip_drain {
+                None
+            } else {
+                drain_host(&all, node.id)
+            };
+            if let Some(h) = drainer {
+                if let Err(e) = kubectl_on(&state, h, "drain", &name).await {
+                    set_node(
+                        pool,
+                        node.id,
+                        "error",
+                        &format!("drain failed, not upgraded: {e:#}"),
+                        "",
+                    )
+                    .await;
+                    return Err(e.context(format!("draining {} failed", t.hostname)));
+                }
+            }
             let res = agent_client::k3s_node(
                 &t.addr,
                 K3sNodeCall {
@@ -253,13 +395,24 @@ pub async fn upgrade(state: AppState, cluster_id: Uuid, version: String, install
                 },
             )
             .await;
-            match res {
-                Ok(_) => set_node(pool, node_id, "ready", "", &version).await,
-                Err(e) => {
-                    set_node(pool, node_id, "error", &e.to_string(), "").await;
-                    return Err(e.context(format!("upgrading {} failed", t.hostname)));
+            if let Err(e) = res {
+                set_node(pool, node.id, "error", &e.to_string(), "").await;
+                return Err(e.context(format!("upgrading {} failed", t.hostname)));
+            }
+            if let Some(h) = drainer {
+                if let Err(e) = kubectl_on(&state, h, "uncordon", &name).await {
+                    set_node(
+                        pool,
+                        node.id,
+                        "error",
+                        &format!("upgraded, but uncordon failed: {e:#}"),
+                        &version,
+                    )
+                    .await;
+                    return Err(e.context(format!("uncordoning {} failed", t.hostname)));
                 }
             }
+            set_node(pool, node.id, "ready", "", &version).await;
         }
         crate::db::query("UPDATE k8s_clusters SET version = ? WHERE id = ?")
             .bind(&version)
@@ -274,11 +427,41 @@ pub async fn upgrade(state: AppState, cluster_id: Uuid, version: String, install
     }
 }
 
-/// Remove k3s from one node and delete its row. The node is kept (status `error`) if the host
-/// refuses, so the failure stays visible.
-pub async fn remove_node(state: &AppState, node_id: Uuid, host_id: Uuid) -> anyhow::Result<()> {
+/// Remove k3s from one node and delete its row. With `drain`, the node is drained from a server
+/// first and its Node object deleted afterwards; a failed drain leaves the node in place (status
+/// `error`) so nothing is removed from under running pods. The node is also kept if the host refuses.
+pub async fn remove_node(
+    state: &AppState,
+    node_id: Uuid,
+    host_id: Uuid,
+    drain: bool,
+) -> anyhow::Result<()> {
     set_node(&state.pool, node_id, "removing", "", "").await;
     let t = target(state, host_id).await?;
+    let name = node_name_for(&t.hostname);
+    let drainer = if drain {
+        let cluster_id: Uuid =
+            crate::db::query_scalar("SELECT cluster_id FROM k8s_cluster_nodes WHERE id = ?")
+                .bind(node_id)
+                .fetch_one(&state.pool)
+                .await?;
+        drain_host(&cluster_nodes(&state.pool, cluster_id).await?, node_id)
+    } else {
+        None
+    };
+    if let Some(h) = drainer {
+        if let Err(e) = kubectl_on(state, h, "drain", &name).await {
+            set_node(
+                &state.pool,
+                node_id,
+                "error",
+                &format!("drain failed, not removed: {e:#}"),
+                "",
+            )
+            .await;
+            return Err(e.context("draining the node failed"));
+        }
+    }
     match agent_client::k3s_node(
         &t.addr,
         K3sNodeCall {
@@ -289,6 +472,12 @@ pub async fn remove_node(state: &AppState, node_id: Uuid, host_id: Uuid) -> anyh
     .await
     {
         Ok(_) => {
+            // The Node object lingers in the cluster after k3s is gone; best effort.
+            if let Some(h) = drainer {
+                if let Err(e) = kubectl_on(state, h, "delete_node", &name).await {
+                    tracing::warn!(node = %name, "deleting the Node object failed: {e:#}");
+                }
+            }
             crate::db::query("DELETE FROM k8s_cluster_nodes WHERE id = ?")
                 .bind(node_id)
                 .execute(&state.pool)
@@ -302,20 +491,21 @@ pub async fn remove_node(state: &AppState, node_id: Uuid, host_id: Uuid) -> anyh
     }
 }
 
-/// Remove every node (agents first, server last) and then the cluster row. Stops at the first node
-/// that cannot be removed, leaving the cluster in `error`.
+/// Remove every node (agents first, servers last) and then the cluster row. No drain: the whole
+/// cluster is going away. Stops at the first node that cannot be removed, leaving the cluster in
+/// `error`.
 pub async fn destroy(state: AppState, cluster_id: Uuid) {
     let pool = &state.pool;
     let run = async {
         let nodes: Vec<(Uuid, Uuid)> = crate::db::query_as(
             "SELECT id, host_id FROM k8s_cluster_nodes WHERE cluster_id = ?
-             ORDER BY CASE WHEN role = 'server' THEN 1 ELSE 0 END, created_at",
+             ORDER BY CASE WHEN role = 'server' THEN 1 ELSE 0 END, created_at DESC",
         )
         .bind(cluster_id)
         .fetch_all(pool)
         .await?;
         for (node_id, host_id) in nodes {
-            remove_node(&state, node_id, host_id).await?;
+            remove_node(&state, node_id, host_id, false).await?;
         }
         crate::db::query("DELETE FROM k8s_clusters WHERE id = ?")
             .bind(cluster_id)
@@ -342,6 +532,54 @@ mod tests {
         assert_eq!(api_url_for("fd00::5").unwrap(), "https://[fd00::5]:6443");
         assert!(api_url_for("").is_err());
         assert!(api_url_for("10.0.0.5/evil").is_err());
+    }
+
+    fn node(role: &str, status: &str) -> NodeInfo {
+        NodeInfo {
+            id: Uuid::new_v4(),
+            host_id: Uuid::new_v4(),
+            role: role.into(),
+            status: status.into(),
+        }
+    }
+
+    #[test]
+    fn upgrade_goes_servers_first_oldest_first_then_agents() {
+        let (s1, a1, s2, a2) = (
+            node("server", "ready"),
+            node("agent", "ready"),
+            node("server", "ready"),
+            node("agent", "ready"),
+        );
+        let order = upgrade_order(&[s1.clone(), a1.clone(), s2.clone(), a2.clone()]);
+        assert_eq!(order, vec![s1, s2, a1, a2]);
+    }
+
+    #[test]
+    fn drain_runs_from_another_ready_server() {
+        let (s1, s2, a1) = (
+            node("server", "ready"),
+            node("server", "ready"),
+            node("agent", "ready"),
+        );
+        let all = [s1.clone(), s2.clone(), a1.clone()];
+        // An agent drains from the first ready server.
+        assert_eq!(drain_host(&all, a1.id), Some(s1.host_id));
+        // A server drains from a different one.
+        assert_eq!(drain_host(&all, s1.id), Some(s2.host_id));
+        // A server that is not ready cannot run kubectl.
+        let down = [node("server", "error"), a1.clone()];
+        assert_eq!(drain_host(&down, a1.id), None);
+        // A single-server cluster cannot drain its own server, but can drain its agents.
+        let single = [s1.clone(), a1.clone()];
+        assert_eq!(drain_host(&single, s1.id), None);
+        assert_eq!(drain_host(&single, a1.id), Some(s1.host_id));
+    }
+
+    #[test]
+    fn only_odd_control_planes_are_allowed() {
+        assert!([1, 3, 5].iter().all(|n| valid_server_count(*n)));
+        assert!([0, 2, 4, 6, 7].iter().all(|n| !valid_server_count(*n)));
     }
 
     #[test]

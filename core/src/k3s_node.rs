@@ -14,20 +14,32 @@ pub const DEFAULT_INSTALL_URL: &str = "https://get.k3s.io";
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     InstallServer,
+    /// Join an extra server to an HA control plane (embedded etcd).
+    JoinServer,
     JoinAgent,
     Upgrade,
     Remove,
     Status,
+    /// `kubectl drain` of a node, run on a server host.
+    Drain,
+    /// `kubectl uncordon` of a node, run on a server host.
+    Uncordon,
+    /// `kubectl delete node`, run on a server host after the node's k3s is removed.
+    DeleteNode,
 }
 
 impl Action {
     pub fn parse(s: &str) -> Option<Self> {
         Some(match s {
             "install_server" => Self::InstallServer,
+            "join_server" => Self::JoinServer,
             "join_agent" => Self::JoinAgent,
             "upgrade" => Self::Upgrade,
             "remove" => Self::Remove,
             "status" => Self::Status,
+            "drain" => Self::Drain,
+            "uncordon" => Self::Uncordon,
+            "delete_node" => Self::DeleteNode,
             _ => return None,
         })
     }
@@ -47,6 +59,9 @@ pub struct Request {
     pub advertise_address: String,
     pub cluster_cidr: String,
     pub service_cidr: String,
+    /// First server of an HA control plane: start embedded etcd (`--cluster-init`) so more servers
+    /// can join. Leave false for a single-server cluster (SQLite).
+    pub cluster_init: bool,
     /// Installer script URL (an internal mirror for air-gapped sites). Default [`DEFAULT_INSTALL_URL`].
     pub install_url: String,
 }
@@ -173,7 +188,10 @@ pub fn validate_install_url(u: &str) -> Result<(), String> {
 pub fn plan(req: &Request) -> Result<Plan, String> {
     let action =
         Action::parse(&req.action).ok_or_else(|| format!("unknown action '{}'", req.action))?;
-    if matches!(action, Action::Remove | Action::Status) {
+    if matches!(
+        action,
+        Action::Remove | Action::Status | Action::Drain | Action::Uncordon | Action::DeleteNode
+    ) {
         return Err(format!("action '{}' has no installer plan", req.action));
     }
     validate_version(&req.version)?;
@@ -190,8 +208,17 @@ pub fn plan(req: &Request) -> Result<Plan, String> {
         validate_node_name(&req.node_name)?;
     }
     match action {
-        Action::InstallServer => {
+        Action::InstallServer | Action::JoinServer => {
             args.push("server".into());
+            if matches!(action, Action::InstallServer) && req.cluster_init {
+                args.push("--cluster-init".into());
+            }
+            if matches!(action, Action::JoinServer) {
+                validate_server_url(&req.server_url)?;
+                validate_token(&req.token)?;
+                env.push(("K3S_URL".into(), req.server_url.clone()));
+                env.push(("K3S_TOKEN".into(), req.token.clone()));
+            }
             if !req.advertise_address.is_empty() {
                 if req.advertise_address.parse::<IpAddr>().is_err()
                     && validate_server_url(&format!("https://{}", req.advertise_address)).is_err()
@@ -224,9 +251,16 @@ pub fn plan(req: &Request) -> Result<Plan, String> {
         }
         // An upgrade re-runs the installer, which keeps the existing service configuration.
         Action::Upgrade => {}
-        Action::Remove | Action::Status => unreachable!(),
+        Action::Remove | Action::Status | Action::Drain | Action::Uncordon | Action::DeleteNode => {
+            unreachable!()
+        }
     }
-    if !req.node_name.is_empty() && matches!(action, Action::InstallServer | Action::JoinAgent) {
+    if !req.node_name.is_empty()
+        && matches!(
+            action,
+            Action::InstallServer | Action::JoinServer | Action::JoinAgent
+        )
+    {
         args.push("--node-name".into());
         args.push(req.node_name.clone());
     }
@@ -235,6 +269,35 @@ pub fn plan(req: &Request) -> Result<Plan, String> {
         args,
         env,
     })
+}
+
+/// `k3s kubectl` arguments to drain, uncordon or delete `node_name`, run on a server host. Pods that no
+/// controller manages are not forced off (no `--force`): such a pod blocks the drain, which then
+/// fails visibly rather than deleting data.
+pub fn kubectl_args(
+    action: Action,
+    node_name: &str,
+    timeout_secs: u32,
+) -> Result<Vec<String>, String> {
+    validate_node_name(node_name)?;
+    match action {
+        Action::Drain => Ok(vec![
+            "kubectl".into(),
+            "drain".into(),
+            node_name.into(),
+            "--ignore-daemonsets".into(),
+            "--delete-emptydir-data".into(),
+            format!("--timeout={}s", timeout_secs.clamp(30, 3600)),
+        ]),
+        Action::Uncordon => Ok(vec!["kubectl".into(), "uncordon".into(), node_name.into()]),
+        Action::DeleteNode => Ok(vec![
+            "kubectl".into(),
+            "delete".into(),
+            "node".into(),
+            node_name.into(),
+        ]),
+        _ => Err("kubectl_args is for drain and uncordon".into()),
+    }
 }
 
 /// Which uninstall script exists on the host decides what is removed.
@@ -387,6 +450,83 @@ mod tests {
             .env
             .contains(&("K3S_URL".into(), "https://10.0.0.5:6443".into())));
         assert!(!p.args.iter().any(|a| a.contains("secret")));
+    }
+
+    #[test]
+    fn ha_servers_start_etcd_on_the_first_and_join_the_rest() {
+        let mut first = req("install_server");
+        first.cluster_init = true;
+        first.advertise_address = "10.0.0.5".into();
+        assert_eq!(
+            plan(&first).unwrap().args,
+            ["server", "--cluster-init", "--tls-san", "10.0.0.5"]
+        );
+        // A single-server cluster keeps SQLite: no --cluster-init.
+        assert_eq!(plan(&req("install_server")).unwrap().args, ["server"]);
+
+        let mut more = req("join_server");
+        more.server_url = "https://10.0.0.5:6443".into();
+        more.token = "K10secret::server:abc".into();
+        more.node_name = "cp-2".into();
+        more.cluster_init = true; // ignored for a join
+        let p = plan(&more).unwrap();
+        assert_eq!(p.args, ["server", "--node-name", "cp-2"]);
+        assert!(p
+            .env
+            .contains(&("K3S_TOKEN".into(), "K10secret::server:abc".into())));
+        assert!(p
+            .env
+            .contains(&("K3S_URL".into(), "https://10.0.0.5:6443".into())));
+        assert!(!p.args.iter().any(|a| a.contains("secret")));
+        // A join needs the first server's URL and the token.
+        assert!(plan(&req("join_server")).is_err());
+    }
+
+    #[test]
+    fn drain_and_uncordon_are_kubectl_not_installer_plans() {
+        assert_eq!(Action::parse("drain"), Some(Action::Drain));
+        assert_eq!(Action::parse("uncordon"), Some(Action::Uncordon));
+        assert!(plan(&req("drain")).is_err());
+        assert_eq!(
+            kubectl_args(Action::Drain, "worker-1", 300).unwrap(),
+            [
+                "kubectl",
+                "drain",
+                "worker-1",
+                "--ignore-daemonsets",
+                "--delete-emptydir-data",
+                "--timeout=300s"
+            ]
+        );
+        // No --force: an unmanaged pod blocks the drain instead of being deleted.
+        assert!(!kubectl_args(Action::Drain, "w", 300)
+            .unwrap()
+            .iter()
+            .any(|a| a == "--force"));
+        assert_eq!(
+            kubectl_args(Action::Uncordon, "worker-1", 0).unwrap(),
+            ["kubectl", "uncordon", "worker-1"]
+        );
+        assert_eq!(
+            kubectl_args(Action::Drain, "w", 1).unwrap().last().unwrap(),
+            "--timeout=30s"
+        );
+        assert_eq!(
+            kubectl_args(Action::Drain, "w", 999_999)
+                .unwrap()
+                .last()
+                .unwrap(),
+            "--timeout=3600s"
+        );
+        assert!(kubectl_args(Action::Drain, "Bad Name", 300).is_err());
+        assert!(kubectl_args(Action::Drain, "--all", 300).is_err());
+        assert!(kubectl_args(Action::Upgrade, "w", 300).is_err());
+        assert_eq!(Action::parse("delete_node"), Some(Action::DeleteNode));
+        assert_eq!(
+            kubectl_args(Action::DeleteNode, "w-1", 0).unwrap(),
+            ["kubectl", "delete", "node", "w-1"]
+        );
+        assert!(plan(&req("delete_node")).is_err());
     }
 
     #[test]

@@ -22,6 +22,9 @@ const OUTPUT_TAIL: usize = 4000;
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(180);
 const INSTALL_TIMEOUT: Duration = Duration::from_secs(900);
 const REMOVE_TIMEOUT: Duration = Duration::from_secs(300);
+/// kubectl's own eviction timeout; the process is allowed a little longer.
+const KUBECTL_DRAIN_SECS: u32 = 600;
+const DRAIN_TIMEOUT: Duration = Duration::from_secs(660);
 
 fn fail(message: impl Into<String>) -> K3sNodeResponse {
     K3sNodeResponse {
@@ -82,11 +85,15 @@ pub async fn handle(req: K3sNodeRequest) -> K3sNodeResponse {
         cluster_cidr: req.cluster_cidr,
         service_cidr: req.service_cidr,
         install_url: req.install_url,
+        cluster_init: req.cluster_init,
     };
     match Action::parse(&r.action) {
         None => fail(format!("unknown action '{}'", r.action)),
         Some(Action::Status) => status().await,
         Some(Action::Remove) => remove().await,
+        Some(action @ (Action::Drain | Action::Uncordon | Action::DeleteNode)) => {
+            kubectl(&r, action).await
+        }
         Some(action) => install(&r, action).await,
     }
 }
@@ -163,6 +170,37 @@ async fn install(r: &Request, action: Action) -> K3sNodeResponse {
     resp
 }
 
+/// Drain, uncordon or delete a node with the k3s bundled kubectl. Runs on a server host only (it needs the
+/// admin kubeconfig k3s writes there).
+async fn kubectl(r: &Request, action: Action) -> K3sNodeResponse {
+    if !Path::new(K3S_BIN).exists() || !Path::new(KUBECONFIG_PATH).exists() {
+        return fail("this host is not a k3s server (no k3s binary or admin kubeconfig)");
+    }
+    let args = match k3s_node::kubectl_args(action, &r.node_name, KUBECTL_DRAIN_SECS) {
+        Ok(a) => a,
+        Err(e) => return fail(e),
+    };
+    let env = [("KUBECONFIG".to_string(), KUBECONFIG_PATH.to_string())];
+    let out = run(K3S_BIN, &args, &env, DRAIN_TIMEOUT).await;
+    K3sNodeResponse {
+        ok: out.ok,
+        message: if out.ok {
+            match action {
+                Action::Drain => "drained".into(),
+                Action::DeleteNode => "node deleted".into(),
+                _ => "uncordoned".into(),
+            }
+        } else {
+            format!(
+                "kubectl {} failed",
+                args.get(1).map(String::as_str).unwrap_or("")
+            )
+        },
+        output_tail: k3s_node::tail(&out.text, OUTPUT_TAIL),
+        ..Default::default()
+    }
+}
+
 async fn remove() -> K3sNodeResponse {
     let script = k3s_node::uninstall_script(
         Path::new("/usr/local/bin/k3s-uninstall.sh").exists(),
@@ -236,6 +274,22 @@ mod tests {
     fn redact_hides_the_token() {
         assert_eq!(redact("join K10abc ok", "K10abc"), "join *** ok");
         assert_eq!(redact("nothing", ""), "nothing");
+    }
+
+    #[tokio::test]
+    async fn drain_is_refused_on_a_host_that_is_not_a_k3s_server() {
+        if Path::new(K3S_BIN).exists() {
+            return; // a real k3s host: this refusal does not apply
+        }
+        let r = kubectl(
+            &Request {
+                node_name: "worker-1".into(),
+                ..Default::default()
+            },
+            Action::Drain,
+        )
+        .await;
+        assert!(!r.ok && r.message.contains("not a k3s server"));
     }
 
     #[tokio::test]

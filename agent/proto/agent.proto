@@ -1118,7 +1118,7 @@ message AbortFluxvmMigrationResponse {}
 // host sets MACHINA_AGENT_K3S_ENABLED=1; the join token travels only in this message and the
 // installer's environment.
 message K3sNodeRequest {
-  string action = 1; // install_server | join_agent | upgrade | remove | status
+  string action = 1; // install_server | join_server | join_agent | upgrade | remove | status | drain | uncordon
   string version = 2;
   string server_url = 3;
   string token = 4;
@@ -1127,6 +1127,8 @@ message K3sNodeRequest {
   string cluster_cidr = 7;
   string service_cidr = 8;
   string install_url = 9;
+  // install_server: start embedded etcd so more servers can join (an HA control plane).
+  bool cluster_init = 10;
 }
 
 message K3sNodeResponse {
