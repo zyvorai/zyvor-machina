@@ -99,6 +99,7 @@ pub mod upgrade_skew;
 pub mod vm_health;
 pub mod vm_inventory;
 pub mod vm_lifecycle;
+pub mod witness;
 pub mod alarms;
 pub mod eip;
 pub mod natgw;

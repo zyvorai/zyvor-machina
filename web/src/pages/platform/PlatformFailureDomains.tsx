@@ -7,13 +7,19 @@ import OperatingSurfaceLayout from '../../components/platform/OperatingSurfaceLa
 import PlatformEmptyState from '../../components/platform/PlatformEmptyState'
 import PlatformPageChrome, { PlatformBackLink } from '../../components/platform/PlatformPageChrome'
 import { MacGlassPanel, MacListRow } from '../../components/platform/mac/PlatformMacUi'
-import { getFailureDomains, type FailureDomainsReport } from '../../api/platformFleetFeatures'
+import {
+  getFailureDomains,
+  getWitnessStatus,
+  type FailureDomainsReport,
+  type WitnessStatus,
+} from '../../api/platformFleetFeatures'
 import { formatUserError } from '../../utils/apiError'
 
 const gib = (mib: number) => `${(mib / 1024).toFixed(1)} GiB`
 
 export default function PlatformFailureDomains() {
   const [report, setReport] = useState<FailureDomainsReport | null>(null)
+  const [witness, setWitness] = useState<WitnessStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -21,7 +27,9 @@ export default function PlatformFailureDomains() {
     setError(null)
     setLoading(true)
     try {
-      setReport(await getFailureDomains())
+      const [r, w] = await Promise.all([getFailureDomains(), getWitnessStatus().catch(() => null)])
+      setReport(r)
+      setWitness(w)
     } catch (e: unknown) {
       setError(formatUserError(e))
     } finally {
@@ -55,6 +63,23 @@ export default function PlatformFailureDomains() {
                 <ul className="list-disc pl-5 text-sm text-[var(--text-secondary)] space-y-1">
                   {report.findings.map((f) => <li key={f}>{f}</li>)}
                 </ul>
+              )}
+            </MacGlassPanel>
+            <MacGlassPanel
+              title="Witness"
+              subtitle="An outside endpoint HA checks before it fences or restarts anything, so an isolated controller does not act on silence."
+            >
+              {witness === null ? (
+                <p className="text-sm text-[var(--text-secondary)]">Status unavailable.</p>
+              ) : !witness.configured ? (
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Not configured. Set MACHINA_WITNESS_URLS on the controller to a URL in a third failure domain.
+                </p>
+              ) : (
+                <p className={`text-sm ${witness.allowed ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {witness.allowed ? 'HA is active' : 'HA is paused'}: {witness.reachable} of {witness.witnesses.length} witness(es) reachable
+                  ({witness.mode}) — {witness.witnesses.join(', ')}
+                </p>
               )}
             </MacGlassPanel>
             <MacGlassPanel title="Racks" subtitle={`${report.domains.length} domain(s), ${report.unassigned_hosts} host(s) without a rack label`}>

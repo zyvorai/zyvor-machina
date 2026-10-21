@@ -45,10 +45,30 @@ curl -sk -X PATCH https://HOST:5093/api/v1/hosts/$HOST_ID \
 The check counts memory only (the hard limit HA also uses) on hosts that are online, out of maintenance and schedulable. Cordoned
 hosts do not count as spare room.
 
+## Witness: do not act on silence
+
+If the controller loses its own network, every host looks dead. Without a tie-breaker it would fence them all and restart their
+VMs elsewhere. A **witness** is any HTTP(S) endpoint in a third failure domain (a small static server, an object-store URL, a
+monitoring beacon). When one or more witnesses are configured, HA fences hosts and recovers VMs **only while the controller can
+reach them**.
+
+```bash
+# controller environment
+MACHINA_WITNESS_URLS=https://witness.site-c.example/ok,https://10.9.0.5:8443/ok   # up to 5
+MACHINA_WITNESS_MODE=any            # any (default): one reachable is enough; majority: more than half
+```
+
+Any HTTP answer below 500 counts as reachable. Checks are cached for 15 seconds. When the witnesses become unreachable HA pauses and
+records `ha.witness_unreachable` once; `ha.witness_restored` follows when they return. `GET /api/v1/ha/witness` and the Failure
+Domains page show the current state (URLs appear as host and port only). With no URLs set nothing changes.
+
+This is an isolation guard, not distributed consensus: it stops a cut-off controller from acting, and it does not arbitrate between
+two controllers. A witness outage pauses HA, so use a reliable one.
+
 ## What it does not do yet
 
-- No witness or quorum arbiter for the controller: losing the rack that holds the controller is a separate question. See
-  [Controller HA](https://github.com/zyvorai/zyvor-machina/blob/main/docs/controller-ha.md).
+- No quorum between controllers: the witness only stops an isolated controller from acting. Losing the rack that holds the
+  controller is a separate question. See [Controller HA](https://github.com/zyvorai/zyvor-machina/blob/main/docs/controller-ha.md).
 - Storage and network survival are not checked. Pair this with replicated storage that has its own failure domains.
 - Not yet run on real racks: see the claims ledger (C57).
 

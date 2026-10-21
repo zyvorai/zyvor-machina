@@ -46,3 +46,12 @@ pub async fn failure_domains(
         .map(Json)
         .map_err(|e| ApiError::internal(e.to_string()))
 }
+
+/// Whether HA is currently allowed to act: the witness check behind `MACHINA_WITNESS_URLS`. Witness
+/// URLs are shown as host and port only.
+pub async fn witness_status(
+    Extension(actor): Extension<AuthUser>,
+) -> Result<Json<crate::engine::witness::Status>, ApiError> {
+    require_operator(&actor)?;
+    Ok(Json(crate::engine::witness::check().await))
+}

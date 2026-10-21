@@ -18,6 +18,7 @@ environment variables from their env files.
 | `MACHINA_CONTROLLER_ID` | random `ctrl-xxxxxxxx` per start | Stable instance id; set it on every instance in a multi-controller deployment |
 | `MACHINA_AGENT_ADDR` | `http://127.0.0.1:50051` | Agent gRPC address |
 | `MACHINA_AGENT_CA`, `MACHINA_AGENT_CLIENT_CERT`, `MACHINA_AGENT_CLIENT_KEY` | unset | mTLS to agents |
+| `MACHINA_WITNESS_URLS`, `MACHINA_WITNESS_MODE` | unset, `any` | Comma-separated witness URLs (at most 5) HA must reach before it fences or recovers; mode `any` or `majority` |
 | `MACHINA_K3S_FLEET` | unset | `1` enables the fleet k3s cluster API (`/api/v1/k8s-clusters`); hosts must also opt in with `MACHINA_AGENT_K3S_ENABLED=1` |
 | `MACHINA_JWT_SECRET` | random per process | JWT signing secret; set it for sessions that survive restarts |
 | `MACHINA_ALLOW_DEV_SECRETS` | unset | Allow the well-known development secret (never in production) |

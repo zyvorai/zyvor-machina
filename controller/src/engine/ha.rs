@@ -28,7 +28,40 @@ pub fn spawn(state: AppState) {
     });
 }
 
+/// True while the last witness check failed, so the event is recorded once per outage.
+static WITNESS_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Whether HA may act. With witnesses configured (`MACHINA_WITNESS_URLS`), a controller that cannot
+/// reach enough of them might be the isolated side, so it neither fences hosts nor restarts VMs.
+/// The pause and the return to normal are each recorded once.
+async fn witness_allows(state: &AppState) -> bool {
+    use std::sync::atomic::Ordering;
+    let st = crate::engine::witness::check().await;
+    let was_down = WITNESS_DOWN.swap(!st.allowed, Ordering::SeqCst);
+    if !st.allowed && !was_down {
+        tracing::warn!(reachable = st.reachable, "HA paused: witness unreachable");
+        let _ = record_ha_event(
+            &state.pool,
+            None,
+            None,
+            "ha.witness_unreachable",
+            &format!(
+                "Only {} of {} witness(es) reachable: HA actions are paused so an isolated controller does not fence healthy hosts",
+                st.reachable,
+                st.witnesses.len()
+            ),
+        )
+        .await;
+    } else if st.allowed && was_down {
+        let _ = record_ha_event(&state.pool, None, None, "ha.witness_restored", "Witness reachable again: HA actions resumed").await;
+    }
+    st.allowed
+}
+
 pub async fn scan(state: &AppState) -> anyhow::Result<()> {
+    if !witness_allows(state).await {
+        return Ok(());
+    }
     mark_stale_hosts(state).await?;
     retry_pending_fences(state).await?;
     recover_vms(state).await?;

@@ -34,6 +34,17 @@ export type FailureDomainsReport = {
 
 export const getFailureDomains = () => platformFetch<FailureDomainsReport>('/api/v1/failure-domains')
 
+export type WitnessStatus = {
+  configured: boolean
+  mode: 'any' | 'majority'
+  witnesses: string[]
+  reachable: number
+  /** False means HA is paused because too few witnesses answer. */
+  allowed: boolean
+}
+
+export const getWitnessStatus = () => platformFetch<WitnessStatus>('/api/v1/ha/witness')
+
 // ── Fleet k3s clusters ──────────────────────────────────────────────────────
 
 export type K8sNode = {
