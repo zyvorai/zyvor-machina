@@ -117,6 +117,11 @@ const CloudInitStudio = lazyWithRetry(() => import('./pages/platform/CloudInitSt
 const PlatformNetworkCanvas = lazyWithRetry(() => import('./pages/platform/PlatformNetworkCanvas'))
 const PlatformDatacenter = lazyWithRetry(() => import('./pages/platform/PlatformDatacenter'))
 const PlatformFleetSnapshots = lazyWithRetry(() => import('./pages/platform/PlatformFleetSnapshots'))
+const PlatformFailureDomains = lazyWithRetry(() => import('./pages/platform/PlatformFailureDomains'))
+const PlatformK8sClusters = lazyWithRetry(() => import('./pages/platform/PlatformK8sClusters'))
+const PlatformDesktopPools = lazyWithRetry(() => import('./pages/platform/PlatformDesktopPools'))
+const PlatformMigrationWaves = lazyWithRetry(() => import('./pages/platform/PlatformMigrationWaves'))
+const PlatformBackupReplication = lazyWithRetry(() => import('./pages/platform/PlatformBackupReplication'))
 const PlatformAlertRules = lazyWithRetry(() => import('./pages/platform/PlatformAlertRules'))
 const PlatformScheduledJobs = lazyWithRetry(() => import('./pages/platform/PlatformScheduledJobs'))
 const PlatformEnroll = lazyWithRetry(() => import('./pages/platform/PlatformEnroll'))
@@ -409,6 +414,11 @@ function AuthenticatedShellRoutes() {
                   <Route path="migration" element={<PlatformMigration />} />
                   <Route path="backups" element={<PlatformBackups />} />
                   <Route path="fleet-snapshots" element={<PlatformFleetSnapshots />} />
+                  <Route path="failure-domains" element={<PlatformFailureDomains />} />
+                  <Route path="k8s-clusters" element={<PlatformK8sClusters />} />
+                  <Route path="desktop-pools" element={<PlatformDesktopPools />} />
+                  <Route path="migration-waves" element={<PlatformMigrationWaves />} />
+                  <Route path="backup-replication" element={<PlatformBackupReplication />} />
                   <Route path="alert-rules" element={<PlatformAlertRules />} />
                   <Route path="scheduled-jobs" element={<PlatformScheduledJobs />} />
                   <Route path="enroll" element={<PlatformEnroll />} />
