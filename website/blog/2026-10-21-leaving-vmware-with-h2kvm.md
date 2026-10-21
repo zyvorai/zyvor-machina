@@ -8,7 +8,7 @@ description: How h2kvm and Machina take a VM from vSphere to KVM with the guest 
 
 Most VMware exits fail after cutover: the bootloader is wrong, or Windows still points at the old hypervisor. h2kvm repairs the guest offline first, then converts it.
 
-<!-- truncate -->
+{/* truncate */}
 
 1. **Pick up** from vSphere, ESXi, Azure or a disk file (VMDK, VHDX, OVA/OVF, raw).
 2. **Repair** with GuestKit: fstab, bootloader, initramfs, Windows VirtIO drivers.
