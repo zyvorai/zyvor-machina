@@ -18,6 +18,11 @@ Read the header of each script for its environment variables. The scripts that c
 `*_CONFIRM` variable to a sentence naming what they will do (for example `K3S_CONFIRM=install-k3s-on-these-hosts`), so nobody runs
 one by accident. Use disposable hosts, VMs and LUNs.
 
+## Self-signed certificates
+
+A lab daemon or controller usually has a self-signed certificate. Set `QUAL_INSECURE=1` and every call the scripts make accepts it.
+A tunnel works too: `ssh -L 15092:127.0.0.1:5092 user@host` and `MACHINA_URL=https://127.0.0.1:15092`.
+
 ## Exit codes
 
 `0` pass, `1` fail, `2` missing configuration, tool or confirmation, `77` skipped (the environment cannot run the check, for

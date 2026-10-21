@@ -14,6 +14,7 @@
 #   MACHINA_URL, MACHINA_TOKEN   daemon URL (e.g. https://host:5092) and a token with vms:write
 #   TL_ISO                       optional: an installer ISO path on the host (default: none)
 #   TL_HOST_SSH                  optional user@host: also check the swtpm process is running
+#   TL_CREATE_SECS               how long the create call may take (default 900; disk creation is slow on a busy host)
 #   TL_CONFIRM                   must be create-and-delete-a-vm
 . "$(dirname "$0")/lib.sh"
 q_need MACHINA_URL MACHINA_TOKEN
@@ -38,8 +39,9 @@ code="$(api_code -X POST -d "$(jobj name="qual-tl-bios-$$" firmware=bios secure_
 q_step "2/6" "create $NAME with UEFI, Secure Boot and a TPM"
 args=(name="$NAME" firmware=uefi secure_boot=@true vtpm=@true vcpus=@2 memory_mb=@2048 disk_gb=@10)
 [[ -z "${TL_ISO:-}" ]] || args+=(iso="$TL_ISO")
-api -X POST -d "$(jobj "${args[@]}")" "$MACHINA_URL/api/v1/vms" | q_save create.json >/dev/null
+# Arm the cleanup first: on a slow host the create can outlive this call, and the VM must still be removed.
 MADE=1
+QUAL_HTTP_TIMEOUT="${TL_CREATE_SECS:-900}" api -X POST -d "$(jobj "${args[@]}")" "$MACHINA_URL/api/v1/vms" | q_save create.json >/dev/null
 
 q_step "3/6" "libvirt kept the firmware auto-selection, SMM and the TPM"
 xml="$(api "$MACHINA_URL/api/v1/vms/$NAME/xml" | q_save domain-defined.xml)"

@@ -33,6 +33,9 @@ firmware descriptors. The `virt-install` create path passes the equivalent `--bo
   (`edk2-ovmf` on Fedora/RHEL, `ovmf` on Debian/Ubuntu).
 - **TPM:** `swtpm` (and `swtpm-tools`) must be installed.
 
+Secure Boot VMs are created on the **q35** machine type (the signed firmware requires it); the `virt-install` path asks for it
+explicitly.
+
 An existing VM can still get a TPM later through the TPM attach call; it cannot be switched to Secure Boot in place.
 
 ## Limits

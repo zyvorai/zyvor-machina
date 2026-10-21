@@ -41,15 +41,21 @@ q_fail() { echo "FAIL: $*" >&2; echo "evidence: $QUAL_EVIDENCE_DIR" >&2; exit 1;
 q_skip() { echo "SKIP: $*"; exit 77; }
 q_step() { printf '[%s] %s\n' "$1" "$2"; }
 
+# QUAL_INSECURE=1 accepts a self-signed certificate (a lab daemon or controller). Every call below
+# and the scripts' own curl calls go through `qcurl`.
+qcurl() {
+  if [[ "${QUAL_INSECURE:-0}" == 1 ]]; then curl -k "$@"; else curl "$@"; fi
+}
+
 # Authenticated JSON call; fails on an HTTP error status.
 api() {
-  curl -fsS --max-time "${QUAL_HTTP_TIMEOUT:-60}" \
+  qcurl -fsS --max-time "${QUAL_HTTP_TIMEOUT:-60}" \
     -H "Authorization: Bearer ${MACHINA_TOKEN:?}" -H 'Content-Type: application/json' "$@"
 }
 
 # HTTP status code of a call, without failing on 4xx / 5xx.
 api_code() {
-  curl -sS -o /dev/null -w '%{http_code}' --max-time "${QUAL_HTTP_TIMEOUT:-60}" \
+  qcurl -sS -o /dev/null -w '%{http_code}' --max-time "${QUAL_HTTP_TIMEOUT:-60}" \
     -H "Authorization: Bearer ${MACHINA_TOKEN:?}" -H 'Content-Type: application/json' "$@"
 }
 
