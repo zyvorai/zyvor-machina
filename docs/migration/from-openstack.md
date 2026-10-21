@@ -12,7 +12,7 @@ automation move to Machina's REST API or its [EC2-compatible API](../cloud-ec2-a
 |---|---|---|
 | Keystone (identity) | PAM, OIDC, SAML, LDAP, RBAC, project-scoped API keys | See [LDAP](../ldap-auth.md) and [scoped API keys](../guides/scoped-api-keys.md). No Keystone API. |
 | Nova (compute) | `machina-daemon` + `machina-agent` on libvirt/KVM; the controller schedules | Flavors are instance types. Live migration, HA failover and DRS are built in. |
-| Neutron (networking) | Native eBPF VM edge and network policy, VPC objects, NAT, Elastic IPs | VPC routing and peering are stored plans on a host-local backend: see [cloud-vpc-elastic-compute.md](../cloud-vpc-elastic-compute.md). No VXLAN/OVN tenant overlay; a WireGuard overlay joins hosts. |
+| Neutron (networking) | Native eBPF VM edge and network policy, VPC objects, NAT, Elastic IPs | VPC peering, internet-gateway and blackhole routes and network ACLs are enforced on the hosts, across hosts over the WireGuard overlay (cross-host not yet run end to end): see [cloud-fabric.md](../cloud-fabric.md). No VXLAN/OVN tenant overlay. |
 | Glance (images) | Images and templates, Golden Forge builds (virt-builder, Packer) | [Volumes and images](../guides/volumes-and-images.md) |
 | Cinder (block storage) | Volumes with I/O limits and snapshots; Atlas for Ceph, NFS or ZFS | [Atlas](../atlas-storage.md) |
 | Heat (orchestration) | Stacks with dry run, approval and drift repair | [Fleet Cloud features](../fleet-cloud-features.md#stacks-you-describe). Templates are not HOT. |

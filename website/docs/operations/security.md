@@ -27,7 +27,9 @@ audit lines can be signed and shipped off-host.
 
 - The controller generates a random JWT secret per process when `MACHINA_JWT_SECRET` is unset, and refuses to boot on
   the well-known development secret unless explicitly allowed.
-- LLM provider keys are encrypted at rest with AES-256-GCM when `MACHINA_API_KEY_MASTER_KEY` is set.
+- LLM provider keys and BMC passwords are encrypted at rest with AES-256-GCM when a master key is set
+  (`MACHINA_API_KEY_MASTER_KEY`, or `MACHINA_API_KEY_MASTER_KEY_FILE` to keep it out of the environment).
+- JWT signing secrets can be rolled over without logging anyone out; see [Production hardening](production-hardening.md).
 
 ## Network enforcement
 
@@ -39,7 +41,8 @@ honours on its own and that fails open when it expires, and nothing is persisted
 ## Hardening checklist
 
 - Use a certificate from your CA instead of the installer's self-signed one.
-- Set `MACHINA_JWT_SECRET` and `MACHINA_API_KEY_MASTER_KEY` explicitly in production.
+- Set `MACHINA_JWT_SECRET` and a master key explicitly in production, and turn on the strict profile with
+  `MACHINA_SECURITY_PROFILE=production` ([Production hardening](production-hardening.md)).
 - Keep `machina-agent` bound to localhost or a management network, with mTLS between controller and agents.
 - Give automation API tokens the least privilege they need (`operator` rather than `admin`).
 - Ship the signed audit log off-host.

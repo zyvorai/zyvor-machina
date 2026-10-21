@@ -1,0 +1,46 @@
+name: ARM64
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-arm64:
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: machina
+      - uses: actions/checkout@v4
+        with:
+          repository: hypersdk/guestkit
+          path: guestkit
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
+        with:
+          toolchain: stable
+      - name: Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libvirt-dev libpam0g-dev libclang-dev clang protobuf-compiler libssl-dev qemu-system-arm qemu-utils
+      - name: eBPF toolchain
+        working-directory: machina
+        run: make bpf-deps
+      - name: Build and unit tests on native ARM64
+        working-directory: machina
+        env:
+          MACHINA_BPF_REQUIRED: 'true'
+        run: |
+          cargo build --workspace --release --locked
+          cargo test --workspace --locked
+          ./target/release/machina-bpfd --probe | tee /tmp/bpf-probe.json
+          grep -q '"programs_compiled": true' /tmp/bpf-probe.json
+      - name: Web build
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: machina/web/package-lock.json
+      - working-directory: machina/web
+        run: npm ci && npm run build

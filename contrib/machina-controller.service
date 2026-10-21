@@ -14,6 +14,7 @@ Group=root
 EnvironmentFile=-/etc/default/machina-platform
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
+ExecStartPre=/bin/sh -c 'test ! -x /usr/libexec/machina/production-preflight || exec /usr/libexec/machina/production-preflight'
 ExecStart=/usr/local/bin/machina-controller --host 127.0.0.1 --port 5093
 Restart=always
 RestartSec=5

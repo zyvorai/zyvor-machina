@@ -3,7 +3,7 @@
 
 // Competitive comparison data. Every Machina cell starts with a status
 // (Yes / Partial / Planned / No) and must trace to a row in docs/claims.md
-// (C52 covers this page set). Competitor cells describe the product as
+// (C56 covers this page set). Competitor cells describe the product as
 // documented publicly; vendors change things, so each page carries a
 // "check the vendor's current documentation" note.
 
@@ -83,7 +83,7 @@ export const VMWARE: Comparison = {
     {topic: 'HA, DRS, live migration', status: 'Yes', machina: 'Built into the controller; migration oracle and adaptive actuator (unit-tested, C28 to C29)', other: 'vSphere HA, DRS, vMotion'},
     {topic: 'Fault tolerance (lockstep)', status: 'No', machina: 'Not available; use HA restart', other: 'vSphere Fault Tolerance'},
     {topic: 'Storage', status: 'Partial', machina: 'Local, NFS, Atlas-managed Ceph; no vSAN-style built-in engine', other: 'vSAN and VMFS'},
-    {topic: 'Network virtualization', status: 'Partial', machina: 'eBPF security groups and microsegmentation, overlay segments; cross-host VPC not built', other: 'NSX'},
+    {topic: 'Network virtualization', status: 'Partial', machina: 'eBPF security groups and microsegmentation, overlay segments, VPC peering and route tables enforced on hosts (C22, C52)', other: 'NSX'},
     {topic: 'Cloud API', status: 'Yes', machina: 'REST plus EC2-compatible API and Terraform', other: 'vCenter API; VCF Automation'},
     {topic: 'Migration in', status: 'Yes', machina: 'Transiva (vSphere and nine more providers, scheduling, cost and carbon view) with h2kvm conversion and GuestKit offline repair and migration passport; progress via web, webhooks and email', other: 'N/A'},
     {topic: 'Licensing', status: 'Yes', machina: 'Per-host subscription', other: 'Per-core subscription bundles'},

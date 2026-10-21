@@ -1,6 +1,6 @@
 # Machina host daemon: REST/WebSocket API, web UI, PAM auth, libvirt access. Built by scripts/release/build-release.sh.
 name: machina
-arch: amd64
+arch: ${ARCH}
 platform: linux
 version: ${VERSION}
 section: admin

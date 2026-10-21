@@ -1,8 +1,9 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 // SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
 
-//! VPC peering and subnet IPAM. Accepting a peering sets status `planned`. Nothing forwards
-//! packets. Subnet addresses are the managed pool on a subnet, not secondary IPs on an ENI.
+//! VPC peering and subnet IPAM. Accepted peerings are reconciled into the
+//! authenticated machina-wg fabric; forwarding becomes active when a route table selects the peering.
+//! Subnet addresses are the managed pool on a subnet, not secondary IPs on an ENI.
 
 use std::collections::BTreeMap;
 
@@ -46,20 +47,25 @@ pub(super) async fn peering_uuid(state: &AppState, raw: &str) -> Result<Uuid, Ec
 
 pub async fn describe_vpc_peering_connections(state: &AppState, actor: &AuthUser, _p: &Params) -> Result<String, Ec2Error> {
     require_operator(actor)?;
-    let rows: Vec<(Uuid, Uuid, Uuid, String)> = crate::db::query_as(
-        "SELECT id, requester_id, accepter_id, status FROM cloud_peerings ORDER BY id",
+    let rows: Vec<(Uuid, Uuid, Uuid, String, i64)> = crate::db::query_as(
+        "SELECT p.id, p.requester_id, p.accepter_id, p.status,          ((SELECT COUNT(*) FROM cloud_routes r WHERE r.target = 'peering' AND r.target_id = p.id) +           (SELECT COUNT(*) FROM ec2_routes r WHERE r.target_kind = 'peering' AND r.target_id = p.id)) AS route_count          FROM cloud_peerings p ORDER BY p.id",
     )
     .fetch_all(&state.pool)
     .await?;
     let items: String = rows
         .into_iter()
-        .map(|(id, requester, accepter, status)| {
+        .map(|(id, requester, accepter, status, route_count)| {
+            let active = status == "planned" && route_count > 0;
+            let code = if status == "planned" { "active" } else { "pending-acceptance" };
+            let message = if active { "forwarding route installed" } else if status == "planned" { "accepted; add a route to forward traffic" } else { "pending acceptance" };
             format!(
-                "<item><vpcPeeringConnectionId>{}</vpcPeeringConnectionId><requesterVpcInfo><vpcId>{}</vpcId></requesterVpcInfo><accepterVpcInfo><vpcId>{}</vpcId></accepterVpcInfo><status><code>{}</code><message>forwarding is not active</message></status><forwardingActive>false</forwardingActive></item>",
+                "<item><vpcPeeringConnectionId>{}</vpcPeeringConnectionId><requesterVpcInfo><vpcId>{}</vpcId></requesterVpcInfo><accepterVpcInfo><vpcId>{}</vpcId></accepterVpcInfo><status><code>{}</code><message>{}</message></status><forwardingActive>{}</forwardingActive></item>",
                 pcx(id),
                 ec2_id(Kind::Vpc, requester),
                 ec2_id(Kind::Vpc, accepter),
-                xml_escape(&status)
+                code,
+                message,
+                active
             )
         })
         .collect();
@@ -89,8 +95,9 @@ pub async fn create_vpc_peering_connection(state: &AppState, actor: &AuthUser, p
 pub async fn accept_vpc_peering_connection(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
     require_operator(actor)?;
     let id = peering_uuid(state, &need(p, "VpcPeeringConnectionId")?).await?;
-    let _ = crate::api::cloud::network::accept_peering(State(state.clone()), Extension(actor.clone()), Path(id)).await.map_err(api_err)?;
-    Ok(format!("<vpcPeeringConnectionId>{}</vpcPeeringConnectionId><status><code>planned</code></status><forwardingActive>false</forwardingActive>", pcx(id)))
+    let Json(result) = crate::api::cloud::network::accept_peering(State(state.clone()), Extension(actor.clone()), Path(id)).await.map_err(api_err)?;
+    let forwarding = result.get("forwarding_active").and_then(|v| v.as_bool()).unwrap_or(false);
+    Ok(format!("<vpcPeeringConnectionId>{}</vpcPeeringConnectionId><status><code>active</code></status><forwardingActive>{}</forwardingActive>", pcx(id), forwarding))
 }
 
 pub async fn allocate_subnet_address(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {

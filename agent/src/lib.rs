@@ -3,6 +3,7 @@
 
 pub mod backup;
 pub mod bpf_ops;
+pub mod cloud_fabric;
 pub mod console_ws;
 pub mod eip;
 pub mod enrol;

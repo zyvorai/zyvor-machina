@@ -79,9 +79,10 @@ the write actions); only our unit tests have compared that shape with CloudWatch
 - **`MaxResults` (1-1000) and `NextToken`** on every `ec2` `Describe*` that returns a list. Without `MaxResults` the whole list comes
   back, except `DescribeAddresses` and `DescribeSnapshots`, which always page (100). Tokens are opaque and name the last item returned.
 
-**Plan-only versus real.** Several VPC objects (internet gateways, route tables, network ACLs, peering) are stored plans: the answer
-carries `forwardingActive=false` and no host forwards or filters traffic because of them. The exception is a `0.0.0.0/0` route to a NAT
-gateway, which switches the existing per-subnet host masquerade. Details in *VPC networking*.
+**Plan-only versus real.** Internet gateway routes, peering routes and network ACLs are reconciled into the host datapath (see
+[cloud-fabric.md](cloud-fabric.md)): the answer carries `forwardingActive=true` once the host applied them. A `0.0.0.0/0` route to a NAT
+gateway switches the per-subnet host masquerade. Routes to an instance or a network interface are still stored plans
+(`forwardingActive=false`). Details in *VPC networking*.
 
 **`ProjectId` and Terraform.** Machina's `CreateVpc` needs a `ProjectId` (and `AvailabilityZone` or `HostId`), which the `aws` CLI and
 Terraform's provider have no way to send, so `aws_vpc` cannot create one: create the VPC through boto3 with an event hook or the REST API
@@ -111,7 +112,7 @@ Status of each action (judged by reading its handler; **none of this has been ru
 
 An action that is not in these tables answers `UnsupportedOperation` on `ec2` and `InvalidAction` on the other services.
 
-### ec2 actions (204: 7 fixed, 22 mixed, 24 plan, 137 real, 11 recorded, 3 refused)
+### ec2 actions (204: 7 fixed, 31 mixed, 152 real, 11 recorded, 3 refused)
 
 Reached with scope `ec2`, `POST /ec2`.
 
@@ -120,14 +121,14 @@ Reached with scope `ec2`, `POST /ec2`.
 | Action | Status | Note | |
 |---|---|---|---|
 | `AbortExperiment` | real |  | M |
-| `AcceptVpcPeeringConnection` | plan | status `planned`; nothing forwards packets |  |
+| `AcceptVpcPeeringConnection` | real | an accepted peering is `active`; it forwards once a route table selects it (`forwardingActive=true`), across hosts over the machina-wg overlay |  |
 | `AllocateAddress` | real |  |  |
 | `AllocateSubnetAddress` | recorded | reserved in the subnet's address pool; not configured in the guest | M |
 | `AssignPrivateIpAddresses` | recorded | reserved in the subnet's address pool; not configured in the guest |  |
 | `AssociateAddress` | real |  |  |
 | `AssociateDhcpOptions` | recorded | no guest receives these options |  |
-| `AssociateRouteTable` | plan | a `0.0.0.0/0` route to a NAT gateway is the one route with an effect (see NAT gateway) |  |
-| `AttachInternetGateway` | plan | one per VPC; a route to a detached gateway shows `blackhole` |  |
+| `AssociateRouteTable` | mixed | routes to an internet gateway or an accepted peering are forwarded on the hosts and reported `forwardingActive=true`; a `0.0.0.0/0` route to a NAT gateway switches the masquerade; instance and interface targets stay stored plans |  |
+| `AttachInternetGateway` | real | one per VPC; a route to an attached gateway forwards through the host uplink (`forwardingActive=true`); a route to a detached gateway shows `blackhole` |  |
 | `AttachNetworkInterface` | real | runs the real NIC tasks |  |
 | `AttachVolume` | real |  |  |
 | `AuthorizeSecurityGroupEgress` | mixed | IPv6 and prefix-list peers refused |  |
@@ -142,21 +143,21 @@ Reached with scope `ec2`, `POST /ec2`.
 | `CreateDhcpOptions` | recorded | no guest receives these options |  |
 | `CreateFleet` | mixed | `Type=instant` only; `maintain` and `request` refused |  |
 | `CreateImage` | real |  |  |
-| `CreateInternetGateway` | plan | one per VPC; a route to a detached gateway shows `blackhole` |  |
+| `CreateInternetGateway` | real | one per VPC; a route to an attached gateway forwards through the host uplink (`forwardingActive=true`); a route to a detached gateway shows `blackhole` |  |
 | `CreateKeyPair` | mixed | ed25519 only; `KeyType=rsa` and `KeyFormat=ppk` refused |  |
 | `CreateLaunchTemplate` | mixed | template data holds only the `RunInstances` parameters Machina applies; others refused when written |  |
 | `CreateLaunchTemplateVersion` | mixed | template data holds only the `RunInstances` parameters Machina applies; others refused when written |  |
 | `CreateLoadBalancer` | real | the native layer-4 balancer, not ELBv2 (use `elasticloadbalancing` for that) |  |
 | `CreateMaintenanceSchedule` | real |  | M |
 | `CreateNatGateway` | real | real through a `0.0.0.0/0` route: it switches the host masquerade of the subnets using that table; public NAT only |  |
-| `CreateNetworkAcl` | plan | no host filters traffic by an ACL |  |
-| `CreateNetworkAclEntry` | plan | no host filters traffic by an ACL |  |
+| `CreateNetworkAcl` | real | rendered into an ordered nftables chain with an implicit deny, IPv4 only; stateless as in AWS |  |
+| `CreateNetworkAclEntry` | real | rendered into an ordered nftables chain with an implicit deny, IPv4 only; stateless as in AWS |  |
 | `CreateNetworkInterface` | real |  |  |
 | `CreatePlacementGroup` | mixed | `cluster` and `spread`; `partition` refused |  |
 | `CreateProject` | real |  | M |
 | `CreateRestorePoint` | real |  | M |
-| `CreateRoute` | plan | a `0.0.0.0/0` route to a NAT gateway is the one route with an effect (see NAT gateway) |  |
-| `CreateRouteTable` | plan | a `0.0.0.0/0` route to a NAT gateway is the one route with an effect (see NAT gateway) |  |
+| `CreateRoute` | mixed | routes to an internet gateway or an accepted peering are forwarded on the hosts and reported `forwardingActive=true`; a `0.0.0.0/0` route to a NAT gateway switches the masquerade; instance and interface targets stay stored plans |  |
+| `CreateRouteTable` | mixed | routes to an internet gateway or an accepted peering are forwarded on the hosts and reported `forwardingActive=true`; a `0.0.0.0/0` route to a NAT gateway switches the masquerade; instance and interface targets stay stored plans |  |
 | `CreateScheduledJob` | real |  | M |
 | `CreateSecurityGroup` | real |  |  |
 | `CreateSnapshot` | mixed | Atlas-backed volumes only; a local-pool volume is refused |  |
@@ -167,24 +168,24 @@ Reached with scope `ec2`, `POST /ec2`.
 | `CreateVolume` | mixed | size is real; type, IOPS, throughput recorded; `Encrypted`, `KmsKeyId`, `MultiAttachEnabled` refused |  |
 | `CreateVpc` | real | needs Machina's `ProjectId` and `AvailabilityZone` or `HostId` |  |
 | `CreateVpcEndpoint` | refused |  |  |
-| `CreateVpcPeeringConnection` | plan | status `planned`; nothing forwards packets |  |
+| `CreateVpcPeeringConnection` | real | an accepted peering is `active`; it forwards once a route table selects it (`forwardingActive=true`), across hosts over the machina-wg overlay |  |
 | `CreateWebhook` | real |  | M |
 | `DeleteAlarms` | real | also answered by the `monitoring` service, in CloudWatch's shape |  |
 | `DeleteBackupSchedule` | real |  | M |
 | `DeleteDhcpOptions` | recorded | no guest receives these options |  |
 | `DeleteFleets` | real |  |  |
-| `DeleteInternetGateway` | plan | one per VPC; a route to a detached gateway shows `blackhole` |  |
+| `DeleteInternetGateway` | real | one per VPC; a route to an attached gateway forwards through the host uplink (`forwardingActive=true`); a route to a detached gateway shows `blackhole` |  |
 | `DeleteKeyPair` | real |  |  |
 | `DeleteLaunchTemplate` | real |  |  |
 | `DeleteLoadBalancer` | real | the native layer-4 balancer, not ELBv2 (use `elasticloadbalancing` for that) |  |
 | `DeleteMaintenanceSchedule` | real |  | M |
 | `DeleteNatGateway` | real | real through a `0.0.0.0/0` route: it switches the host masquerade of the subnets using that table; public NAT only |  |
-| `DeleteNetworkAcl` | plan | no host filters traffic by an ACL |  |
-| `DeleteNetworkAclEntry` | plan | no host filters traffic by an ACL |  |
+| `DeleteNetworkAcl` | real | rendered into an ordered nftables chain with an implicit deny, IPv4 only; stateless as in AWS |  |
+| `DeleteNetworkAclEntry` | real | rendered into an ordered nftables chain with an implicit deny, IPv4 only; stateless as in AWS |  |
 | `DeleteNetworkInterface` | real |  |  |
 | `DeletePlacementGroup` | real |  |  |
-| `DeleteRoute` | plan | a `0.0.0.0/0` route to a NAT gateway is the one route with an effect (see NAT gateway) |  |
-| `DeleteRouteTable` | plan | a `0.0.0.0/0` route to a NAT gateway is the one route with an effect (see NAT gateway) |  |
+| `DeleteRoute` | mixed | routes to an internet gateway or an accepted peering are forwarded on the hosts and reported `forwardingActive=true`; a `0.0.0.0/0` route to a NAT gateway switches the masquerade; instance and interface targets stay stored plans |  |
+| `DeleteRouteTable` | mixed | routes to an internet gateway or an accepted peering are forwarded on the hosts and reported `forwardingActive=true`; a `0.0.0.0/0` route to a NAT gateway switches the masquerade; instance and interface targets stay stored plans |  |
 | `DeleteScheduledJob` | real |  | M |
 | `DeleteSecurityGroup` | real |  |  |
 | `DeleteSnapshot` | real |  |  |
@@ -222,7 +223,7 @@ Reached with scope `ec2`, `POST /ec2`.
 | `DescribeInstanceTypeOfferings` | real | derived from flavors and hosts; a zone is a host |  |
 | `DescribeInstanceTypes` | real | derived from flavors and hosts; a zone is a host |  |
 | `DescribeInstances` | real |  |  |
-| `DescribeInternetGateways` | plan | one per VPC; a route to a detached gateway shows `blackhole` |  |
+| `DescribeInternetGateways` | real | one per VPC; a route to an attached gateway forwards through the host uplink (`forwardingActive=true`); a route to a detached gateway shows `blackhole` |  |
 | `DescribeKeyPairs` | real |  |  |
 | `DescribeLaunchTemplateVersions` | real |  |  |
 | `DescribeLaunchTemplates` | real |  |  |
@@ -232,7 +233,7 @@ Reached with scope `ec2`, `POST /ec2`.
 | `DescribeManagedPrefixLists` | fixed | always empty (what Terraform reads while refreshing a VPC) |  |
 | `DescribeMigrationJobs` | real |  | M |
 | `DescribeNatGateways` | real | real through a `0.0.0.0/0` route: it switches the host masquerade of the subnets using that table; public NAT only |  |
-| `DescribeNetworkAcls` | plan | no host filters traffic by an ACL |  |
+| `DescribeNetworkAcls` | real | rendered into an ordered nftables chain with an implicit deny, IPv4 only; stateless as in AWS |  |
 | `DescribeNetworkInterfaceAttribute` | real |  |  |
 | `DescribeNetworkInterfaces` | real |  |  |
 | `DescribeNotifications` | real |  | M |
@@ -243,7 +244,7 @@ Reached with scope `ec2`, `POST /ec2`.
 | `DescribeRegions` | real | derived from flavors and hosts; a zone is a host |  |
 | `DescribeRestorePoints` | real |  | M |
 | `DescribeRightsizing` | real |  | M |
-| `DescribeRouteTables` | plan | a `0.0.0.0/0` route to a NAT gateway is the one route with an effect (see NAT gateway) |  |
+| `DescribeRouteTables` | mixed | routes to an internet gateway or an accepted peering are forwarded on the hosts and reported `forwardingActive=true`; a `0.0.0.0/0` route to a NAT gateway switches the masquerade; instance and interface targets stay stored plans |  |
 | `DescribeScheduledJobs` | real |  | M |
 | `DescribeSecurityGroupRules` | real |  |  |
 | `DescribeSecurityGroups` | real |  |  |
@@ -262,15 +263,15 @@ Reached with scope `ec2`, `POST /ec2`.
 | `DescribeVolumesModifications` | real |  |  |
 | `DescribeVpcAttribute` | real |  |  |
 | `DescribeVpcEndpoints` | fixed | always empty (what Terraform reads while refreshing a VPC) |  |
-| `DescribeVpcPeeringConnections` | plan | status `planned`; nothing forwards packets |  |
+| `DescribeVpcPeeringConnections` | real | an accepted peering is `active`; it forwards once a route table selects it (`forwardingActive=true`), across hosts over the machina-wg overlay |  |
 | `DescribeVpcs` | real |  |  |
 | `DescribeWebhooks` | real |  | M |
-| `DetachInternetGateway` | plan | one per VPC; a route to a detached gateway shows `blackhole` |  |
+| `DetachInternetGateway` | real | one per VPC; a route to an attached gateway forwards through the host uplink (`forwardingActive=true`); a route to a detached gateway shows `blackhole` |  |
 | `DetachNetworkInterface` | real | runs the real NIC tasks |  |
 | `DetachVolume` | real |  |  |
 | `DisableAlarmActions` | real | also answered by the `monitoring` service, in CloudWatch's shape |  |
 | `DisassociateAddress` | real |  |  |
-| `DisassociateRouteTable` | plan | a `0.0.0.0/0` route to a NAT gateway is the one route with an effect (see NAT gateway) |  |
+| `DisassociateRouteTable` | mixed | routes to an internet gateway or an accepted peering are forwarded on the hosts and reported `forwardingActive=true`; a `0.0.0.0/0` route to a NAT gateway switches the masquerade; instance and interface targets stay stored plans |  |
 | `EnableAlarmActions` | real | also answered by the `monitoring` service, in CloudWatch's shape |  |
 | `FenceHost` | real |  | M |
 | `ForkInstance` | real |  | M |
@@ -300,10 +301,10 @@ Reached with scope `ec2`, `POST /ec2`.
 | `RegisterInstancesWithLoadBalancer` | real |  | M |
 | `ReleaseAddress` | real |  |  |
 | `ReleaseSubnetAddress` | recorded | reserved in the subnet's address pool; not configured in the guest | M |
-| `ReplaceNetworkAclAssociation` | plan | no host filters traffic by an ACL |  |
-| `ReplaceNetworkAclEntry` | plan | no host filters traffic by an ACL |  |
-| `ReplaceRoute` | plan | a `0.0.0.0/0` route to a NAT gateway is the one route with an effect (see NAT gateway) |  |
-| `ReplaceRouteTableAssociation` | plan | a `0.0.0.0/0` route to a NAT gateway is the one route with an effect (see NAT gateway) |  |
+| `ReplaceNetworkAclAssociation` | real | rendered into an ordered nftables chain with an implicit deny, IPv4 only; stateless as in AWS |  |
+| `ReplaceNetworkAclEntry` | real | rendered into an ordered nftables chain with an implicit deny, IPv4 only; stateless as in AWS |  |
+| `ReplaceRoute` | mixed | routes to an internet gateway or an accepted peering are forwarded on the hosts and reported `forwardingActive=true`; a `0.0.0.0/0` route to a NAT gateway switches the masquerade; instance and interface targets stay stored plans |  |
+| `ReplaceRouteTableAssociation` | mixed | routes to an internet gateway or an accepted peering are forwarded on the hosts and reported `forwardingActive=true`; a `0.0.0.0/0` route to a NAT gateway switches the masquerade; instance and interface targets stay stored plans |  |
 | `RequestSpotInstances` | mixed | one-time requests only; launches at once; there is no price market |  |
 | `RestoreBackup` | real |  | M |
 | `RevokeSecurityGroupEgress` | mixed | IPv6 and prefix-list peers refused |  |
@@ -583,10 +584,10 @@ and `scripts/ec2/terraform/vpc/` are the client checks (see `docs/claims.md` C40
 
 | Object | Actions | What is real |
 |---|---|---|
-| Internet gateway (`igw-`) | `Create`/`Delete`/`DescribeInternetGateways`, `Attach`/`DetachInternetGateway` | A stored plan: one per VPC. Nothing forwards because of it; a route to a detached gateway shows `blackhole`. |
+| Internet gateway (`igw-`) | `Create`/`Delete`/`DescribeInternetGateways`, `Attach`/`DetachInternetGateway` | One per VPC. A route to an attached gateway forwards the route's source subnets through the host uplink (the IPv4 default route unless named); a route to a detached gateway shows `blackhole`. |
 | NAT gateway (`nat-`) | `CreateNatGateway` (needs an `AllocationId` of a real Elastic IP), `DescribeNatGateways`, `DeleteNatGateway` | **Real through the route:** a route `0.0.0.0/0` → `nat-…` turns on the host masquerade of every subnet that uses that route table (`PUT /api/v1/cloud/subnets/{id}/nat`); replacing or deleting the route, or deleting the gateway, turns it off again. Only that default route is acted on, so a masquerade you switched on by hand survives other edits. Public NAT only. |
-| Route table (`rtb-`) | `CreateRouteTable`, `DeleteRouteTable`, `DescribeRouteTables`, `AssociateRouteTable`, `DisassociateRouteTable`, `ReplaceRouteTableAssociation`, `CreateRoute`, `ReplaceRoute`, `DeleteRoute` | Stored plans (`forwardingActive=false`). Every VPC has a main route table with the VPC's `local` route; subnets without an association use it. Targets: internet gateway, NAT gateway, accepted peering connection, instance, network interface. Transit gateway, endpoint, egress-only, carrier/local gateway, IPv6 and prefix-list routes answer `UnsupportedOperation`. Changing the main table (`ReplaceRouteTableAssociation` on the main association) is not supported. The legacy `VpcId` + `Target` form of `CreateRoute`/`DeleteRoute` still works and its routes show on the main table. |
-| Network ACL (`acl-`) | `CreateNetworkAcl`, `DeleteNetworkAcl`, `DescribeNetworkAcls`, `CreateNetworkAclEntry`, `ReplaceNetworkAclEntry`, `DeleteNetworkAclEntry`, `ReplaceNetworkAclAssociation` | Stored plans: entries are validated and listed as AWS does (rule 1-32766, final rule 32767 deny, IPv4 CIDR, TCP/UDP port range) but no host filters traffic by them (`forwardingActive=false`). ICMP type/code and IPv6 entries answer `UnsupportedOperation`. Every VPC has a default ACL and every subnet starts associated with it. |
+| Route table (`rtb-`) | `CreateRouteTable`, `DeleteRouteTable`, `DescribeRouteTables`, `AssociateRouteTable`, `DisassociateRouteTable`, `ReplaceRouteTableAssociation`, `CreateRoute`, `ReplaceRoute`, `DeleteRoute` | Routes to an internet gateway or an accepted peering are applied on the hosts at once (`forwardingActive=true`; blackholes are explicit drops); instance and network-interface targets are stored plans (`forwardingActive=false`). Every VPC has a main route table with the VPC's `local` route; subnets without an association use it. Targets: internet gateway, NAT gateway, accepted peering connection, instance, network interface. Transit gateway, endpoint, egress-only, carrier/local gateway, IPv6 and prefix-list routes answer `UnsupportedOperation`. Changing the main table (`ReplaceRouteTableAssociation` on the main association) is not supported. The legacy `VpcId` + `Target` form of `CreateRoute`/`DeleteRoute` still works and its routes show on the main table. |
+| Network ACL (`acl-`) | `CreateNetworkAcl`, `DeleteNetworkAcl`, `DescribeNetworkAcls`, `CreateNetworkAclEntry`, `ReplaceNetworkAclEntry`, `DeleteNetworkAclEntry`, `ReplaceNetworkAclAssociation` | Entries are validated as AWS does (rule 1-32766, final rule 32767 deny, IPv4 CIDR, TCP/UDP port range) and enforced on the hosts as a stateless nftables chain (`inet machina_cloud_acl`, forward hook, priority -250) with an implicit deny. ICMP type/code and IPv6 entries answer `UnsupportedOperation`. Every VPC has a default ACL and every subnet starts associated with it. |
 | DHCP options (`dopt-`) | `CreateDhcpOptions`, `DescribeDhcpOptions`, `AssociateDhcpOptions` (`default` removes it), `DeleteDhcpOptions` | Stored: `DescribeVpcs` reports the association; no guest receives these options. |
 | VPC attributes | `DescribeVpcAttribute`, `ModifyVpcAttribute` | `enableDnsHostnames` is recorded only. `enableDnsSupport=false` and network address usage metrics answer `UnsupportedOperation` (the subnets' networks always run DNS). |
 | Security group rules (`sgr-`) | `DescribeSecurityGroupRules`, `ModifySecurityGroupRules` (in place, the id stays), `UpdateSecurityGroupRuleDescriptionsIngress`/`Egress`; `Authorize…` now keeps `Description` | The same rows the REST API and the web UI show. IPv6 and prefix-list peers answer `UnsupportedOperation`. |
@@ -671,7 +672,7 @@ Run `scripts/ec2/boto3_elbv2.py` against a controller to exercise it with the re
 
 ## Known gaps
 Things a client may expect that Machina does not do (each is refused or absent, not silently ignored):
-- IMDSv2 session tokens, VPC peering or internet-gateway/route/ACL enforcement that forwards or filters packets, and multi-host Elastic IP failover.
+- IMDSv2 session tokens, IPv6 forwarding and ACLs, transit routing through a peer, and multi-host Elastic IP failover. Cross-host peering has been run on two hosts with netns traffic; gateway egress to a real uplink has not.
 - Egress-only gateways, VPC endpoints, transit gateways and IPv6 (describes of the first two answer empty).
 - CloudWatch: only the six alarm and statistics actions; no `PutMetricData`, `ListMetrics`, dashboards or log groups.
 - Auto Scaling: lifecycle hooks, scheduled actions, instance refresh, warm pools, notification configurations, load balancer attachment,

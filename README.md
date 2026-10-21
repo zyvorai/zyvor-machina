@@ -60,6 +60,9 @@ CPU scaling, and the explicit routing/peering limitations.
 | **Plain-English policies** | Describe a VM network policy in words; Zyvor drafts the YAML, dry-runs it against past traffic and applies it after approval. |
 | **Project isolation** | Fleet Cloud projects are isolated from each other by default, with per-project egress allowlists and egress IPs that Machina adds to the host and announces itself. |
 | **Encrypted cross-host overlay** | WireGuard between hypervisors; VM traffic keeps its identity across hosts, so isolation holds even on NAT networks. |
+| **VPC forwarding and ACLs** | Peering, internet-gateway and blackhole routes and stateless network ACLs enforced on the hosts, with `forwardingActive` reported by the EC2 API. Run on two hosts with real packets; gateway egress and guest-VM ACLs not yet run. [Guide →](docs/cloud-fabric.md) |
+| **Production profile** | Opt-in strict startup preflight, master key from a file, JWT key rollover, bounded audit retention, mandatory eBPF datapath, amd64 and arm64 packages. [Guide →](website/docs/operations/production-hardening.md) |
+| **Transiva gateway** | Provider discovery and VM migration preview, submit and batch through `/api/v1/transiva/*`. |
 | **Segmentation evidence** | Export a sealed (SHA-256) JSON or Markdown report of policies, the reachability matrix and denied traffic for audits. |
 | **FluxVM backend** | VMs from the FluxVM engine appear next to libvirt VMs, with eBPF networking, live migration and HA across hosts. [Guide →](docs/fluxvm.md) |
 | **PostgreSQL controller** | Run the controller on PostgreSQL for large fleets or several controllers; `machinactl db setup pod --migrate` moves an SQLite site over. [Database →](#database-sqlite-or-postgresql) |
@@ -303,7 +306,7 @@ From your laptop to a remote host (sources are rsync'd and built on the server; 
 
 ### Requirements
 
-- 64-bit Linux (x86_64 or aarch64) with VT-x/AMD-V, so `/dev/kvm` exists, and libvirt.
+- 64-bit Linux (x86_64 or aarch64) with VT-x/AMD-V, so `/dev/kvm` exists, and libvirt. Release packages cover amd64 and arm64.
 - Ubuntu, Debian, Fedora, RHEL/Alma/Rocky, openSUSE or Arch.
 - Native eBPF: kernel with BTF and cgroup v2; 6.6+ for TCX attach, BPF-LSM (`lsm=...,bpf`) for VMM guard enforcement, 6.12+ for the sched_ext scheduler. `GET /api/v1/bpf/status` shows what your kernel supports.
 - Ports: `5092` (daemon, web UI), `5093` (controller), `50051`/`50052` (agent). [Full port list →](docs/handbook/README.md#ports)

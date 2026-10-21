@@ -1,6 +1,6 @@
 # Multi-host control plane (embedded SQLite by default, PostgreSQL build included; scheduler, HA, DRS, AI engine).
 name: machina-controller
-arch: amd64
+arch: ${ARCH}
 platform: linux
 version: ${VERSION}
 section: admin
@@ -21,6 +21,9 @@ contents:
     file_info: { mode: 0755 }
   - src: ${STAGE}/units/machina-controller.service
     dst: /usr/lib/systemd/system/machina-controller.service
+  - src: ${STAGE}/bin/production-preflight
+    dst: /usr/libexec/machina/production-preflight
+    file_info: { mode: 0755 }
   - src: ${STAGE}/doc/LICENSE
     dst: /usr/share/doc/machina-controller/LICENSE
   - dst: /var/lib/machina

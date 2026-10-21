@@ -12,16 +12,17 @@ elastic compute (`/fleet-cloud/vpcs`) to create and inspect these resources.
 | VPC | Project and host ownership, RFC1918 CIDR, host-wide overlap checks |
 | Subnet | CIDR containment and overlap checks; durable provisioning task; isolated libvirt network with DHCP |
 | IPAM | Transactional allocation; caller request keys are idempotent; release supported |
-| Routes | Validated local, blackhole, or accepted-peering plans; **not installed in a datapath** |
-| Peering | Explicit request and target-project acceptance; status stays `planned` |
+| Routes | Validated local, blackhole, internet-gateway or accepted-peering routes; peering, gateway and blackhole routes are installed in the host datapath (see [cloud-fabric.md](cloud-fabric.md)) |
+| Peering | Explicit request and target-project acceptance; accepted peerings carry traffic once a route selects them, over the `machina-wg` overlay |
 | Launch template | Immutable VM spec; template lists omit the stored spec; plaintext guest passwords/public consoles rejected |
 | Instance group | Desired count, min/max, pause, optional CPU target and cooldown; leader loop creates VMs and reuses the existing quota/policy checks |
 | Scale-in | Stop and retain VM/disks; increasing desired resumes retained slots |
 
 This is not AWS/Azure/GCP API compatibility or a complete hyperscaler clone.
-There are no internet/NAT/transit/VPN gateways, route-table/subnet associations,
-private endpoints, managed databases, IPv6 or cross-host VPC forwarding in this
-release. Existing Fleet Cloud security groups remain advisory; this change does
+There are no transit/VPN gateways, private endpoints, managed databases or IPv6
+forwarding in this release. Peering, internet-gateway and blackhole routes and
+network ACLs are enforced on the hosts ([cloud-fabric.md](cloud-fabric.md));
+cross-host peering has been run on two hosts with test traffic (claim C52). Existing Fleet Cloud security groups remain advisory; this change does
 not claim to activate them. Use the separate VM network policy service where
 appropriate, accounting for its enforcement lease and preview maturity.
 
@@ -188,5 +189,5 @@ Full controller builds require the sibling GuestKit checkout and Linux libvirt,
 PAM, OpenSSL, libclang, and protobuf build packages, as documented in CI.
 See [the hardware smoke script](../scripts/cloud-subnet-smoke.sh) for a disposable
 isolated network check on a dedicated libvirt test host. This must be run before
-production qualification. It does not prove cross-host forwarding, HA, guest
+production qualification. It does not prove cross-host forwarding (see `docs/claims.md` C52), HA, guest
 boot, or eBPF security-group enforcement.

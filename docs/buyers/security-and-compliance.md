@@ -32,5 +32,5 @@ What exists today, in plain terms. This is a checklist for your review, not a ce
 Releases ship `SHA256SUMS` and a CycloneDX SBOM ([INSTALL](../INSTALL.md)).
 
 ## Not claimed
-A formal certification, per-interface security groups, cross-host VPC isolation, and multi-host failover under real host loss
+A formal certification (FIPS included), per-interface security groups, cross-host VPC isolation proven on real traffic, and multi-host failover under real host loss
 (needs a drill at your site).

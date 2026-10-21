@@ -12,8 +12,8 @@ live is [site readiness](../CUSTOMER_SITE_READINESS.md); claims are tracked in t
 
 ## Agree before you start
 1. The workloads and the success numbers that matter to you (restore time, launch time, effort per VM).
-2. What counts as a blocker. Known limits today are listed in the [ledger](../claims.md) (no cross-host VPC; host-loss drill
-   needed for multi-host HA).
+2. What counts as a blocker. Known limits today are listed in the [ledger](../claims.md) (VPC internet-gateway egress not yet run; host-loss drill
+   needed for multi-host HA; qualification scripts in `scripts/qualification/` produce the evidence).
 3. Who at your side owns each week.
 
 ## Do not

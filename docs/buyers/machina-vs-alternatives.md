@@ -19,8 +19,8 @@ These are separate Zyvor products, not part of the Machina install.
 
 ## What Machina does not do today
 Rack-aware placement and a witness, iSCSI/Fibre Channel targets, vGPU partitioning, desktop pools (VDI), orchestrated site
-failover, Arc-style management of foreign estates, cross-host VPCs, an internet-gateway datapath beyond host-local Elastic IPs and NAT, per-interface security groups and a managed
-database or queue service. Multi-host failover is built and needs a host-loss drill on your hardware before you rely on it
+failover, Arc-style management of foreign estates, internet-gateway egress and guest-VM ACLs proven on real traffic (peering, blackhole routes and ACLs are enforced on the hosts and
+were run across two hosts with test traffic), per-interface security groups and a managed database or queue service. Multi-host failover is built and needs a host-loss drill on your hardware before you rely on it
 ([ledger](../claims.md)).
 
 ## How to find out for sure

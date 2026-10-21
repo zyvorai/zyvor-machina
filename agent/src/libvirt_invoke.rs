@@ -560,6 +560,10 @@ pub fn host_invoke(conn: &Connect, action: &str, payload: &Value) -> Result<Valu
             let n = crate::natgw::sync(payload).map_err(LibvirtError::Operation)?;
             Ok(serde_json::json!({ "status": "ok", "entries": n }))
         }
+        "cloud.fabric.sync" => {
+            let result = crate::cloud_fabric::sync(payload).map_err(LibvirtError::Operation)?;
+            Ok(serde_json::to_value(result).unwrap_or(serde_json::Value::Null))
+        }
         "network.start" => {
             let name = payload_str(payload, "name")?;
             network::start_network(conn, &name)?;

@@ -10,7 +10,8 @@ description: Use awscli, boto3 and Terraform against the Machina controller.
 
 The controller answers four AWS query services with SigV4-signed requests: EC2 (204 actions), Auto Scaling (48), ELBv2 (30) and
 CloudWatch-style alarms (6). It is a compatibility layer over Machina's own objects, **not AWS**. Every action is applied, recorded
-as a stored plan, or refused by name, never silently dropped.
+as a stored plan, or refused by name, never silently dropped. Peering, internet-gateway and blackhole routes and network
+ACLs are enforced on the hosts and report `forwardingActive=true` ([VPC forwarding](vpc-forwarding.md)).
 
 ![Launch instances with the aws CLI](/anim/ec2-launch.svg)
 

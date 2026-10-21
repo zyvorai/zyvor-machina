@@ -4,10 +4,8 @@
 //! Route tables and routes on `POST /ec2`. Every VPC has a main route table (created on first use, with the VPC's
 //! `local` route); more tables are associated with subnets one by one.
 //!
-//! Routes are **stored plans** (`forwardingActive=false` in the XML): a route to an internet gateway, peering, instance or
-//! interface changes nothing on a host. The one route that does something is the default route (`0.0.0.0/0`) to a NAT
-//! gateway: the subnets that use that table get the host masquerade of `PUT /api/v1/cloud/subnets/{id}/nat`
-//! (`reconcile_table`), and lose it again when the route is replaced or deleted.
+//! Peering and Internet Gateway routes are reconciled into the host dataplane; NAT-gateway routes retain the existing
+//! subnet masquerade behavior. Unsupported target families remain explicitly refused rather than silently planned.
 //!
 //! The legacy form (`VpcId` + `Target`/`DestinationCidrBlock`, no `RouteTableId`) still goes to the VPC's own route plan
 //! (`cloud_routes`), which the main route table also lists.
@@ -122,8 +120,8 @@ fn route_xml(destination: &str, kind: &str, target: Option<Uuid>, live: bool, or
         },
     };
     format!(
-        "<item><destinationCidrBlock>{}</destinationCidrBlock>{element}<state>{state_name}</state><origin>{origin}</origin><forwardingActive>false</forwardingActive></item>",
-        xml_escape(destination)
+        "<item><destinationCidrBlock>{}</destinationCidrBlock>{element}<state>{state_name}</state><origin>{origin}</origin><forwardingActive>{}</forwardingActive></item>",
+        xml_escape(destination), live && matches!(kind, "igw" | "peering")
     )
 }
 
@@ -444,7 +442,9 @@ pub async fn create_route(state: &AppState, actor: &AuthUser, p: &Params) -> Res
     if dest == DEFAULT_ROUTE {
         reconcile_table(state, actor, table).await;
     }
-    Ok("<return>true</return><forwardingActive>false</forwardingActive>".into())
+    let forwarding = crate::engine::cloud_fabric::converge_vpc(&state.pool, vpc).await.is_ok()
+        && matches!(kind, "igw" | "peering");
+    Ok(format!("<return>true</return><forwardingActive>{forwarding}</forwardingActive>"))
 }
 
 pub async fn replace_route(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
@@ -468,7 +468,9 @@ pub async fn replace_route(state: &AppState, actor: &AuthUser, p: &Params) -> Re
     if dest == DEFAULT_ROUTE {
         reconcile_table(state, actor, table).await;
     }
-    Ok("<return>true</return>".into())
+    let forwarding = crate::engine::cloud_fabric::converge_vpc(&state.pool, vpc).await.is_ok()
+        && matches!(kind, "igw" | "peering");
+    Ok(format!("<return>true</return><forwardingActive>{forwarding}</forwardingActive>"))
 }
 
 pub async fn delete_route(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
@@ -494,6 +496,8 @@ pub async fn delete_route(state: &AppState, actor: &AuthUser, p: &Params) -> Res
     if dest == DEFAULT_ROUTE {
         reconcile_table(state, actor, table).await;
     }
+    // Withdraw forwarding for the removed route right away; drift repair would take up to 30 s.
+    let _ = crate::engine::cloud_fabric::converge_vpc(&state.pool, vpc).await;
     Ok("<return>true</return>".into())
 }
 
@@ -502,12 +506,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn route_xml_marks_dead_targets_and_never_claims_forwarding() {
+    fn route_xml_claims_forwarding_only_for_dataplane_backed_targets() {
         let t = Uuid::parse_str("0123456789abcdef0123456789abcdef").unwrap();
         let live = route_xml("0.0.0.0/0", "igw", Some(t), true, "CreateRoute");
         assert!(live.contains("<gatewayId>igw-0123456789abcdef0</gatewayId>"));
         assert!(live.contains("<state>active</state>"));
-        assert!(live.contains("<forwardingActive>false</forwardingActive>"));
+        assert!(live.contains("<forwardingActive>true</forwardingActive>"));
+        let stored = route_xml("10.8.0.0/16", "instance", Some(t), true, "CreateRoute");
+        assert!(stored.contains("<forwardingActive>false</forwardingActive>"));
         let dead = route_xml("0.0.0.0/0", "nat", Some(t), false, "CreateRoute");
         assert!(dead.contains("<natGatewayId>nat-0123456789abcdef0</natGatewayId>"));
         assert!(dead.contains("<state>blackhole</state>"));

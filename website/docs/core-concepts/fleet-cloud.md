@@ -22,6 +22,7 @@ controller's own APIs; there is no external cloud to integrate.
 | Stacks | Heat-style templates that create several resources together |
 | Projects | Tenancy and quota boundaries |
 | Load balancers | Weighted round-robin iptables rules pushed to the owning host, no amphora VM |
+| VPC routing | Peering, internet-gateway and blackhole routes and network ACLs enforced on the hosts: [VPC forwarding](vpc-forwarding.md) |
 
 ![Fleet Cloud](/machina-fleet-cloud-dark.png)
 

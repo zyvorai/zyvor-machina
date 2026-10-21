@@ -40,7 +40,7 @@ cutover per application inside the product; keep the wave list in Transiva or yo
 
 ## What to know
 
-- Transiva and h2kvm are separate products with their own licences; see the [claims ledger](https://github.com/zyvorai/zyvor-machina/blob/main/docs/claims.md) (C52) for what is verified in this repository.
+- Transiva and h2kvm are separate products with their own licences; see the [claims ledger](https://github.com/zyvorai/zyvor-machina/blob/main/docs/claims.md) (C54 for the Machina-side Transiva API, C56 for scope) for what is verified in this repository.
 - Machina has no live replication from the source: a VM is down or quiesced during final sync and cutover.
 - Machina can also take KubeVirt VMs the other way; see the KubeVirt migration guide in the repository docs.
 

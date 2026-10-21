@@ -51,6 +51,12 @@ socket; the controller reaches remote hosts' bpfd through each agent.
 Long-running controller operations (migrations, rebuilds, image builds) return a task; the UI polls
 `/api/v1/tasks/{task_id}` until it completes.
 
+## Cloud fabric
+
+Fleet Cloud routes and EC2 network ACLs are reconciled by the controller into each host through the agent
+(`cloud.fabric.sync`): iptables forwarding for peering and gateway routes, an early nftables chain for ACLs, and the
+`machina-wg` overlay between hosts. See [VPC forwarding](vpc-forwarding.md).
+
 ## What is not in the box
 
 There is no message queue, external database, identity service or separate network agent to run. The controller

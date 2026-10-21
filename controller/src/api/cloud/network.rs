@@ -651,7 +651,15 @@ pub async fn accept_peering(
         .await?;
     audit(&mut tx, &actor, "cloud.peering.accept", id).await?;
     tx.commit().await?;
-    Ok(Json(json!({"status":"planned","forwarding_active":false})))
+    let requester: Uuid = crate::db::query_scalar("SELECT requester_id FROM cloud_peerings WHERE id = ?")
+        .bind(id).fetch_one(&state.pool).await?;
+    let has_routes = crate::engine::cloud_fabric::peering_has_routes(&state.pool, id).await.unwrap_or(false);
+    let apply = crate::engine::cloud_fabric::converge_vpc(&state.pool, requester).await;
+    Ok(Json(json!({
+        "status": "active",
+        "forwarding_active": has_routes && apply.is_ok(),
+        "apply_error": apply.err().map(|e| format!("{e:#}")),
+    })))
 }
 pub async fn list_peerings(
     State(state): State<AppState>,
@@ -746,9 +754,13 @@ pub async fn create_route(
     .await?;
     audit(&mut tx, &actor, "cloud.route.create", rid).await?;
     tx.commit().await?;
-    Ok(Json(
-        json!({"id":rid,"status":"planned","forwarding_active":false}),
-    ))
+    let apply = crate::engine::cloud_fabric::converge_vpc(&state.pool, id).await;
+    Ok(Json(json!({
+        "id": rid,
+        "status": if apply.is_ok() { "active" } else { "planned" },
+        "forwarding_active": apply.is_ok(),
+        "apply_error": apply.err().map(|e| format!("{e:#}")),
+    })))
 }
 pub async fn list_routes(
     State(state): State<AppState>,
@@ -778,6 +790,8 @@ pub async fn delete_route(
     }
     audit(&mut tx, &actor, "cloud.route.delete", rid).await?;
     tx.commit().await?;
+    // Withdraw forwarding now; the 30 s drift loop would take up to half a minute.
+    let _ = crate::engine::cloud_fabric::converge_vpc(&state.pool, id).await;
     Ok(Json(json!({"deleted":true})))
 }
 pub async fn plan(

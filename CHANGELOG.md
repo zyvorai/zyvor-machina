@@ -1,5 +1,59 @@
 # Changelog
 
+## v0.3.0 — 2026-10-17
+
+Everything merged since v0.2.1 (#140 to #171). The detailed entries are the dated sections below.
+
+- **Cloud fabric.** VPC peering, internet-gateway and blackhole routes and EC2 network ACLs are programmed on the
+  hosts, including same-host peerings, with immediate convergence (#166, #168).
+- **Production profile and security lifecycle.** `MACHINA_SECURITY_PROFILE=production` preflight, API-key master key
+  file, JWT secret rollover, audit retention, `machina-bpfd --require-programs` (#166).
+- **ARM64.** Native arm64 CI and a dual-architecture release workflow with per-architecture SBOM and checksums (#166).
+- **Transiva gateway.** `/api/v1/transiva/*` status, providers, preview, submit and batch (#166).
+- **Bare-metal provisioning.** BMC discovery, Redfish and IPMI control, virtual media, SOL console, verified OS
+  images, image deploy, profiles and zero-touch join (#145 to #165).
+- **Local-first and air-gap.** Azure touchpoints removed, keyless local LLM, Atlas reachability and headroom checks,
+  mirror overrides for k3s, Kata and Firecracker (#140 to #143).
+- **Fixes and docs.** Fencing IPMI passwords encrypted at rest (#150); leaving-Nutanix guide (#170, #171); website,
+  README and claims updates.
+
+## 2026-10-13 (later) — Same-host peering, immediate convergence, cross-host verification
+
+- **Fixed:** two peered VPCs on the **same host** never forwarded (the rules only matched `machina-wg`) while the API
+  reported `forwarding_active: true`. The controller now emits `local_routes` and the agent forwards between the
+  bridges, one-sided like the other routes.
+- **Convergence.** Native route delete, EC2 network-ACL entry create/replace/delete and association change, and
+  internet-gateway attach/detach now converge the hosts when the call returns instead of waiting up to 30 s.
+  `CreateNetworkAclEntry` reports the real `forwardingActive`.
+- **Verified (same host).** After the fix, two peered VPCs on one host forward bridge to bridge; ACL, blackhole and
+  route-delete changes converge in about 2 s (previously 6-27 s).
+- **Verified.** Cross-host peering over WireGuard, ACL deny/allow and blackhole routes passed with real packets on
+  two hosts; claim C52 is now `verified (cross-host, netns)`. Not run: gateway egress, IPv6, ACLs against guest VMs.
+
+## 2026-10-13 — Cloud fabric, production profile, ARM64 packages, Transiva gateway
+
+See [docs/cloud-fabric.md](docs/cloud-fabric.md) and
+[Production hardening](website/docs/operations/production-hardening.md). Claims C52 to C55 (#166).
+
+- **VPC forwarding.** Accepted peerings, internet-gateway routes and blackholes are installed on the hosts and EC2
+  network ACLs are rendered into an early nftables chain (`machina_cloud_acl`, priority -250) with an implicit deny.
+  Convergence is immediate on a route or peering change and every 30 s for drift. Peering reuses the `machina-wg`
+  overlay: `AllowedIPs` (source ownership) are separate from the installed routes, IPv4 and IPv6 are programmed
+  correctly, and a peering turns the overlay on without touching the VM-network-policy setting.
+- **Honest status.** Peering accept and route calls return `forwarding_active` / `forwardingActive` from the real apply
+  instead of a permanent `false`; instance and interface targets stay stored plans. The EC2 action table is
+  regenerated (peering, internet gateway and ACL actions are no longer `plan`).
+- **Security lifecycle.** `MACHINA_SECURITY_PROFILE=production` preflight, `MACHINA_API_KEY_MASTER_KEY_FILE`,
+  `MACHINA_JWT_PREVIOUS_SECRETS` rollover, `MACHINA_AUDIT_RETENTION_DAYS` (daily, leader only), and
+  `machina-bpfd --require-programs` / `MACHINA_BPF_REQUIRED`.
+- **Transiva gateway.** `/api/v1/transiva/{status,providers,migrations/preview,submit,batch}`.
+- **ARM64.** Native arm64 CI, architecture-neutral nfpm packages, `build-release.sh --arch`, dual-architecture release
+  workflow with per-architecture SBOM and checksums.
+- **Qualification gates.** `scripts/qualification/*` and `scripts/compliance/generate-evidence.py`; not run in CI.
+- **Verification.** Compiled, unit-tested (agent 72, bpf 152, controller 531) and installed on a lab host; a
+  single-host peering, route and ACL-hook run passed. Cross-host peering, gateway egress, ACL filtering of real
+  traffic, arm64 and the qualification scripts have not run.
+
 ## 2026-10-12 — Bare-metal provisioning: BMCs to joined hosts
 
 See [docs/baremetal-provisioning.md](docs/baremetal-provisioning.md). Claims C49 to C51.

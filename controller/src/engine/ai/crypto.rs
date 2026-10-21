@@ -21,9 +21,19 @@ const ENC_PREFIX: &str = "enc:";
 
 static MASTER_KEY: OnceLock<Option<[u8; 32]>> = OnceLock::new();
 
-/// Load master key from env var. Call once at controller startup.
+/// Load the master key from `MACHINA_API_KEY_MASTER_KEY_FILE` or the legacy
+/// environment variable. The file form is preferred in production (systemd
+/// credentials, Vault/secret-agent rendered file, Kubernetes secret volume).
 pub fn init() {
-    let key = std::env::var("MACHINA_API_KEY_MASTER_KEY").ok().and_then(|s| {
+    let raw = std::env::var("MACHINA_API_KEY_MASTER_KEY_FILE")
+        .ok()
+        .filter(|p| !p.trim().is_empty())
+        .and_then(|p| match std::fs::read_to_string(p.trim()) {
+            Ok(v) => Some(v),
+            Err(e) => { tracing::error!("cannot read MACHINA_API_KEY_MASTER_KEY_FILE: {e}"); None }
+        })
+        .or_else(|| std::env::var("MACHINA_API_KEY_MASTER_KEY").ok());
+    let key = raw.and_then(|s| {
         match hex::decode(s.trim()) {
             Ok(bytes) => bytes.try_into().ok(),
             Err(_) => {
@@ -35,7 +45,7 @@ pub fn init() {
     if key.is_some() {
         tracing::info!("AES-256-GCM API key encryption enabled");
     } else {
-        tracing::warn!("MACHINA_API_KEY_MASTER_KEY not set — LLM provider API keys will be stored in plaintext. Set this variable in production.");
+        tracing::warn!("no API-key master key configured — provider/BMC secrets may be stored in plaintext; production profile refuses this");
     }
     let _ = MASTER_KEY.set(key);
 }

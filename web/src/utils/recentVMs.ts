@@ -6,7 +6,7 @@ const KEY = 'machina_recent_vms'
 export function addRecentVM(name: string) {
   const list = getRecentVMs().filter(n => n !== name)
   list.unshift(name)
-  localStorage.setItem(KEY, JSON.stringify(list.slice(0, 5)))
+  try { localStorage.setItem(KEY, JSON.stringify(list.slice(0, 5))) } catch { /* storage unavailable or full */ }
 }
 
 export function getRecentVMs(): string[] {
@@ -20,5 +20,5 @@ export function removeRecentVMs(names: string[]) {
   if (!names.length) return
   const drop = new Set(names)
   const next = getRecentVMs().filter((n) => !drop.has(n))
-  localStorage.setItem(KEY, JSON.stringify(next))
+  try { localStorage.setItem(KEY, JSON.stringify(next)) } catch { /* storage unavailable or full */ }
 }

@@ -137,6 +137,19 @@ pub fn validate(cfg: &VmOverlay) -> Result<(), String> {
         if p.prefixes.is_empty() || !p.prefixes.iter().all(|x| cidr_ok(x)) {
             return Err(format!("peer {}: prefixes must be CIDRs", p.host));
         }
+        if !p.routes.iter().all(|x| cidr_ok(x)) {
+            return Err(format!("peer {}: routes must be CIDRs", p.host));
+        }
+    }
+    for r in &cfg.direct_routes {
+        if !cidr_ok(&r.source) || !cidr_ok(&r.destination) {
+            return Err(format!("direct route {} -> {} must use CIDRs", r.source, r.destination));
+        }
+        let sf = r.source.split('/').next().and_then(|s| s.parse::<IpAddr>().ok());
+        let df = r.destination.split('/').next().and_then(|s| s.parse::<IpAddr>().ok());
+        if sf.zip(df).is_none_or(|(s, d)| s.is_ipv4() != d.is_ipv4()) {
+            return Err(format!("direct route {} -> {} mixes address families", r.source, r.destination));
+        }
     }
     Ok(())
 }
@@ -200,7 +213,26 @@ pub fn render(cfg: &VmOverlay) -> Option<String> {
             }
         }
     }
-    Some(table("ip", &m4) + &table("ip6", &m6))
+    let mut v4 = table("ip", &m4);
+    let mut v6 = table("ip6", &m6);
+    // The normal guard accepts only DNATed fleet-address traffic. Direct VPC
+    // routing is an explicit exception, scoped to configured source/destination
+    // CIDRs and still subject to NACL/host FORWARD policy.
+    let marker = format!("    iifname \"{IFACE}\" ct state new ct status & dnat == 0 drop\n");
+    let mut a4 = String::new();
+    let mut a6 = String::new();
+    for r in &cfg.direct_routes {
+        let ipv6 = r.source.contains(':');
+        let kw = if ipv6 { "ip6" } else { "ip" };
+        let line = format!(
+            "    iifname \"{IFACE}\" {kw} saddr {} {kw} daddr {} accept\n",
+            r.source, r.destination
+        );
+        if ipv6 { a6.push_str(&line); } else { a4.push_str(&line); }
+    }
+    if !a4.is_empty() { v4 = v4.replacen(&marker, &(a4 + &marker), 1); }
+    if !a6.is_empty() { v6 = v6.replacen(&marker, &(a6 + &marker), 1); }
+    Some(v4 + &v6)
 }
 
 /// Drop the old tables (created first so the deletes cannot fail), add the new.
@@ -282,7 +314,9 @@ mod tests {
                 public_key: private_key([7; 32]),
                 endpoint: "10.0.0.2:51871".into(),
                 prefixes: vec!["100.96.2.0/24".into()],
+                routes: vec!["100.96.2.0/24".into()],
             }],
+            direct_routes: Vec::new(),
         }
     }
 
