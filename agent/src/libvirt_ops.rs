@@ -1715,6 +1715,9 @@ fn create_request_from_vm(
         virt_install_location: label_str(&labels, "virt_install_location")
             .trim()
             .to_string(),
+        // Set by the platform create wizard's Windows options; honored when the VM is created.
+        secure_boot: label_bool(&labels, "secure_boot"),
+        vtpm: label_bool(&labels, "tpm"),
         virt_install_pxe: label_bool(&labels, "virt_install_pxe"),
         virt_install_pxe_network: label_str(&labels, "virt_install_pxe_network")
             .trim()
