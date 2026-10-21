@@ -40,11 +40,33 @@ Machina creates and removes the partitions itself and attaches them with `manage
 Partitions do not survive a host reboot: recreate them (for example from a boot script that calls the same API) before starting
 VMs that reference them.
 
+## From the controller
+
+The controller manages partitions on every host, keeps a record of which VM holds which, and pins those VMs. All calls go to
+`/api/v1` on the controller (port 5093); listing needs the `operator` role, changes need `admin`, and every change is audited.
+
+```bash
+curl -sk .../api/v1/hosts/<host-id>/mdev                                  # types the GPUs offer, partitions, assignments
+curl -sk -X POST .../api/v1/hosts/<host-id>/mdev -d '{"parent":"0000:03:00.0","type":"nvidia-222"}'
+curl -sk -X POST .../api/v1/vms/<vm-id>/mdev -d '{"uuid":"<uuid>"}'      # attach (the partition must be on the VM's host)
+curl -sk -X DELETE .../api/v1/vms/<vm-id>/mdev/<uuid>                    # detach
+curl -sk -X DELETE .../api/v1/hosts/<host-id>/mdev/<uuid>                # remove (refused while a VM holds it)
+```
+
+A partition lives on one host's GPU and does not move, so **a VM holding one is pinned to its host**:
+
+- **Migration** is refused by the pre-check (`vgpu_pinned`) until you detach the partition.
+- **DRS** never recommends moving it.
+- **HA** does not restart it on another host (it would silently lose the GPU). When its host fails, an `ha.pinned_vgpu` event is
+  recorded once and the VM waits for the host to return.
+
+Partitions do not survive a host reboot. After one, the host's list no longer shows the partition and the assignment is reported
+with `"missing": true`: recreate the partition (the same UUID is not reused unless you supply it on the host) and re-attach.
+
 ## Limits
 
-- **Daemon and agent only.** The host and per-VM calls exist on the daemon (`/api/v1/host/mdev`, `/vms/{name}/hostdev/mdev/*`)
-  and the agent can attach and detach (`mdev.attach`, `mdev.detach`). There is no controller API, scheduler awareness (a VM with
-  a partition is not pinned to its host by the placement engine) or web page yet.
-- **No live migration** of a VM holding a partition; detach first.
+- The single-host daemon calls (`/api/v1/host/mdev`, `/vms/{name}/hostdev/mdev/*`) do not record anything; use the controller calls
+  above to get the pinning.
+- **No live migration** of a VM holding a partition (the controller refuses it); detach first.
 - Partition availability is whatever the driver reports at that moment; creating a type with no instances left is refused.
 - Not yet run on a vGPU host: see claims C59.

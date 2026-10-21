@@ -47,6 +47,7 @@ mod kubevirt;
 mod launchpad;
 mod load_balancers;
 pub(crate) mod desktop_pools;
+pub(crate) mod vgpu;
 pub(crate) mod backup_replication;
 mod k8s_clusters;
 mod maintenance;
@@ -1659,6 +1660,10 @@ pub fn router(state: AppState) -> Router {
             post(network_segments::bind_network_to_segment),
         )
         .route("/api/v1/failure-domains", get(placement::failure_domains))
+        .route("/api/v1/hosts/{id}/mdev", get(vgpu::host_mdev).post(vgpu::create_mdev))
+        .route("/api/v1/hosts/{id}/mdev/{uuid}", delete(vgpu::delete_mdev))
+        .route("/api/v1/vms/{id}/mdev", post(vgpu::attach_vm_mdev))
+        .route("/api/v1/vms/{id}/mdev/{uuid}", delete(vgpu::detach_vm_mdev))
         .route("/api/v1/ha/witness", get(placement::witness_status))
         .route(
             "/api/v1/desktop-pools",

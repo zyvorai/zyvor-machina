@@ -81,6 +81,11 @@
       "category": "Platform"
     },
     {
+      "label": "vGPU Partitions",
+      "path": "/platform/vgpu",
+      "category": "Platform"
+    },
+    {
       "label": "Networks",
       "path": "/platform/networks",
       "category": "Platform"

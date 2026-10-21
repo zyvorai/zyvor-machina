@@ -59,7 +59,8 @@ pub async fn compute_recommendations(
     let vms: Vec<(Uuid, String, Uuid, i64, crate::db::Json<Vec<String>>)> = crate::db::query_as(
         "SELECT v.id, v.name, v.host_id, v.memory_mib, COALESCE(v.tags, '[]') AS tags FROM vms v
          JOIN hosts h ON h.id = v.host_id
-         WHERE v.desired_state = 'running' AND h.state = 'online'",
+         WHERE v.desired_state = 'running' AND h.state = 'online'
+           AND NOT EXISTS (SELECT 1 FROM vm_mdev m WHERE m.vm_id = v.id)",
     )
     .fetch_all(pool)
     .await?;

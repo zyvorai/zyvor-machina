@@ -195,6 +195,22 @@ async fn recover_vms(state: &AppState) -> anyhow::Result<()> {
         vm_memory_mib,
     ) in victims
     {
+        // A VM holding a vGPU partition cannot be restarted elsewhere: the partition lives on the
+        // failed host's GPU, and a restart without it would silently lose the GPU. Say so once.
+        if crate::api::vgpu::is_pinned(&state.pool, vm_id).await {
+            record_ha_event_deduped(
+                &state.pool,
+                Some(vm_id),
+                Some(failed_host),
+                "ha.pinned_vgpu",
+                &format!(
+                    "VM {vm_name} holds a vGPU partition on host {failed_host} and is not restarted elsewhere; bring the host back or detach the partition"
+                ),
+            )
+            .await?;
+            continue;
+        }
+
         // Split-brain guard (fail-safe default): recover a VM ONLY once its failed
         // host is confirmed fenced (powered off). An unfenced host may still be
         // running the VM, so starting it elsewhere on shared storage corrupts data.
