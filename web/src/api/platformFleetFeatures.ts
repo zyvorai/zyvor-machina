@@ -196,6 +196,9 @@ export type BackupReplica = {
   bytes: number
   files: number
   is_dir: boolean
+  /** True when the copy has a SHA-256 manifest; false means size-verified only. */
+  checksummed: boolean
+  manifest_sha256: string
   status: string
   message: string
   verified_at: string

@@ -6,7 +6,7 @@
 //! * desktop pools: every 30 s, advance clones, recycles and surplus removal;
 //! * migration waves: every 60 s, advance waves an operator has started;
 //! * backup replication: every 5 minutes, copy new backups to S3 targets whose config sets
-//!   `"auto_replicate": true`.
+//!   `"auto_replicate": true`, and prune off-site copies beyond a target's `"retain"` count.
 //!
 //! Like the other schedulers they run only on the leader controller, and one failing pass is logged
 //! and retried on the next tick.
@@ -42,6 +42,7 @@ pub fn spawn(state: AppState) {
             }
             if due(this, 10) {
                 crate::api::backup_replication::replicate_automatically(&state).await;
+                crate::api::backup_replication::prune_old_copies(&state).await;
             }
         }
     });

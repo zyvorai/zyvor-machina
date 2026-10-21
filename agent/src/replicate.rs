@@ -3,8 +3,13 @@
 
 //! Replicates a backup to (or fetches one from) an S3-compatible store for the controller. It runs
 //! on the host that holds the backup, with that host's `aws` CLI and credentials, so the data never
-//! passes through the controller. See `machina_core::backup_replica` for the validation and the
-//! size check. Local paths must be inside `MACHINA_BACKUP_DIR`.
+//! passes through the controller. See `machina_core::backup_replica` for the validation, the size
+//! check and the checksum manifest. Local paths must be inside `MACHINA_BACKUP_DIR`.
+//!
+//! A push uploads the data, confirms every object's size, then stores a SHA-256 manifest next to the
+//! copy. A fetch downloads the data and proves it against that manifest (a copy made before
+//! manifests existed is accepted on size alone, and the response says so). A delete removes the
+//! copy and its manifest.
 
 use std::path::Path;
 use std::time::Duration;
@@ -93,10 +98,42 @@ async fn walk(path: &Path) -> Result<Vec<(String, u64)>, String> {
         .map_err(|e| e.to_string())?
 }
 
+/// Size and SHA-256 of every file in a backup. A single file is recorded under `single_name` when
+/// given (a fetched copy has a different file name from the original).
+async fn local_manifest(
+    path: &Path,
+    single_name: Option<String>,
+) -> Result<Vec<plan::ManifestFile>, String> {
+    let p = path.to_path_buf();
+    tokio::task::spawn_blocking(move || {
+        let is_dir = p.is_dir();
+        let files = local_files(&p)?;
+        let mut out = Vec::with_capacity(files.len());
+        for (rel, size) in files {
+            let file = if is_dir { p.join(&rel) } else { p.clone() };
+            let sha256 =
+                plan::sha256_file(&file).map_err(|e| format!("{}: {e}", file.display()))?;
+            let path = match (&single_name, is_dir) {
+                (Some(n), false) => n.clone(),
+                _ => rel,
+            };
+            out.push(plan::ManifestFile { path, size, sha256 });
+        }
+        Ok(out)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn temp_file(tag: &str) -> std::path::PathBuf {
+    std::env::temp_dir().join(format!("machina-replica-{}-{tag}", uuid::Uuid::new_v4()))
+}
+
 pub async fn handle(req: ReplicateBackupRequest) -> ReplicateBackupResponse {
     let root =
         std::env::var("MACHINA_BACKUP_DIR").unwrap_or_else(|_| "/var/lib/machina/backups".into());
-    if !crate::backup::within_root(&req.local_path, &root) {
+    // A delete touches the store only, so it has no local path to check.
+    if req.action != "delete" && !crate::backup::within_root(&req.local_path, &root) {
         return fail(format!("refused: the path must be inside {root}"));
     }
     if let Err(e) =
@@ -116,13 +153,18 @@ pub async fn handle(req: ReplicateBackupRequest) -> ReplicateBackupResponse {
     match req.action.as_str() {
         "push" => push(&req).await,
         "fetch" => fetch(&req).await,
+        "delete" => delete(&req).await,
         other => fail(format!("unknown action '{other}'")),
     }
 }
 
 async fn list_remote(req: &ReplicateBackupRequest) -> Result<Vec<(u64, String)>, String> {
-    let out = aws(&plan::ls_args(&req.bucket, &req.key, &req.endpoint_url)).await?;
-    Ok(plan::parse_ls(&out))
+    // `aws s3 ls` exits 1 with no output when nothing matches: that is an empty listing.
+    match aws(&plan::ls_args(&req.bucket, &req.key, &req.endpoint_url)).await {
+        Ok(out) => Ok(plan::parse_ls(&out)),
+        Err(e) if e.trim().is_empty() => Ok(Vec::new()),
+        Err(e) => Err(e),
+    }
 }
 
 async fn push(req: &ReplicateBackupRequest) -> ReplicateBackupResponse {
@@ -136,6 +178,11 @@ async fn push(req: &ReplicateBackupRequest) -> ReplicateBackupResponse {
     let local = match walk(path).await {
         Ok(l) => l,
         Err(e) => return fail(e),
+    };
+    // Checksums first, so the manifest describes exactly what is uploaded.
+    let manifest = match local_manifest(path, None).await {
+        Ok(m) => m,
+        Err(e) => return fail(format!("checksumming failed: {e}")),
     };
     if let Err(e) = aws(&plan::push_args(
         &req.local_path,
@@ -152,17 +199,62 @@ async fn push(req: &ReplicateBackupRequest) -> ReplicateBackupResponse {
         Ok(r) => r,
         Err(e) => return fail(format!("uploaded, but listing the store failed: {e}")),
     };
-    match plan::verify(&local, &remote, &req.key, is_dir) {
-        Ok(bytes) => ReplicateBackupResponse {
-            ok: true,
-            message: "uploaded and verified".into(),
-            bytes,
-            files: local.len() as u32,
-            is_dir,
-            remote_uri: plan::uri(&req.bucket, &req.key),
-        },
-        Err(e) => fail(format!("verification failed: {e}")),
+    let bytes = match plan::verify(&local, &remote, &req.key, is_dir) {
+        Ok(b) => b,
+        Err(e) => return fail(format!("verification failed: {e}")),
+    };
+    // Store the checksums next to the copy so a later fetch can prove the data intact end to end.
+    let text = plan::manifest_json(&manifest);
+    let tmp = temp_file("manifest.json");
+    if let Err(e) = tokio::fs::write(&tmp, &text).await {
+        return fail(format!("cannot write the checksum manifest: {e}"));
     }
+    let up = aws(&plan::push_args(
+        &tmp.to_string_lossy(),
+        false,
+        &req.bucket,
+        &plan::manifest_key(&req.key),
+        &req.endpoint_url,
+    ))
+    .await;
+    let _ = tokio::fs::remove_file(&tmp).await;
+    if let Err(e) = up {
+        return fail(format!(
+            "uploaded, but storing the checksum manifest failed: {e}"
+        ));
+    }
+    ReplicateBackupResponse {
+        ok: true,
+        message: "uploaded, verified by size and checksummed".into(),
+        bytes,
+        files: local.len() as u32,
+        is_dir,
+        remote_uri: plan::uri(&req.bucket, &req.key),
+        manifest_sha256: plan::sha256_hex(&text),
+        checksummed: true,
+    }
+}
+
+/// Download and parse the checksum manifest next to a copy; None when there is none.
+async fn fetch_manifest(req: &ReplicateBackupRequest) -> Option<(String, Vec<plan::ManifestFile>)> {
+    let tmp = temp_file("fetched-manifest.json");
+    let got = aws(&plan::fetch_args(
+        &tmp.to_string_lossy(),
+        false,
+        &req.bucket,
+        &plan::manifest_key(&req.key),
+        &req.endpoint_url,
+    ))
+    .await;
+    let text = if got.is_ok() {
+        tokio::fs::read_to_string(&tmp).await.ok()
+    } else {
+        None
+    };
+    let _ = tokio::fs::remove_file(&tmp).await;
+    let text = text?;
+    let manifest = plan::parse_manifest(&text).ok()?;
+    Some((text, manifest))
 }
 
 async fn fetch(req: &ReplicateBackupRequest) -> ReplicateBackupResponse {
@@ -200,13 +292,94 @@ async fn fetch(req: &ReplicateBackupRequest) -> ReplicateBackupResponse {
     if local != expected {
         return fail("verification failed: the downloaded files do not match the store listing");
     }
+    // Prove the bytes with the stored checksums. A copy made before manifests existed has none and
+    // is accepted on size alone, and the response says so.
+    let (checksummed, manifest_sha256, message) = match fetch_manifest(req).await {
+        Some((text, manifest)) => {
+            let single = if is_dir {
+                None
+            } else {
+                manifest.first().map(|m| m.path.clone())
+            };
+            match local_manifest(dest, single).await {
+                Ok(have) => {
+                    if let Err(e) = plan::verify_manifest(&have, &manifest) {
+                        return fail(format!("checksum verification failed: {e}"));
+                    }
+                    (
+                        true,
+                        plan::sha256_hex(&text),
+                        "downloaded and verified by checksum",
+                    )
+                }
+                Err(e) => return fail(format!("checksumming the download failed: {e}")),
+            }
+        }
+        None => (
+            false,
+            String::new(),
+            "downloaded and verified by size (this copy has no checksum manifest)",
+        ),
+    };
     ReplicateBackupResponse {
         ok: true,
-        message: "downloaded and verified".into(),
+        message: message.into(),
         bytes: local.iter().map(|(_, s)| s).sum(),
         files: local.len() as u32,
         is_dir,
         remote_uri: plan::uri(&req.bucket, &req.key),
+        manifest_sha256,
+        checksummed,
+    }
+}
+
+/// Remove a copy (and its manifest) from the store and confirm it is gone.
+async fn delete(req: &ReplicateBackupRequest) -> ReplicateBackupResponse {
+    let remote = match list_remote(req).await {
+        Ok(r) => r,
+        Err(e) => return fail(format!("listing the store failed: {e}")),
+    };
+    let is_dir = plan::remote_is_dir(&remote, &req.key);
+    if !remote.is_empty() {
+        if let Err(e) = aws(&plan::delete_args(
+            &req.bucket,
+            &req.key,
+            is_dir,
+            &req.endpoint_url,
+        ))
+        .await
+        {
+            return fail(format!("delete failed: {e}"));
+        }
+    }
+    // The manifest is a separate object; removing a missing one is not an error.
+    if let Err(e) = aws(&plan::delete_args(
+        &req.bucket,
+        &plan::manifest_key(&req.key),
+        false,
+        &req.endpoint_url,
+    ))
+    .await
+    {
+        return fail(format!("deleting the checksum manifest failed: {e}"));
+    }
+    let dir_prefix = format!("{}/", req.key);
+    match list_remote(req).await {
+        Ok(left)
+            if left
+                .iter()
+                .all(|(_, k)| *k != req.key && !k.starts_with(&dir_prefix)) =>
+        {
+            ReplicateBackupResponse {
+                ok: true,
+                message: "deleted".into(),
+                remote_uri: plan::uri(&req.bucket, &req.key),
+                is_dir,
+                ..Default::default()
+            }
+        }
+        Ok(_) => fail("delete reported success but objects remain"),
+        Err(e) => fail(format!("could not confirm the delete: {e}")),
     }
 }
 
@@ -264,10 +437,19 @@ mod tests {
         assert!(!r.ok && r.message.contains("bucket"));
         let r = handle(ReplicateBackupRequest {
             local_path: "/var/lib/machina/backups/a.qcow2".into(),
-            action: "delete".into(),
-            ..base
+            action: "explode".into(),
+            ..base.clone()
         })
         .await;
         assert!(!r.ok && r.message.contains("unknown action"));
+        // A delete has no local path, but its key is still validated.
+        let r = handle(ReplicateBackupRequest {
+            action: "delete".into(),
+            local_path: String::new(),
+            key: "--recursive".into(),
+            ..base
+        })
+        .await;
+        assert!(!r.ok);
     }
 }

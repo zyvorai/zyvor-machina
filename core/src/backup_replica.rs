@@ -254,6 +254,141 @@ pub fn expected_files(remote: &[(u64, String)], key: &str, is_dir: bool) -> Vec<
     }
 }
 
+/// One file in a checksum manifest.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ManifestFile {
+    /// Path relative to the backup (a file's own name, or `sub/disk.qcow2` inside a directory).
+    pub path: String,
+    pub size: u64,
+    pub sha256: String,
+}
+
+/// The sidecar object that holds a copy's checksums. It sits next to the data, not inside a
+/// directory copy, so `aws s3 sync` of the directory never picks it up.
+pub fn manifest_key(key: &str) -> String {
+    format!("{key}.manifest.json")
+}
+
+pub fn manifest_json(files: &[ManifestFile]) -> String {
+    serde_json::json!({ "version": 1, "files": files }).to_string()
+}
+
+pub fn parse_manifest(text: &str) -> Result<Vec<ManifestFile>, String> {
+    let v: Value =
+        serde_json::from_str(text).map_err(|e| format!("the checksum manifest is damaged: {e}"))?;
+    let files = v
+        .get("files")
+        .cloned()
+        .ok_or("the checksum manifest has no file list")?;
+    serde_json::from_value(files).map_err(|e| format!("the checksum manifest is damaged: {e}"))
+}
+
+/// Lowercase hex SHA-256 of a file, read in 1 MiB chunks.
+pub fn sha256_file(path: &std::path::Path) -> std::io::Result<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+    let mut f = std::fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buf = vec![0u8; 1 << 20];
+    loop {
+        let n = f.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect())
+}
+
+/// SHA-256 of a string, as lowercase hex.
+pub fn sha256_hex(text: &str) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(text.as_bytes())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// Compare what is on disk with what the manifest recorded: same files, sizes and checksums.
+pub fn verify_manifest(local: &[ManifestFile], manifest: &[ManifestFile]) -> Result<(), String> {
+    if manifest.is_empty() {
+        return Err("the checksum manifest lists no files".into());
+    }
+    for want in manifest {
+        match local.iter().find(|l| l.path == want.path) {
+            None => return Err(format!("{} is missing", want.path)),
+            Some(l) if l.size != want.size => {
+                return Err(format!(
+                    "{} is {} bytes, the manifest says {}",
+                    want.path, l.size, want.size
+                ))
+            }
+            Some(l) if l.sha256 != want.sha256 => {
+                return Err(format!(
+                    "{} does not match its recorded checksum",
+                    want.path
+                ))
+            }
+            Some(_) => {}
+        }
+    }
+    if let Some(extra) = local
+        .iter()
+        .find(|l| !manifest.iter().any(|m| m.path == l.path))
+    {
+        return Err(format!("{} is not in the checksum manifest", extra.path));
+    }
+    Ok(())
+}
+
+/// Delete a copy: the object (`rm key`) or the directory (`rm key/ --recursive`), never the bare
+/// prefix, which would also match sibling names like `key.manifest.json` or `key2/`.
+pub fn delete_args(bucket: &str, key: &str, is_dir: bool, endpoint: &str) -> Vec<String> {
+    let args = if is_dir {
+        vec![
+            "s3".into(),
+            "rm".into(),
+            format!("{}/", uri(bucket, key)),
+            "--recursive".into(),
+            "--only-show-errors".into(),
+        ]
+    } else {
+        vec![
+            "s3".into(),
+            "rm".into(),
+            uri(bucket, key),
+            "--only-show-errors".into(),
+        ]
+    };
+    with_endpoint(args, endpoint)
+}
+
+/// Which copies fall outside "keep the newest `retain` per VM". `rows` are `(replica id, vm id)` for
+/// verified copies, already ordered newest backup first; the first `retain` of each VM are kept.
+pub fn expired<T: Copy, V: Eq + std::hash::Hash + Copy>(rows: &[(T, V)], retain: usize) -> Vec<T> {
+    let mut seen: std::collections::HashMap<V, usize> = std::collections::HashMap::new();
+    let mut out = Vec::new();
+    for (id, vm) in rows {
+        let n = seen.entry(*vm).or_insert(0);
+        *n += 1;
+        if *n > retain {
+            out.push(*id);
+        }
+    }
+    out
+}
+
+/// True when `remote_uri` is an object under this destination (`s3://bucket/prefix/...`), so a
+/// retention pass never deletes outside the prefix its target owns.
+pub fn within_dest(dest: &S3Dest, remote_uri: &str) -> bool {
+    remote_uri.starts_with(&format!("s3://{}/{}/", dest.bucket, dest.prefix))
+        && !remote_uri.contains("/../")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -418,5 +553,118 @@ mod tests {
             expected_files(&[(5, "p/a.qcow2".to_string())], "p/a.qcow2", false),
             vec![("a.qcow2".to_string(), 5)]
         );
+    }
+
+    #[test]
+    fn manifest_round_trips_and_names_a_sidecar() {
+        let files = vec![
+            ManifestFile {
+                path: "disk.qcow2".into(),
+                size: 10,
+                sha256: "aa".into(),
+            },
+            ManifestFile {
+                path: "manifest.json".into(),
+                size: 2,
+                sha256: "bb".into(),
+            },
+        ];
+        let text = manifest_json(&files);
+        assert_eq!(parse_manifest(&text).unwrap(), files);
+        assert!(parse_manifest("nope").is_err());
+        assert!(parse_manifest("{}").is_err());
+        assert_eq!(manifest_key("p/vm.d"), "p/vm.d.manifest.json");
+        // The sidecar is not under the directory prefix, so a listing for the directory excludes it.
+        assert!(!remote_is_dir(&[(5, manifest_key("p/vm.d"))], "p/vm.d"));
+    }
+
+    #[test]
+    fn checksums_detect_changed_missing_and_extra_files() {
+        let f = |p: &str, s: u64, h: &str| ManifestFile {
+            path: p.into(),
+            size: s,
+            sha256: h.into(),
+        };
+        let manifest = vec![f("a", 1, "h1"), f("b", 2, "h2")];
+        assert!(verify_manifest(&[f("a", 1, "h1"), f("b", 2, "h2")], &manifest).is_ok());
+        assert!(verify_manifest(&[f("a", 1, "h1")], &manifest)
+            .unwrap_err()
+            .contains("b is missing"));
+        assert!(
+            verify_manifest(&[f("a", 1, "h1"), f("b", 3, "h2")], &manifest)
+                .unwrap_err()
+                .contains("3 bytes")
+        );
+        assert!(
+            verify_manifest(&[f("a", 1, "h1"), f("b", 2, "XX")], &manifest)
+                .unwrap_err()
+                .contains("checksum")
+        );
+        assert!(verify_manifest(
+            &[f("a", 1, "h1"), f("b", 2, "h2"), f("c", 1, "h3")],
+            &manifest
+        )
+        .unwrap_err()
+        .contains("c is not"));
+        assert!(verify_manifest(&[], &[]).is_err());
+    }
+
+    #[test]
+    fn sha256_matches_known_vectors() {
+        assert_eq!(
+            sha256_hex("abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        assert_eq!(
+            sha256_hex(""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        let p = std::env::temp_dir().join(format!("machina-sha-{}", std::process::id()));
+        std::fs::write(&p, b"abc").unwrap();
+        assert_eq!(sha256_file(&p).unwrap(), sha256_hex("abc"));
+        // A file bigger than the read buffer hashes the same as the whole string.
+        let big = "x".repeat((1 << 20) + 17);
+        std::fs::write(&p, big.as_bytes()).unwrap();
+        assert_eq!(sha256_file(&p).unwrap(), sha256_hex(&big));
+        let _ = std::fs::remove_file(&p);
+    }
+
+    #[test]
+    fn delete_never_uses_a_bare_prefix() {
+        assert_eq!(
+            delete_args("b", "p/a.qcow2", false, ""),
+            ["s3", "rm", "s3://b/p/a.qcow2", "--only-show-errors"]
+        );
+        assert_eq!(
+            delete_args("b", "p/vm.d", true, "https://e"),
+            [
+                "s3",
+                "rm",
+                "s3://b/p/vm.d/",
+                "--recursive",
+                "--only-show-errors",
+                "--endpoint-url",
+                "https://e"
+            ]
+        );
+    }
+
+    #[test]
+    fn retention_keeps_the_newest_per_vm() {
+        // (replica, vm), newest first within each VM.
+        let rows = [(1, 'a'), (2, 'a'), (3, 'a'), (4, 'b'), (5, 'b'), (6, 'a')];
+        assert_eq!(expired(&rows, 2), vec![3, 6]);
+        assert!(expired(&rows, 10).is_empty());
+        assert_eq!(expired(&rows, 1), vec![2, 3, 5, 6]);
+        assert!(expired::<i32, char>(&[], 3).is_empty());
+    }
+
+    #[test]
+    fn retention_only_touches_objects_under_the_targets_prefix() {
+        let d = dest();
+        assert!(within_dest(&d, "s3://dr-backups/site-a/vm.qcow2"));
+        assert!(!within_dest(&d, "s3://dr-backups/other/vm.qcow2"));
+        assert!(!within_dest(&d, "s3://elsewhere/site-a/vm.qcow2"));
+        assert!(!within_dest(&d, "s3://dr-backups/site-a/../other/x"));
     }
 }
