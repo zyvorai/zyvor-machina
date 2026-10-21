@@ -1144,7 +1144,7 @@ message K3sNodeResponse {
 // Copy a backup (file or multi-disk directory) to or from an S3-compatible store with the host's
 // aws CLI and credentials, and verify the sizes. The local path must be inside MACHINA_BACKUP_DIR.
 message ReplicateBackupRequest {
-  string action = 1; // push | fetch
+  string action = 1; // push | fetch | delete (delete ignores local_path)
   string local_path = 2; // push: the backup to upload; fetch: where to put it (must not exist)
   string bucket = 3;
   string key = 4; // object key (a file) or key prefix (a directory)
@@ -1158,4 +1158,8 @@ message ReplicateBackupResponse {
   uint32 files = 4;
   bool is_dir = 5;
   string remote_uri = 6;
+  // SHA-256 of the checksum manifest stored next to the copy; checksummed is false for a copy
+  // made before manifests existed (verified by size only).
+  string manifest_sha256 = 7;
+  bool checksummed = 8;
 }

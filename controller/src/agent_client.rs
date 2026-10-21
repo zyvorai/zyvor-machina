@@ -1752,9 +1752,12 @@ pub struct ReplicateResult {
     pub is_dir: bool,
     pub remote_uri: String,
     pub message: String,
+    pub manifest_sha256: String,
+    pub checksummed: bool,
 }
 
-/// Copy a backup to (`push`) or from (`fetch`) an S3-compatible store on the host that holds it.
+/// Copy a backup to (`push`) or from (`fetch`) an S3-compatible store on the host that holds it, or
+/// remove a copy from the store (`delete`, which ignores `local_path`).
 pub async fn replicate_backup(
     addr: &str,
     action: &str,
@@ -1781,6 +1784,8 @@ pub async fn replicate_backup(
             is_dir: resp.is_dir,
             remote_uri: resp.remote_uri,
             message: resp.message,
+            manifest_sha256: resp.manifest_sha256,
+            checksummed: resp.checksummed,
         })
     } else {
         anyhow::bail!(resp.message)

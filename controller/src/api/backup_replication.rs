@@ -30,6 +30,9 @@ pub struct ReplicaRow {
     pub bytes: i64,
     pub files: i64,
     pub is_dir: bool,
+    /// True when the copy has a SHA-256 manifest; false for copies made before manifests (size-verified only).
+    pub checksummed: bool,
+    pub manifest_sha256: String,
     pub status: String,
     pub message: String,
     pub verified_at: String,
@@ -40,7 +43,7 @@ pub struct ReplicaRow {
     pub updated_at: String,
 }
 
-const COLS: &str = "id, backup_id, target_id, remote_uri, bytes, files, is_dir, status, message, verified_at, fetch_status, fetch_path, fetch_message, created_at, updated_at";
+const COLS: &str = "id, backup_id, target_id, remote_uri, bytes, files, is_dir, checksummed, manifest_sha256, status, message, verified_at, fetch_status, fetch_path, fetch_message, created_at, updated_at";
 
 /// What replicating one backup needs, resolved from the database.
 struct Job {
@@ -187,13 +190,16 @@ async fn run_push(state: AppState, replica_id: Uuid, job: Job) {
         Ok(r) => {
             crate::db::query(
                 "UPDATE backup_replicas SET status = 'verified', message = ?, remote_uri = ?, bytes = ?, files = ?,
-                        is_dir = ?, verified_at = datetime('now'), updated_at = datetime('now') WHERE id = ?",
+                        is_dir = ?, checksummed = ?, manifest_sha256 = ?, verified_at = datetime('now'),
+                        updated_at = datetime('now') WHERE id = ?",
             )
             .bind(&r.message)
             .bind(&r.remote_uri)
             .bind(r.bytes as i64)
             .bind(r.files as i64)
             .bind(r.is_dir)
+            .bind(r.checksummed)
+            .bind(&r.manifest_sha256)
             .bind(replica_id)
             .execute(&state.pool)
             .await
@@ -430,6 +436,105 @@ pub(crate) async fn replicate_automatically(state: &AppState) {
     }
 }
 
+/// Verified copies per target, newest backup first, so [`machina_core::backup_replica::expired`]
+/// can keep the first `retain` of each VM. Copies being fetched are left alone.
+pub(crate) const PRUNE_CANDIDATES_SQL: &str = "SELECT r.id, b.vm_id
+ FROM backup_replicas r JOIN backup_records b ON b.id = r.backup_id
+ WHERE r.target_id = ? AND r.status = 'verified' AND r.fetch_status <> 'running'
+ ORDER BY b.created_at DESC, r.id";
+
+/// At most this many remote deletions per pass, so a misconfigured `retain` cannot empty a store at once.
+const PRUNE_PER_PASS: usize = 5;
+
+/// Remove one replica from the store (through the agent on the VM's host) and forget it.
+async fn delete_copy(state: &AppState, dest: &S3Dest, replica_id: Uuid) -> Result<(), String> {
+    let (uri, host): (String, Option<Uuid>) = crate::db::query_as(
+        "SELECT r.remote_uri, v.host_id FROM backup_replicas r
+         JOIN backup_records b ON b.id = r.backup_id JOIN vms v ON v.id = b.vm_id WHERE r.id = ?",
+    )
+    .bind(replica_id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| e.to_string())?;
+    // Never delete outside the prefix this target owns.
+    if !machina_core::backup_replica::within_dest(dest, &uri) {
+        return Err(format!("{uri} is outside the target's prefix"));
+    }
+    let key = uri
+        .strip_prefix(&format!("s3://{}/", dest.bucket))
+        .ok_or("the remote URI does not match the target")?
+        .to_string();
+    let host = host.ok_or("the VM has no host to run the delete from")?;
+    let (_, addr) = crate::engine::host_os::resolve_agent_addr(&state.pool, &state.config, host)
+        .await
+        .map_err(|e| e.to_string())?;
+    crate::agent_client::replicate_backup(
+        &addr,
+        "delete",
+        "",
+        &dest.bucket,
+        &key,
+        &dest.endpoint_url,
+    )
+    .await
+    .map_err(|e| format!("{e:#}"))?;
+    crate::db::query("DELETE FROM backup_replicas WHERE id = ?")
+        .bind(replica_id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// For every S3 target whose config sets `"retain": N` (1 to 365), delete the copies beyond the
+/// newest N verified ones per VM. Opt-in: a target without `retain` is never pruned. A copy whose
+/// local backup was already removed has lost its row (the row follows the backup) and is not seen
+/// here: use a store lifecycle rule for those.
+pub(crate) async fn prune_old_copies(state: &AppState) {
+    let targets: Vec<(Uuid, serde_json::Value)> =
+        match crate::db::query_as("SELECT id, config_json FROM backup_targets WHERE kind = 's3'")
+            .fetch_all(&state.pool)
+            .await
+        {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!("backup replication: listing targets failed: {e}");
+                return;
+            }
+        };
+    for (target_id, cfg) in targets {
+        let Some(retain) = cfg
+            .get("retain")
+            .and_then(serde_json::Value::as_u64)
+            .filter(|n| (1..=365).contains(n))
+        else {
+            continue;
+        };
+        let Ok(dest) = S3Dest::from_config(&cfg) else {
+            continue;
+        };
+        let rows: Vec<(Uuid, Uuid)> = match crate::db::query_as(PRUNE_CANDIDATES_SQL)
+            .bind(target_id)
+            .fetch_all(&state.pool)
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!(target = %target_id, "retention listing failed: {e}");
+                continue;
+            }
+        };
+        for id in machina_core::backup_replica::expired(&rows, retain as usize)
+            .into_iter()
+            .take(PRUNE_PER_PASS)
+        {
+            if let Err(e) = delete_copy(state, &dest, id).await {
+                tracing::warn!(replica = %id, "removing an old off-site copy failed: {e}");
+            }
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct FetchBody {
     /// The host to pull the copy onto (its agent must have the AWS CLI and credentials).
@@ -557,6 +662,12 @@ mod tests {
             let rows = q.bind(Uuid::new_v4()).fetch_all(&pool).await.unwrap();
             assert!(rows.is_empty());
         }
+        let pruned: Vec<(Uuid, Uuid)> = crate::db::query_as(PRUNE_CANDIDATES_SQL)
+            .bind(Uuid::new_v4())
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert!(pruned.is_empty());
         for (t, st) in [(false, false), (true, false), (false, true), (true, true)] {
             let sql = list_sql(t, st);
             let mut q = crate::db::query_as::<_, ReplicaRow>(&sql);

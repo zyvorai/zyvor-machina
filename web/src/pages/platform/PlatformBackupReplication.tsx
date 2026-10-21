@@ -79,7 +79,7 @@ export default function PlatformBackupReplication() {
       onErrorRetry={() => void load()}
       prepend={<PlatformBackLink to="/platform/backups" label="Backup & Restore" />}
       title="Off-site backup replication"
-      subtitle="Backups copied to S3-compatible storage at another site, verified by size."
+      subtitle="Backups copied to S3-compatible storage at another site, verified by size and SHA-256 checksum."
       icon={<Cloud className="w-6 h-6 text-[var(--text-muted)]" />}
       loading={loading && replicas.length === 0}
     >
@@ -116,7 +116,7 @@ export default function PlatformBackupReplication() {
                 <MacListRow
                   key={r.id}
                   title={r.remote_uri || r.backup_id}
-                  subtitle={`${r.status}${r.status === 'verified' ? ` · ${mib(r.bytes)} in ${r.files} file(s)` : r.message ? ` · ${r.message}` : ''}${r.fetch_status ? ` · fetch ${r.fetch_status}${r.fetch_path ? ` at ${r.fetch_path}` : ''}` : ''}`}
+                  subtitle={`${r.status}${r.status === 'verified' ? ` · ${mib(r.bytes)} in ${r.files} file(s) · ${r.checksummed ? 'checksummed' : 'size-verified only'}` : r.message ? ` · ${r.message}` : ''}${r.fetch_status ? ` · fetch ${r.fetch_status}${r.fetch_path ? ` at ${r.fetch_path}` : ''}` : ''}`}
                   badge={
                     r.status === 'verified' ? (
                       <button type="button" className="btn-secondary text-xs" disabled={!fetchHost} onClick={() => void fetchBack(r.id)}>
