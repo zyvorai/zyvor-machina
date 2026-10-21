@@ -56,6 +56,9 @@ The script verifies the bundle, checks that libvirt and QEMU are present (it **n
 what is missing), installs to `/usr/local`, creates first-run secrets, and starts the services. `--bind 0.0.0.0` makes the
 web UI listen on all interfaces. `--uninstall [--purge]` removes it (data is kept unless you pass `--purge`).
 
+For a site with no internet route at all (mirrors for Kubernetes bootstrap and images, and a check that nothing leaves), see
+[Air-gapped and sovereign sites](../website/docs/operations/air-gapped.md).
+
 ## Before you install, and after
 
 `machina-preflight` (also `machinactl preflight`) answers "can this machine run Machina?": hardware virtualisation, `/dev/kvm`, libvirt and QEMU, kernel BTF and cgroup v2, free ports, disk, memory, clock and (with `--controller URL`) reachability of the controller. Every failed line says what to do; `--role agent|controller|daemon` checks only what that role needs, `--json` is for scripts, and `--fix` installs missing libvirt/QEMU with your package manager after asking.
