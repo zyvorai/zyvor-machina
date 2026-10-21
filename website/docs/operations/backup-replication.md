@@ -38,6 +38,9 @@ curl -sk        .../api/v1/backups/<backup-id>/replicas          # status: runni
 # Everything new: each VM's newest completed backup without a verified or running copy (run it from cron)
 curl -sk -X POST .../api/v1/backup-replication/run -d '{"target_id":"<uuid>","limit":10}'
 
+# Or let the controller do it: set "auto_replicate": true in the target's config_json. Every 5 minutes it copies the
+# newest not-yet-replicated backups, keeping at most 3 copies running per target.
+
 # Overview
 curl -sk ".../api/v1/backup-replicas?target_id=<uuid>&status=failed"
 ```
@@ -62,5 +65,5 @@ This path is only as automatic as you make it: Machina does not detect a site lo
 - The backup must still be on the host that took it (not pruned, and the VM has not moved to another host since).
 - Sizes are verified, not checksums. A same-size corruption in transit would not be caught; run `qemu-img check` after a fetch.
 - No retention on the remote copy: delete old objects with your store's lifecycle rules.
-- No automatic replication after each backup, no bandwidth limit, no web page.
+- Automatic replication checks every 5 minutes (not the instant a backup finishes), copies at most 3 at a time per target, has no bandwidth limit, and there is no web page yet.
 - Not yet run against a real store: see claims C64.

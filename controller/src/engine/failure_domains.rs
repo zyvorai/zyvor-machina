@@ -131,14 +131,14 @@ pub fn analyze(hosts: &[DomainHost]) -> FailureDomainsReport {
         if !d.survivable {
             findings.push(format!(
                 "Losing {} leaves {} MiB of HA memory without room (short by {} MiB).",
-                d.domain,
-                d.ha_memory_to_recover_mib,
-                -d.spare_after_loss_mib
+                d.domain, d.ha_memory_to_recover_mib, -d.spare_after_loss_mib
             ));
         }
     }
     if unassigned > 0 && !domains.is_empty() {
-        findings.push(format!("{unassigned} host(s) have no rack label and are not counted in any domain."));
+        findings.push(format!(
+            "{unassigned} host(s) have no rack label and are not counted in any domain."
+        ));
     }
     let rack_loss_tolerant = domains.len() >= 2 && domains.iter().all(|d| d.survivable);
     FailureDomainsReport {
@@ -160,7 +160,10 @@ pub fn widen_to_domains(
     let mut per_domain: HashMap<&str, HashSet<String>> = HashMap::new();
     for (host, tags) in anti_map {
         if let Some(d) = host_domain.get(host) {
-            per_domain.entry(d.as_str()).or_default().extend(tags.iter().cloned());
+            per_domain
+                .entry(d.as_str())
+                .or_default()
+                .extend(tags.iter().cloned());
         }
     }
     let mut out = anti_map.clone();
@@ -170,6 +173,18 @@ pub fn widen_to_domains(
         }
     }
     out
+}
+
+/// Reorder recovery candidates (best first) so hosts for which `conflicts` is false come before
+/// those for which it is true; the order inside each part is kept. HA recovery uses this to keep a
+/// VM away from racks that already hold a member of its anti-affinity group, and from the rack it
+/// just lost. It is a preference: a conflicting host is still used when nothing else has room.
+pub fn prefer_non_conflicting(
+    candidates: Vec<(Uuid, i64)>,
+    conflicts: impl Fn(&Uuid) -> bool,
+) -> Vec<(Uuid, i64)> {
+    let (ok, bad): (Vec<_>, Vec<_>) = candidates.into_iter().partition(|c| !conflicts(&c.0));
+    ok.into_iter().chain(bad).collect()
 }
 
 /// host id -> domain key for every host that has a rack label.
@@ -211,21 +226,23 @@ pub async fn load_report(pool: &DbPool) -> anyhow::Result<FailureDomainsReport> 
 
     let hosts: Vec<DomainHost> = rows
         .into_iter()
-        .map(|(id, site, rack, state, maintenance, schedulable, total, used, vm_count)| {
-            let online = state == "online";
-            let (ha_mem, ha_n) = ha.get(&id).copied().unwrap_or((0, 0));
-            DomainHost {
-                id,
-                domain: domain_key(&site, &rack),
-                online,
-                can_take_vms: online && !maintenance && schedulable,
-                memory_total_mib: total,
-                memory_used_mib: used,
-                vm_count,
-                ha_memory_mib: ha_mem,
-                ha_vm_count: ha_n,
-            }
-        })
+        .map(
+            |(id, site, rack, state, maintenance, schedulable, total, used, vm_count)| {
+                let online = state == "online";
+                let (ha_mem, ha_n) = ha.get(&id).copied().unwrap_or((0, 0));
+                DomainHost {
+                    id,
+                    domain: domain_key(&site, &rack),
+                    online,
+                    can_take_vms: online && !maintenance && schedulable,
+                    memory_total_mib: total,
+                    memory_used_mib: used,
+                    vm_count,
+                    ha_memory_mib: ha_mem,
+                    ha_vm_count: ha_n,
+                }
+            },
+        )
         .collect();
     Ok(analyze(&hosts))
 }
@@ -280,7 +297,10 @@ mod tests {
         assert!(!r.rack_loss_tolerant);
         let a = r.domains.iter().find(|d| d.domain == "a").unwrap();
         assert_eq!(a.spare_after_loss_mib, 300 - 800);
-        assert!(r.findings.iter().any(|f| f.contains("Losing a") && f.contains("500")));
+        assert!(r
+            .findings
+            .iter()
+            .any(|f| f.contains("Losing a") && f.contains("500")));
     }
 
     #[test]
@@ -312,10 +332,36 @@ mod tests {
     }
 
     #[test]
+    fn recovery_prefers_hosts_without_conflicts_and_keeps_order() {
+        let (a, b, c, d) = (
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+        );
+        let cands = vec![(a, 10), (b, 20), (c, 30), (d, 40)];
+        let out = prefer_non_conflicting(cands.clone(), |h| *h == a || *h == c);
+        assert_eq!(
+            out.iter().map(|x| x.0).collect::<Vec<_>>(),
+            vec![b, d, a, c]
+        );
+        // Nothing conflicts: unchanged. Everything conflicts: unchanged (still usable).
+        assert_eq!(prefer_non_conflicting(cands.clone(), |_| false), cands);
+        assert_eq!(prefer_non_conflicting(cands.clone(), |_| true), cands);
+    }
+
+    #[test]
     fn widen_spreads_anti_affinity_across_a_rack() {
-        let (h1, h2, h3, h4) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+        let (h1, h2, h3, h4) = (
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+            Uuid::new_v4(),
+        );
         let mut anti: HashMap<Uuid, HashSet<String>> = HashMap::new();
-        anti.entry(h1).or_default().insert("anti-affinity:db".into());
+        anti.entry(h1)
+            .or_default()
+            .insert("anti-affinity:db".into());
         let domains: HashMap<Uuid, String> = [
             (h1, "a".to_string()),
             (h2, "a".to_string()),

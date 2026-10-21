@@ -198,6 +198,7 @@ async fn main() -> anyhow::Result<()> {
     machina_controller::engine::operations_scheduler::spawn(state.clone());
     machina_controller::engine::fleet_snapshot_scheduler::spawn(state.clone());
     machina_controller::engine::fleet_backup_scheduler::spawn(state.clone());
+    machina_controller::engine::automation::spawn(state.clone());
     machina_controller::engine::alert_evaluator::spawn(state.clone());
     machina_controller::engine::scheduled_jobs_runner::spawn(state.clone());
     machina_controller::engine::health_watchdog::spawn(state.clone());

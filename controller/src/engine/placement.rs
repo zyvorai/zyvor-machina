@@ -286,6 +286,21 @@ pub async fn pick_host_for_vm(
 
 type AntiMap = std::collections::HashMap<Uuid, std::collections::HashSet<String>>;
 
+/// host -> anti-affinity tags of the running VMs on it, widened across racks: a peer anywhere in a
+/// host's rack counts. Used by HA recovery to keep a VM out of a rack that holds a group peer.
+pub(crate) async fn anti_affinity_by_rack(pool: &DbPool) -> anyhow::Result<AntiMap> {
+    let hosts = host_anti_affinity_map(pool).await?;
+    Ok(crate::engine::failure_domains::widen_to_domains(
+        &hosts,
+        &crate::engine::failure_domains::host_domains(pool).await?,
+    ))
+}
+
+/// True when `host` already carries a member of one of `vm_tags`' anti-affinity groups.
+pub(crate) fn host_conflicts(map: &AntiMap, host: &Uuid, vm_tags: &[String]) -> bool {
+    map.get(host).is_some_and(|a| violates_anti_affinity(vm_tags, a))
+}
+
 /// The best host and whether it breaks anti-affinity (only when every host would).
 fn choose_host(
     hosts: &[HostCandidate],

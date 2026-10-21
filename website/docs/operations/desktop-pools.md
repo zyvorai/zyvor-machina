@@ -45,8 +45,9 @@ out or release for someone else.
 `needs_clone` → `cloning` → `ready` → `assigned`; a released non-persistent desktop goes `recycling` while its VM is deleted, then
 back through `needs_clone`. `error` shows why a clone could not be queued and is retried.
 
-Nothing runs by itself. **Reconcile** advances the members and is called by create, scale, checkout and release, so call it again
-(or just check out again) once clones finish. A checkout with no free desktop returns 409 until a clone is `ready`.
+The controller reconciles every pool every 30 seconds (on the leader): it notices finished clones, re-clones recycled desktops and
+removes surplus ones. **Reconcile** does the same pass on demand and is also called by create, scale, checkout and release. A
+checkout with no free desktop returns 409 until a clone is `ready`.
 
 ## Limits
 
@@ -55,5 +56,5 @@ Nothing runs by itself. **Reconcile** advances the members and is called by crea
 - **No broker.** Machina does not proxy sessions or reconnect users; give users the VM console or RDP address.
 - **Any authenticated user can check out and release for themselves**, which starts a VM: restrict who can log in accordingly.
 - A clone that never completes stays `cloning`; delete the stuck VM and reconcile.
-- No web page and no background reconcile yet.
+- No web page yet.
 - Not yet run on a host: see claims C63.

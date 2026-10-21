@@ -190,7 +190,7 @@ async fn power(state: &AppState, vm_id: Uuid, action: &str) -> Result<(), ApiErr
 }
 
 /// Advance every member and drop surplus ones. Idempotent.
-async fn reconcile_pool(state: &AppState, pool_id: Uuid) -> Result<(), ApiError> {
+pub(crate) async fn reconcile_pool(state: &AppState, pool_id: Uuid) -> Result<(), ApiError> {
     let pool = load_pool(state, pool_id).await?;
     let members = members_db(state, pool_id).await?;
     let template_host: Option<Uuid> =
@@ -256,6 +256,25 @@ async fn reconcile_pool(state: &AppState, pool_id: Uuid) -> Result<(), ApiError>
         }
     }
     Ok(())
+}
+
+/// Reconcile every pool (the background loop). One pool's failure does not stop the others.
+pub(crate) async fn reconcile_all(state: &AppState) {
+    let ids: Vec<Uuid> = match crate::db::query_scalar("SELECT id FROM desktop_pools LIMIT 500")
+        .fetch_all(&state.pool)
+        .await
+    {
+        Ok(ids) => ids,
+        Err(e) => {
+            tracing::warn!("desktop pools: listing pools failed: {e}");
+            return;
+        }
+    };
+    for id in ids {
+        if let Err(e) = reconcile_pool(state, id).await {
+            tracing::warn!(pool = %id, "desktop pool reconcile failed: {}", e.message);
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

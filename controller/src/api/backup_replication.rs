@@ -330,31 +330,29 @@ pub struct RunResult {
     pub skipped: Vec<String>,
 }
 
-/// Replicate each VM's newest completed backup that has no verified or running copy on the target.
-/// Meant for a cron job.
-pub async fn run(
-    State(state): State<AppState>,
-    Extension(actor): Extension<AuthUser>,
-    Json(body): Json<RunBody>,
-) -> Result<Json<RunResult>, ApiError> {
-    require_operator(&actor)?;
-    let limit = body.limit.unwrap_or(10).clamp(1, 50) as usize;
-    target_dest(&state, body.target_id).await?;
-    // Newest completed file backup per VM (Atlas backups have no local path).
-    let sql = candidates_sql(body.vm_id.is_some());
+/// Start copies of each VM's newest completed file backup that has no verified or running copy on
+/// the target, at most `limit`. Shared by the `run` call and the background loop.
+pub(crate) async fn start_newest(
+    state: &AppState,
+    target_id: Uuid,
+    vm_id: Option<Uuid>,
+    limit: usize,
+) -> Result<RunResult, ApiError> {
+    target_dest(state, target_id).await?;
+    let sql = candidates_sql(vm_id.is_some());
     let mut query = crate::db::query_as::<_, (Uuid,)>(&sql);
-    if let Some(v) = body.vm_id {
+    if let Some(v) = vm_id {
         query = query.bind(v);
     }
-    let candidates: Vec<(Uuid,)> = query.bind(body.target_id).fetch_all(&state.pool).await?;
+    let candidates: Vec<(Uuid,)> = query.bind(target_id).fetch_all(&state.pool).await?;
     let mut started = Vec::new();
     let mut skipped = Vec::new();
     for (backup_id,) in candidates {
         if started.len() >= limit {
             break;
         }
-        match job_for(&state, backup_id, body.target_id).await {
-            Ok(job) => match begin(&state, backup_id, body.target_id).await {
+        match job_for(state, backup_id, target_id).await {
+            Ok(job) => match begin(state, backup_id, target_id).await {
                 Ok((row, true)) => {
                     started.push(row.id);
                     tokio::spawn(run_push(state.clone(), row.id, job));
@@ -365,16 +363,71 @@ pub async fn run(
             Err(e) => skipped.push(format!("{backup_id}: {}", e.message)),
         }
     }
+    Ok(RunResult { started, skipped })
+}
+
+/// Replicate each VM's newest completed backup that has no verified or running copy on the target.
+/// Meant for a cron job; set `auto_replicate` on the target to have the controller do it.
+pub async fn run(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Json(body): Json<RunBody>,
+) -> Result<Json<RunResult>, ApiError> {
+    require_operator(&actor)?;
+    let limit = body.limit.unwrap_or(10).clamp(1, 50) as usize;
+    let result = start_newest(&state, body.target_id, body.vm_id, limit).await?;
     write_audit(
         &state,
         &actor.username,
         "backup.replicate_run",
         "backup_target",
         Some(body.target_id),
-        serde_json::json!({ "started": started.len(), "skipped": skipped.len() }),
+        serde_json::json!({ "started": result.started.len(), "skipped": result.skipped.len() }),
     )
     .await?;
-    Ok(Json(RunResult { started, skipped }))
+    Ok(Json(result))
+}
+
+/// Never run more than this many copies to one target at once from the background loop.
+const AUTO_MAX_RUNNING: i64 = 3;
+
+/// For every S3 target whose config has `"auto_replicate": true`, copy the newest backups that are
+/// not yet replicated, keeping at most [`AUTO_MAX_RUNNING`] copies in flight per target.
+pub(crate) async fn replicate_automatically(state: &AppState) {
+    let targets: Vec<(Uuid, serde_json::Value)> =
+        match crate::db::query_as("SELECT id, config_json FROM backup_targets WHERE kind = 's3'")
+            .fetch_all(&state.pool)
+            .await
+        {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!("backup replication: listing targets failed: {e}");
+                return;
+            }
+        };
+    for (target_id, cfg) in targets {
+        if cfg
+            .get("auto_replicate")
+            .and_then(serde_json::Value::as_bool)
+            != Some(true)
+        {
+            continue;
+        }
+        let running: i64 = crate::db::query_scalar(
+            "SELECT COUNT(*) FROM backup_replicas WHERE target_id = ? AND status = 'running'",
+        )
+        .bind(target_id)
+        .fetch_one(&state.pool)
+        .await
+        .unwrap_or(AUTO_MAX_RUNNING);
+        if running >= AUTO_MAX_RUNNING {
+            continue;
+        }
+        let room = (AUTO_MAX_RUNNING - running) as usize;
+        if let Err(e) = start_newest(state, target_id, None, room).await {
+            tracing::warn!(target = %target_id, "auto replication failed: {}", e.message);
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

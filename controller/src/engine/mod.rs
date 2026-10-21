@@ -6,6 +6,7 @@ pub mod alert_evaluator;
 pub mod adaptive_actuator;
 pub mod atlas_bridge;
 pub mod atlas_vm;
+pub mod automation;
 pub mod backup_verifier;
 pub mod baremetal;
 pub mod baremetal_alloc;
