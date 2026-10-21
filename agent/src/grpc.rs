@@ -2328,6 +2328,13 @@ impl HostAgent for AgentService {
         }
     }
 
+    async fn k3s_node(
+        &self,
+        request: Request<K3sNodeRequest>,
+    ) -> Result<Response<K3sNodeResponse>, Status> {
+        Ok(Response::new(crate::k3s::handle(request.into_inner()).await))
+    }
+
     async fn delete_load_balancer(
         &self,
         request: Request<DeleteLoadBalancerRequest>,

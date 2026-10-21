@@ -1691,3 +1691,56 @@ mod host_token_tests {
         assert_ne!(token_for("10.9.9.9:50051").as_deref(), Some("mat-own"));
     }
 }
+
+/// One k3s node operation on a host (see `machina_core::k3s_node`). The agent refuses unless the
+/// host opted in with `MACHINA_AGENT_K3S_ENABLED=1`.
+#[derive(Debug, Clone, Default)]
+pub struct K3sNodeCall {
+    pub action: String,
+    pub version: String,
+    pub server_url: String,
+    pub token: String,
+    pub node_name: String,
+    pub advertise_address: String,
+    pub install_url: String,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct K3sNodeResult {
+    pub node_token: String,
+    pub kubeconfig: String,
+    pub version: String,
+    pub active: bool,
+    pub message: String,
+}
+
+pub async fn k3s_node(addr: &str, call: K3sNodeCall) -> anyhow::Result<K3sNodeResult> {
+    let mut client = connect(addr).await?;
+    let resp = client
+        .k3s_node(K3sNodeRequest {
+            action: call.action,
+            version: call.version,
+            server_url: call.server_url,
+            token: call.token,
+            node_name: call.node_name,
+            advertise_address: call.advertise_address,
+            cluster_cidr: String::new(),
+            service_cidr: String::new(),
+            install_url: call.install_url,
+        })
+        .await?
+        .into_inner();
+    if resp.ok {
+        Ok(K3sNodeResult {
+            node_token: resp.node_token,
+            kubeconfig: resp.kubeconfig,
+            version: resp.version,
+            active: resp.active,
+            message: resp.message,
+        })
+    } else if resp.output_tail.is_empty() {
+        anyhow::bail!(resp.message)
+    } else {
+        anyhow::bail!("{}: {}", resp.message, resp.output_tail)
+    }
+}

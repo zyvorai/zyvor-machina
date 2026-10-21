@@ -12,6 +12,7 @@ pub mod fluxvm;
 pub mod grpc;
 pub mod imds;
 pub mod jwt;
+pub mod k3s;
 pub mod lbprobe;
 pub mod libvirt_invoke;
 pub mod natgw;

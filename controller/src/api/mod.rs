@@ -46,6 +46,7 @@ pub(crate) mod metric_stats;
 mod kubevirt;
 mod launchpad;
 mod load_balancers;
+mod k8s_clusters;
 mod maintenance;
 mod marketplace;
 mod mcp;
@@ -1655,6 +1656,21 @@ pub fn router(state: AppState) -> Router {
             post(network_segments::bind_network_to_segment),
         )
         .route("/api/v1/failure-domains", get(placement::failure_domains))
+        .route(
+            "/api/v1/k8s-clusters",
+            get(k8s_clusters::list).post(k8s_clusters::create),
+        )
+        .route(
+            "/api/v1/k8s-clusters/{id}",
+            get(k8s_clusters::get).delete(k8s_clusters::delete),
+        )
+        .route("/api/v1/k8s-clusters/{id}/nodes", post(k8s_clusters::add_node))
+        .route(
+            "/api/v1/k8s-clusters/{id}/nodes/{node_id}",
+            delete(k8s_clusters::remove_node),
+        )
+        .route("/api/v1/k8s-clusters/{id}/upgrade", post(k8s_clusters::upgrade))
+        .route("/api/v1/k8s-clusters/{id}/kubeconfig", get(k8s_clusters::kubeconfig))
         .route(
             "/api/v1/placement/recommendations",
             get(placement::list_recommendations),

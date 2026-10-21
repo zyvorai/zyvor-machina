@@ -75,6 +75,7 @@ service HostAgent {
   rpc DeletePortForward(DeletePortForwardRequest) returns (DeletePortForwardResponse);
   rpc ListHostGpus(ListHostGpusRequest) returns (ListHostGpusResponse);
   rpc SetLoadBalancer(SetLoadBalancerRequest) returns (SetLoadBalancerResponse);
+  rpc K3sNode(K3sNodeRequest) returns (K3sNodeResponse);
   rpc DeleteLoadBalancer(DeleteLoadBalancerRequest) returns (DeleteLoadBalancerResponse);
   // Restore points and forks on qcow2 backing chains (machina_core::libvirt::fork).
   rpc ForkVm(ForkVmRequest) returns (ForkVmResponse);
@@ -1111,3 +1112,30 @@ message AbortFluxvmMigrationRequest {
 }
 
 message AbortFluxvmMigrationResponse {}
+
+// k3s node operations (install a server, join an agent, upgrade, remove, status). Off unless the
+// host sets MACHINA_AGENT_K3S_ENABLED=1; the join token travels only in this message and the
+// installer's environment.
+message K3sNodeRequest {
+  string action = 1; // install_server | join_agent | upgrade | remove | status
+  string version = 2;
+  string server_url = 3;
+  string token = 4;
+  string node_name = 5;
+  string advertise_address = 6;
+  string cluster_cidr = 7;
+  string service_cidr = 8;
+  string install_url = 9;
+}
+
+message K3sNodeResponse {
+  bool ok = 1;
+  string message = 2;
+  // Set by install_server: the join token and the admin kubeconfig (127.0.0.1 server address).
+  string node_token = 3;
+  string kubeconfig = 4;
+  // Set by status: the installed k3s version and whether its service is active.
+  string version = 5;
+  bool active = 6;
+  string output_tail = 7;
+}
