@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use machina_core::libvirt::guest_agent::GuestIpAddress;
 use machina_core::libvirt::{
     boot, capabilities, cdrom, domain, domain_job, emulator, extras, filesystem, guest_agent,
-    guest_agent_provision, guest_health, guest_repair, host_cpu, hostdev_pci, migrate, net_xml,
+    guest_agent_provision, guest_health, guest_repair, host_cpu, hostdev_pci, mdev, migrate, net_xml,
     network, node_device, numa_tune, nwfilter, save_restore, secret, storage,
 };
 use machina_core::{LibvirtError, LibvirtManager};
@@ -1054,6 +1054,102 @@ async fn detach_pci_hostdev_handler(
     })))
 }
 
+// ── Mediated devices (vGPU partitions) ──────────────────────────────
+
+#[derive(serde::Deserialize)]
+struct MdevCreateBody {
+    parent: String,
+    #[serde(rename = "type")]
+    type_id: String,
+    #[serde(default)]
+    uuid: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct MdevUuidBody {
+    uuid: String,
+}
+
+/// Partition types each mdev-capable GPU offers, and the partitions that exist.
+async fn list_mdev_handler(
+    Extension(actor): Extension<RequestActor>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    require_usb_pci(&actor)?;
+    let root = std::path::Path::new(mdev::SYSFS_ROOT);
+    Ok(Json(serde_json::json!({
+        "types": mdev::list_types(root),
+        "instances": mdev::list_instances(root),
+    })))
+}
+
+async fn create_mdev_handler(
+    Extension(actor): Extension<RequestActor>,
+    Json(req): Json<MdevCreateBody>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    require_write(&actor, "vms:write")?;
+    require_usb_pci(&actor)?;
+    let uuid = mdev::create(
+        std::path::Path::new(mdev::SYSFS_ROOT),
+        &req.parent,
+        &req.type_id,
+        req.uuid.as_deref(),
+    )?;
+    Ok(Json(serde_json::json!({
+        "status": "mdev_created", "uuid": uuid, "parent": req.parent, "type": req.type_id,
+    })))
+}
+
+async fn delete_mdev_handler(
+    Extension(actor): Extension<RequestActor>,
+    Path(uuid): Path<String>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    require_write(&actor, "vms:write")?;
+    require_usb_pci(&actor)?;
+    mdev::remove(std::path::Path::new(mdev::SYSFS_ROOT), &uuid)?;
+    Ok(Json(serde_json::json!({ "status": "mdev_removed", "uuid": uuid })))
+}
+
+async fn attach_mdev_handler(
+    Extension(actor): Extension<RequestActor>,
+    State(manager): State<LibvirtManager>,
+    Query(conn_q): Query<ConnQuery>,
+    Path(name): Path<String>,
+    Json(req): Json<MdevUuidBody>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    require_write(&actor, "vms:write")?;
+    require_usb_pci(&actor)?;
+    let uuid = req.uuid.clone();
+    let name2 = name.clone();
+    spawn_libvirt_actor(manager, Some(&actor), conn_q, move |conn| {
+        mdev::attach_mdev(conn, &name2, &uuid)
+    })
+    .await?;
+    Ok(Json(
+        serde_json::json!({ "status": "mdev_attached", "name": name, "uuid": req.uuid }),
+    ))
+}
+
+async fn detach_mdev_handler(
+    Extension(actor): Extension<RequestActor>,
+    State(manager): State<LibvirtManager>,
+    Query(conn_q): Query<ConnQuery>,
+    Path(name): Path<String>,
+    Json(req): Json<MdevUuidBody>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    require_write(&actor, "vms:write")?;
+    require_usb_pci(&actor)?;
+    let uuid = req.uuid.clone();
+    let name2 = name.clone();
+    let outcome = spawn_libvirt_actor(manager, Some(&actor), conn_q, move |conn| {
+        mdev::detach_mdev(conn, &name2, &uuid)
+    })
+    .await?;
+    Ok(Json(serde_json::json!({
+        "status": "mdev_detached", "name": name, "uuid": req.uuid,
+        "live_removed": outcome.live_removed,
+    })))
+}
+
 async fn detach_nodedev_handler(
     Extension(actor): Extension<RequestActor>,
     State(manager): State<LibvirtManager>,
@@ -1332,6 +1428,10 @@ pub fn advanced_routes() -> Router<LibvirtManager> {
             "/vms/{name}/hostdev/pci/detach",
             post(detach_pci_hostdev_handler),
         )
+        .route("/host/mdev", get(list_mdev_handler).post(create_mdev_handler))
+        .route("/host/mdev/{uuid}", delete(delete_mdev_handler))
+        .route("/vms/{name}/hostdev/mdev/attach", post(attach_mdev_handler))
+        .route("/vms/{name}/hostdev/mdev/detach", post(detach_mdev_handler))
         .route("/host/nodedev/{name}/detach", post(detach_nodedev_handler))
         .route(
             "/host/nodedev/{name}/reattach",
