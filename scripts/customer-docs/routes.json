@@ -186,6 +186,31 @@
       "category": "Platform"
     },
     {
+      "label": "Backup Replication",
+      "path": "/platform/backup-replication",
+      "category": "Platform"
+    },
+    {
+      "label": "Failure Domains",
+      "path": "/platform/failure-domains",
+      "category": "Platform"
+    },
+    {
+      "label": "Kubernetes Clusters",
+      "path": "/platform/k8s-clusters",
+      "category": "Platform"
+    },
+    {
+      "label": "Desktop Pools",
+      "path": "/platform/desktop-pools",
+      "category": "Platform"
+    },
+    {
+      "label": "Migration Waves",
+      "path": "/platform/migration-waves",
+      "category": "Platform"
+    },
+    {
       "label": "Disaster Recovery",
       "path": "/platform/placement",
       "category": "Platform"
