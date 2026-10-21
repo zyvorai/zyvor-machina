@@ -48,6 +48,7 @@ mod launchpad;
 mod load_balancers;
 mod k8s_clusters;
 mod maintenance;
+mod migration_waves;
 mod marketplace;
 mod mcp;
 mod tags;
@@ -1718,6 +1719,26 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/migrations",
             get(migration_jobs::list_migration_jobs),
+        )
+        .route(
+            "/api/v1/migration-waves",
+            get(migration_waves::list).post(migration_waves::create),
+        )
+        .route(
+            "/api/v1/migration-waves/{id}",
+            get(migration_waves::get).delete(migration_waves::delete),
+        )
+        .route(
+            "/api/v1/migration-waves/{id}/advance",
+            post(migration_waves::advance),
+        )
+        .route(
+            "/api/v1/migration-waves/{id}/cancel",
+            post(migration_waves::cancel),
+        )
+        .route(
+            "/api/v1/migration-waves/{id}/items/{item_id}/cutover",
+            post(migration_waves::cutover),
         )
         .route("/api/v1/transiva/status", get(transiva::status))
         .route("/api/v1/transiva/providers", get(transiva::providers))
