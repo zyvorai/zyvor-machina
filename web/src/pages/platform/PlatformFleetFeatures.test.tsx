@@ -20,6 +20,7 @@ vi.mock('../../api/platform', () => ({
 }))
 vi.mock('../../api/platformFleetFeatures', () => ({
   getFailureDomains: vi.fn(),
+  getWitnessStatus: vi.fn(),
   listDesktopPools: vi.fn(),
   getDesktopPool: vi.fn(),
   createDesktopPool: vi.fn(),
@@ -70,16 +71,21 @@ describe('PlatformFailureDomains', () => {
         },
       ],
     })
+    vi.mocked(api.getWitnessStatus).mockResolvedValue({
+      configured: true, mode: 'any', witnesses: ['witness.example:8443'], reachable: 0, allowed: false,
+    })
     render(<MemoryRouter><PlatformFailureDomains /></MemoryRouter>)
     await waitFor(() => expect(screen.getByText('Rack loss is not covered')).toBeTruthy())
     expect(screen.getByText('dc1/r1')).toBeTruthy()
     expect(screen.getByText('dc1/r2')).toBeTruthy()
     expect(screen.getByText(/short by 64\.0 GiB/)).toBeTruthy()
     expect(screen.getByText(/Losing dc1\/r2/)).toBeTruthy()
+    expect(screen.getByText(/HA is paused: 0 of 1 witness/)).toBeTruthy()
   })
 
   it('explains how to define racks when there are none', async () => {
     vi.mocked(api.getFailureDomains).mockResolvedValue({ rack_loss_tolerant: false, unassigned_hosts: 3, findings: [], domains: [] })
+    vi.mocked(api.getWitnessStatus).mockResolvedValue({ configured: false, mode: 'any', witnesses: [], reachable: 0, allowed: true })
     render(<MemoryRouter><PlatformFailureDomains /></MemoryRouter>)
     await waitFor(() => expect(screen.getByText('No racks labelled')).toBeTruthy())
   })

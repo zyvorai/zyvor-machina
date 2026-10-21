@@ -1659,6 +1659,7 @@ pub fn router(state: AppState) -> Router {
             post(network_segments::bind_network_to_segment),
         )
         .route("/api/v1/failure-domains", get(placement::failure_domains))
+        .route("/api/v1/ha/witness", get(placement::witness_status))
         .route(
             "/api/v1/desktop-pools",
             get(desktop_pools::list).post(desktop_pools::create),
