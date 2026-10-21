@@ -141,14 +141,7 @@ pub fn detach_disk(
     // fixes. Determine the real type from the domain's current XML instead of
     // assuming file-backed.
     let current_xml = domain.get_xml_desc(0).unwrap_or_default();
-    let disk_type = if super::domain::collect_network_disk_targets(&current_xml)
-        .iter()
-        .any(|t| t == target)
-    {
-        "network"
-    } else {
-        "file"
-    };
+    let disk_type = disk_type_for_target(&current_xml, target);
 
     let xml = format!(
         r#"<disk type='{disk_type}' device='disk'>
@@ -178,6 +171,25 @@ pub fn detach_disk(
 }
 
 /// Does `<target dev='{target}' .../>` (either quote style) appear anywhere in `xml`?
+/// The `type` of the disk whose target is `target` in a domain's XML, limited to the kinds libvirt
+/// accepts in a detach (`file`, `block`, `network`, `volume`, `dir`); anything else, or no such disk,
+/// is treated as `file`, as before. Matching the real type matters: a detach whose `type` differs
+/// from the attached disk can report success while the live domain keeps the disk.
+pub(crate) fn disk_type_for_target(xml: &str, target: &str) -> &'static str {
+    for block in crate::xml::split_blocks(xml, "disk") {
+        if crate::xml::extract_attr(&block, "target", "dev").as_deref() == Some(target) {
+            return match crate::xml::extract_attr(&block, "disk", "type").as_deref() {
+                Some("network") => "network",
+                Some("block") => "block",
+                Some("volume") => "volume",
+                Some("dir") => "dir",
+                _ => "file",
+            };
+        }
+    }
+    "file"
+}
+
 pub(crate) fn target_dev_present(xml: &str, target: &str) -> bool {
     xml.contains(&format!("target dev='{target}'"))
         || xml.contains(&format!("target dev=\"{target}\""))
@@ -404,4 +416,31 @@ fn extract_attr(xml: &str, tag: &str, attr: &str) -> Option<String> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::disk_type_for_target;
+
+    const XML: &str = "<domain><devices>\
+<disk type='file' device='disk'><driver name='qemu' type='qcow2'/><source file='/var/lib/libvirt/images/a.qcow2'/><target dev='vda' bus='virtio'/></disk>\
+<disk type='network' device='disk'><source protocol='rbd' name='pool/vol'/><target dev='vdb' bus='virtio'/></disk>\
+<disk type='block' device='disk'><driver name='qemu' type='raw'/><source dev='/dev/disk/by-path/ip-10.0.0.20:3260-iscsi-iqn.x:d-lun-1'/><target dev='vdc' bus='virtio'/></disk>\
+<disk type='file' device='cdrom'><source file='/iso/x.iso'/><target dev='sda' bus='sata'/></disk>\
+</devices></domain>";
+
+    #[test]
+    fn detach_uses_the_real_disk_type() {
+        assert_eq!(disk_type_for_target(XML, "vda"), "file");
+        assert_eq!(disk_type_for_target(XML, "vdb"), "network");
+        assert_eq!(disk_type_for_target(XML, "vdc"), "block");
+        assert_eq!(disk_type_for_target(XML, "sda"), "file");
+    }
+
+    #[test]
+    fn an_unknown_target_or_odd_type_falls_back_to_file() {
+        assert_eq!(disk_type_for_target(XML, "vdz"), "file");
+        let odd = "<domain><devices><disk type='nvme' device='disk'><target dev='vdd'/></disk></devices></domain>";
+        assert_eq!(disk_type_for_target(odd, "vdd"), "file");
+    }
 }

@@ -433,6 +433,11 @@ pub fn create_pool(
     target_path: &str,
 ) -> Result<(), LibvirtError> {
     crate::validate::validate_name(name)?;
+    if pool_type == "iscsi" {
+        return Err(LibvirtError::Invalid(
+            "an iSCSI pool needs a portal and target: use POST /api/v1/storage/iscsi-pools".into(),
+        ));
+    }
 
     let xml = match pool_type {
         "dir" => format!(
