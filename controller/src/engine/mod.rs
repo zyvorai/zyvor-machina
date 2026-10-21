@@ -65,6 +65,7 @@ pub mod load_balancer;
 pub mod migrate_precheck;
 pub mod adaptive_migration;
 pub mod migration_oracle;
+pub mod migration_waves;
 pub mod network_overlay;
 pub mod network_sync;
 pub mod observability;

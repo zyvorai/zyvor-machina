@@ -35,8 +35,8 @@ e1000e NIC, UEFI). After deploy, use the RDP console from the VM page.
 
 ## Moving many VMs
 
-Batch exports (`transiva-export -batch vms.txt`) and Transiva's scheduler cover waves. Machina does not yet plan waves or track
-cutover per application inside the product; keep the wave list in Transiva or your ticketing system.
+Plan the batch as a [migration wave](./migration-waves.md): Machina starts the VMs a few at a time through Transiva, follows each
+job and keeps a cutover checklist. For a one-off list, Transiva's own batch export (`transiva-export -batch vms.txt`) also works.
 
 ## What to know
 

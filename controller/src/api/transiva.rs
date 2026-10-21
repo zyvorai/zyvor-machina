@@ -28,7 +28,7 @@ fn endpoint() -> Result<String, ApiError> {
     Ok(raw.to_string())
 }
 
-async fn call(method: Method, path: &str, body: Option<Value>) -> Result<Json<Value>, ApiError> {
+pub(crate) async fn call(method: Method, path: &str, body: Option<Value>) -> Result<Json<Value>, ApiError> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(
             std::env::var("MACHINA_TRANSIVA_TIMEOUT_SECS")
