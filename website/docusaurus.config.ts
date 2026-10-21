@@ -46,7 +46,13 @@ const config: Config = {
           sidebarPath: './sidebars.ts',
           editUrl: `${REPO}/tree/main/website/`,
         },
-        blog: false,
+        blog: {
+          path: 'blog',
+          routeBasePath: 'blog',
+          showReadingTime: true,
+          blogSidebarCount: 'ALL',
+          feedOptions: {type: ['rss', 'atom'], title: 'Machina blog'},
+        },
         theme: {
           customCss: ['./src/css/custom.css', './src/css/machina.css'],
         },
@@ -60,7 +66,7 @@ const config: Config = {
       '@easyops-cn/docusaurus-search-local',
       {
         hashed: true,
-        indexBlog: false,
+        indexBlog: true,
         docsRouteBasePath: '/docs',
         highlightSearchTermsOnTargetPage: true,
       },
@@ -85,7 +91,18 @@ const config: Config = {
       },
       items: [
         {type: 'docSidebar', sidebarId: 'docsSidebar', position: 'left', label: 'Docs'},
-        {to: '/vs-openstack', label: 'vs OpenStack', position: 'left'},
+        {
+          label: 'Compare',
+          position: 'left',
+          items: [
+            {to: '/vs-azure-local', label: 'vs Azure Local'},
+            {to: '/vs-vmware', label: 'vs VMware'},
+            {to: '/vs-nutanix', label: 'vs Nutanix'},
+            {to: '/vs-proxmox', label: 'vs Proxmox VE'},
+            {to: '/vs-openstack', label: 'vs OpenStack'},
+          ],
+        },
+        {to: '/blog', label: 'Blog', position: 'left'},
         {to: '/gallery', label: 'Gallery', position: 'left'},
         {to: '/resources', label: 'Resources', position: 'left'},
         {href: REPO, label: 'GitHub', position: 'right'},
@@ -109,6 +126,8 @@ const config: Config = {
             {label: 'Security', to: '/docs/operations/security'},
             {label: 'Troubleshooting', to: '/docs/operations/troubleshooting'},
             {label: 'Machina vs OpenStack', to: '/vs-openstack'},
+            {label: 'Machina vs Azure Local', to: '/vs-azure-local'},
+            {label: 'Blog', to: '/blog'},
           ],
         },
         {
