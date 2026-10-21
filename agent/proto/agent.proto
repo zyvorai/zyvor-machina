@@ -76,6 +76,7 @@ service HostAgent {
   rpc ListHostGpus(ListHostGpusRequest) returns (ListHostGpusResponse);
   rpc SetLoadBalancer(SetLoadBalancerRequest) returns (SetLoadBalancerResponse);
   rpc K3sNode(K3sNodeRequest) returns (K3sNodeResponse);
+  rpc ReplicateBackup(ReplicateBackupRequest) returns (ReplicateBackupResponse);
   rpc DeleteLoadBalancer(DeleteLoadBalancerRequest) returns (DeleteLoadBalancerResponse);
   // Restore points and forks on qcow2 backing chains (machina_core::libvirt::fork).
   rpc ForkVm(ForkVmRequest) returns (ForkVmResponse);
@@ -1138,4 +1139,23 @@ message K3sNodeResponse {
   string version = 5;
   bool active = 6;
   string output_tail = 7;
+}
+
+// Copy a backup (file or multi-disk directory) to or from an S3-compatible store with the host's
+// aws CLI and credentials, and verify the sizes. The local path must be inside MACHINA_BACKUP_DIR.
+message ReplicateBackupRequest {
+  string action = 1; // push | fetch
+  string local_path = 2; // push: the backup to upload; fetch: where to put it (must not exist)
+  string bucket = 3;
+  string key = 4; // object key (a file) or key prefix (a directory)
+  string endpoint_url = 5;
+}
+
+message ReplicateBackupResponse {
+  bool ok = 1;
+  string message = 2;
+  uint64 bytes = 3;
+  uint32 files = 4;
+  bool is_dir = 5;
+  string remote_uri = 6;
 }

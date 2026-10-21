@@ -2328,6 +2328,15 @@ impl HostAgent for AgentService {
         }
     }
 
+    async fn replicate_backup(
+        &self,
+        request: Request<ReplicateBackupRequest>,
+    ) -> Result<Response<ReplicateBackupResponse>, Status> {
+        Ok(Response::new(
+            crate::replicate::handle(request.into_inner()).await,
+        ))
+    }
+
     async fn k3s_node(
         &self,
         request: Request<K3sNodeRequest>,
