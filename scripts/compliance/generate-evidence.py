@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+
 """Generate a machine-readable security evidence manifest from build/test artifacts."""
 import argparse, hashlib, json, pathlib, time
 p=argparse.ArgumentParser(); p.add_argument('--root', default='.'); p.add_argument('--out', default='machina-evidence.json'); a=p.parse_args()

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+
 """Small no-mock boto3 conformance driver for the EC2/ELBv2 endpoint."""
 import os, sys
 try:
