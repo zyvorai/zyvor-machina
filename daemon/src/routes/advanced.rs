@@ -10,8 +10,8 @@ use std::collections::HashMap;
 use machina_core::libvirt::guest_agent::GuestIpAddress;
 use machina_core::libvirt::{
     boot, capabilities, cdrom, domain, domain_job, emulator, extras, filesystem, guest_agent,
-    guest_agent_provision, guest_health, guest_repair, host_cpu, hostdev_pci, mdev, migrate, net_xml,
-    network, node_device, numa_tune, nwfilter, save_restore, secret, storage,
+    guest_agent_provision, guest_health, guest_repair, host_cpu, hostdev_pci, iscsi, mdev,
+    migrate, net_xml, network, node_device, numa_tune, nwfilter, save_restore, secret, storage,
 };
 use machina_core::{LibvirtError, LibvirtManager};
 
@@ -1150,6 +1150,136 @@ async fn detach_mdev_handler(
     })))
 }
 
+// ── iSCSI storage ───────────────────────────────────────────────────
+
+#[derive(serde::Deserialize)]
+struct IscsiDiscoverBody {
+    host: String,
+    #[serde(default)]
+    port: Option<u16>,
+}
+
+/// Ask an iSCSI portal which targets it offers (runs `iscsiadm` on this host).
+async fn iscsi_discover_handler(
+    Extension(actor): Extension<RequestActor>,
+    Json(req): Json<IscsiDiscoverBody>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    require_write(&actor, "storage:write")?;
+    let port = req.port.unwrap_or(iscsi::DEFAULT_PORT);
+    let host = req.host.clone();
+    let targets = tokio::task::spawn_blocking(move || iscsi::discover(&host, port))
+        .await
+        .map_err(|e| AppError::from(LibvirtError::Internal(format!("Task failed: {e}"))))??;
+    Ok(Json(serde_json::json!({
+        "portal": format!("{}:{port}", req.host),
+        "targets": targets,
+    })))
+}
+
+#[derive(serde::Deserialize)]
+struct CreateIscsiPoolRequest {
+    name: String,
+    host: String,
+    #[serde(default)]
+    port: Option<u16>,
+    target_iqn: String,
+    #[serde(default)]
+    initiator_iqn: Option<String>,
+    #[serde(default)]
+    chap_username: Option<String>,
+    #[serde(default)]
+    chap_secret: Option<String>,
+}
+
+/// Log in to an iSCSI target and expose its LUNs as a storage pool. The CHAP secret becomes a
+/// libvirt secret and is never returned.
+async fn create_iscsi_pool_handler(
+    State(manager): State<LibvirtManager>,
+    Extension(actor): Extension<RequestActor>,
+    Query(conn_q): Query<ConnQuery>,
+    Json(req): Json<CreateIscsiPoolRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    require_write(&actor, "storage:write")?;
+    let chap = match (req.chap_username.clone(), req.chap_secret.clone()) {
+        (Some(username), Some(secret)) => Some(iscsi::Chap { username, secret }),
+        (None, None) => None,
+        _ => {
+            return Err(LibvirtError::Invalid(
+                "give both chap_username and chap_secret, or neither".into(),
+            )
+            .into())
+        }
+    };
+    let spec = iscsi::IscsiSpec {
+        name: req.name.clone(),
+        host: req.host.clone(),
+        port: req.port.unwrap_or(iscsi::DEFAULT_PORT),
+        target_iqn: req.target_iqn.clone(),
+        initiator_iqn: req.initiator_iqn.clone(),
+        chap,
+    };
+    spawn_libvirt_actor(manager, Some(&actor), conn_q, move |conn| {
+        iscsi::create_iscsi_pool(conn, &spec)
+    })
+    .await?;
+    Ok(Json(serde_json::json!({
+        "status": "created",
+        "name": req.name,
+        "target_iqn": req.target_iqn,
+        "chap": req.chap_username.is_some(),
+    })))
+}
+
+#[derive(serde::Deserialize)]
+struct AttachLunBody {
+    pool: String,
+    volume: String,
+    #[serde(default = "default_lun_target")]
+    target: String,
+    #[serde(default)]
+    bus: String,
+    #[serde(default)]
+    readonly: bool,
+    #[serde(default)]
+    shareable: bool,
+}
+
+fn default_lun_target() -> String {
+    "vdb".to_string()
+}
+
+/// Attach one LUN of an iSCSI pool to a VM as a raw block disk. Detach it with the normal disk
+/// detach, using the same `target`.
+async fn attach_lun_handler(
+    Extension(actor): Extension<RequestActor>,
+    State(manager): State<LibvirtManager>,
+    Query(conn_q): Query<ConnQuery>,
+    Path(name): Path<String>,
+    Json(req): Json<AttachLunBody>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    require_write(&actor, "vms:write")?;
+    require_write(&actor, "storage:write")?;
+    let (vm, pool, volume, target, bus) = (
+        name.clone(),
+        req.pool.clone(),
+        req.volume.clone(),
+        req.target.clone(),
+        req.bus.clone(),
+    );
+    let (readonly, shareable) = (req.readonly, req.shareable);
+    spawn_libvirt_actor(manager, Some(&actor), conn_q, move |conn| {
+        iscsi::attach_lun(conn, &vm, &pool, &volume, &target, &bus, readonly, shareable)
+    })
+    .await?;
+    Ok(Json(serde_json::json!({
+        "status": "lun_attached",
+        "name": name,
+        "pool": req.pool,
+        "volume": req.volume,
+        "target": req.target,
+    })))
+}
+
 async fn detach_nodedev_handler(
     Extension(actor): Extension<RequestActor>,
     State(manager): State<LibvirtManager>,
@@ -1428,6 +1558,9 @@ pub fn advanced_routes() -> Router<LibvirtManager> {
             "/vms/{name}/hostdev/pci/detach",
             post(detach_pci_hostdev_handler),
         )
+        .route("/host/iscsi/discover", post(iscsi_discover_handler))
+        .route("/storage/iscsi-pools", post(create_iscsi_pool_handler))
+        .route("/vms/{name}/disks/lun", post(attach_lun_handler))
         .route("/host/mdev", get(list_mdev_handler).post(create_mdev_handler))
         .route("/host/mdev/{uuid}", delete(delete_mdev_handler))
         .route("/vms/{name}/hostdev/mdev/attach", post(attach_mdev_handler))

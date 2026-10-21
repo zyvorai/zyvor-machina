@@ -35,6 +35,7 @@ pub mod host_cpu;
 pub mod host_network;
 pub mod host_sysctl;
 pub mod hostdev_pci;
+pub mod iscsi;
 pub mod linux_guestkit;
 pub mod mdev;
 pub mod metrics;
