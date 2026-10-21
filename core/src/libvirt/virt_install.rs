@@ -285,9 +285,20 @@ pub fn create_vm_virt_install(
         args.push("--noautoconsole".into());
     }
 
-    if firmware == "uefi" {
+    super::trusted_launch::validate(req.secure_boot, req.vtpm, firmware)?;
+    super::trusted_launch::preflight(req.secure_boot, req.vtpm)?;
+    if req.secure_boot {
+        args.push("--boot".into());
+        args.push(super::trusted_launch::VIRT_INSTALL_SECURE_BOOT.into());
+        args.push("--features".into());
+        args.push("smm=on".into());
+    } else if firmware == "uefi" {
         args.push("--boot".into());
         args.push("uefi".into());
+    }
+    if req.vtpm {
+        args.push("--tpm".into());
+        args.push(super::trusted_launch::VIRT_INSTALL_TPM.into());
     }
 
     // NIC (always one libvirt network; PXE adds a second `--network` below.)

@@ -241,6 +241,9 @@ fn create_vm_libvirt_xml(
     let gt = if gt.is_empty() { "vnc" } else { gt };
     crate::validate::validate_graphics_type(gt)?;
 
+    super::trusted_launch::validate(req.secure_boot, req.vtpm, firmware)?;
+    super::trusted_launch::preflight(req.secure_boot, req.vtpm)?;
+
     if firmware == "uefi" && find_ovmf_code().is_none() {
         return Err(LibvirtError::Operation(
                 "UEFI firmware (OVMF) not found. Install edk2-ovmf (Fedora/RHEL) or ovmf (Debian/Ubuntu).".to_string()
@@ -609,7 +612,9 @@ fn generate_domain_xml(
     let is_uefi = firmware == "uefi";
     let bios_boot_dev = if !iso_path.is_empty() { "cdrom" } else { "hd" };
 
-    let os_xml = if is_uefi {
+    let os_xml = if req.secure_boot {
+        super::trusted_launch::SECURE_BOOT_OS_XML.to_string()
+    } else if is_uefi {
         let ovmf_code =
             find_ovmf_code().unwrap_or_else(|| "/usr/share/edk2/ovmf/OVMF_CODE.fd".to_string());
         let vars_template = find_ovmf_vars_template();
@@ -713,6 +718,16 @@ fn generate_domain_xml(
     // rejects any live increase. Headroom is 4x capped at 16 (QEMU reserves only light
     // per-vCPU state for the ceiling), never below the requested count.
     let vcpu_max = vcpu_max_for(req.vcpus);
+    let smm_xml = if req.secure_boot {
+        format!("\n    {}", super::trusted_launch::SMM_FEATURE_XML)
+    } else {
+        String::new()
+    };
+    let tpm_xml = if req.vtpm {
+        super::trusted_launch::TPM_DEVICE_XML
+    } else {
+        ""
+    };
     format!(
         r#"<domain type='kvm'>
   <name>{name}</name>
@@ -723,7 +738,7 @@ fn generate_domain_xml(
   <features>
     <acpi/>
     <apic/>
-    <vmport state='off'/>
+    <vmport state='off'/>{smm_xml}
   </features>
   <cpu mode='host-passthrough' check='none'/>
   <clock offset='utc'>
@@ -755,6 +770,7 @@ fn generate_domain_xml(
     <video>
       <model type='{video_model}' heads='1'/>
     </video>
+    {tpm_xml}
     <controller type='usb' index='0' model='qemu-xhci'/>
     <!-- Spare PCIe root ports so NIC/disk hotplug has free slots on q35.
          Without these, libvirt only creates ports for devices present at define
@@ -789,7 +805,58 @@ fn generate_domain_xml(
 
 #[cfg(test)]
 mod tests {
-    use super::vcpu_max_for;
+    use super::{generate_domain_xml, vcpu_max_for};
+    use crate::state::CreateVmRequest;
+
+    fn domain_xml(secure_boot: bool, vtpm: bool, firmware: &str) -> String {
+        let req = CreateVmRequest {
+            name: "w11".into(),
+            secure_boot,
+            vtpm,
+            firmware: firmware.into(),
+            ..Default::default()
+        };
+        generate_domain_xml(
+            &req,
+            "/var/lib/libvirt/images/w11.qcow2",
+            "qcow2",
+            firmware,
+            "",
+            "",
+            "",
+            "127.0.0.1",
+            "vnc",
+        )
+    }
+
+    #[test]
+    fn trusted_launch_adds_secure_boot_smm_and_tpm() {
+        let x = domain_xml(true, true, "uefi");
+        assert!(x.contains("<os firmware='efi'>"));
+        assert!(x.contains("name='secure-boot'"));
+        assert!(x.contains("<smm state='on'/>"));
+        assert!(x.contains("<tpm model='tpm-crb'>"));
+        // libvirt selects the firmware, so no hard-coded loader/nvram.
+        assert!(!x.contains("<loader"));
+        assert!(!x.contains("<nvram"));
+    }
+
+    #[test]
+    fn default_create_has_no_tpm_or_smm_and_keeps_the_old_uefi_block() {
+        let plain = domain_xml(false, false, "bios");
+        assert!(!plain.contains("<tpm"));
+        assert!(!plain.contains("<smm"));
+        let uefi = domain_xml(false, false, "uefi");
+        assert!(uefi.contains("<loader readonly='yes' type='pflash'>"));
+        assert!(!uefi.contains("secure-boot"));
+    }
+
+    #[test]
+    fn tpm_alone_works_with_bios() {
+        let x = domain_xml(false, true, "bios");
+        assert!(x.contains("<tpm model='tpm-crb'>"));
+        assert!(!x.contains("<smm"));
+    }
 
     #[test]
     fn vcpu_headroom_gives_room_to_hotplug_but_stays_capped() {
