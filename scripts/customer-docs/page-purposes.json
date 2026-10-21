@@ -105,5 +105,10 @@
   "/platform/hosts/finder": "Machine Finder: opens the fleet VM list in its topology lens (/platform/vms?lens=topology) to find any VM by host, network or name.",
   "/platform/alert-rules": "Threshold alert rules on VM CPU and memory: notify (via Alerts / webhooks) when a metric crosses a bound.",
   "/platform/scheduled-jobs": "Recurring controller operations from a whitelist, for example periodic host inventory refresh.",
-  "/platform/zyra/security/native-bpf": "Native eBPF: per-host machina-bpfd status, observe/enforce mode under a lease, deny/allow policies, flows, DNS, L7, load balancing, CNI and guest policy across 22 tabs."
+  "/platform/zyra/security/native-bpf": "Native eBPF: per-host machina-bpfd status, observe/enforce mode under a lease, deny/allow policies, flows, DNS, L7, load balancing, CNI and guest policy across 22 tabs.",
+  "/platform/backup-replication": "Backup Replication \u2014 copy completed backups to an S3-compatible store at another site, see which copies are verified, and fetch one back onto a host. Page at `/platform/backup-replication`.",
+  "/platform/failure-domains": "Failure Domains \u2014 racks defined by host site and rack labels, and whether HA could re-home each rack if it were lost. Page at `/platform/failure-domains`.",
+  "/platform/k8s-clusters": "Kubernetes Clusters \u2014 create, scale, upgrade and delete k3s clusters across enrolled hosts (opt-in on the controller and each host). Page at `/platform/k8s-clusters`.",
+  "/platform/desktop-pools": "Desktop Pools \u2014 clone a template VM into numbered desktops, check one out per user and recycle it on release. Page at `/platform/desktop-pools`.",
+  "/platform/migration-waves": "Migration Waves \u2014 plan a batch of VMs for Transiva, start them a few at a time, follow each job and record cutover. Page at `/platform/migration-waves`."
 }

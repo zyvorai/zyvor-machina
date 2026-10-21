@@ -93,6 +93,8 @@ export default function CreateVMPage() {
   const [diskGb, setDiskGb] = useState(20)
   const [network, setNetwork] = useState('default')
   const [firmware, setFirmware] = useState('bios')
+  const [secureBoot, setSecureBoot] = useState(false)
+  const [vtpm, setVtpm] = useState(false)
   const [osVariant, setOsVariant] = useState('')
   const [iso, setIso] = useState('')
   const [guestProfile, setGuestProfile] = useState<GuestProfile>('auto')
@@ -523,6 +525,8 @@ export default function CreateVMPage() {
       disk_gb: diskGb,
       network,
       firmware,
+      secure_boot: secureBoot && firmware === 'uefi' ? true : undefined,
+      vtpm: vtpm ? true : undefined,
       create_backend: 'virt_install',
       os_variant: osVariant.trim() || undefined,
       guest_profile: guestProfile !== 'auto' ? guestProfile : undefined,
@@ -1110,6 +1114,23 @@ export default function CreateVMPage() {
               <option value="bios">BIOS</option>
               <option value="uefi">UEFI</option>
             </select>
+          </div>
+          <div className="space-y-1">
+            <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+              <input
+                type="checkbox"
+                checked={secureBoot && firmware === 'uefi'}
+                disabled={firmware !== 'uefi'}
+                onChange={(e) => setSecureBoot(e.target.checked)}
+              />{' '}
+              Secure Boot (keys enrolled)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+              <input type="checkbox" checked={vtpm} onChange={(e) => setVtpm(e.target.checked)} /> TPM 2.0 (emulated)
+            </label>
+            <p className="text-xs text-[var(--text-muted)]">
+              Windows 11 needs both. Secure Boot requires UEFI; the host needs signed OVMF firmware and swtpm.
+            </p>
           </div>
           <div>
             <label htmlFor="guest-profile" className="block text-sm text-[var(--text-muted)] mb-1">

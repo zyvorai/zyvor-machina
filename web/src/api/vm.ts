@@ -223,6 +223,10 @@ export interface CreateVmRequest {
   virtio_win_iso?: string
   existing_disk?: string
   firmware?: string
+  /** Enforce UEFI Secure Boot with keys enrolled (needs firmware 'uefi'). */
+  secure_boot?: boolean
+  /** Add an emulated TPM 2.0 (swtpm). */
+  vtpm?: boolean
   /** Libvirt VNC listen IP (default 127.0.0.1). Use 0.0.0.0 for all interfaces (remote display; still use machina’s console proxy where applicable). */
   graphics_listen?: string
   /** `vnc` (noVNC) or `spice` (spice-html5). */
