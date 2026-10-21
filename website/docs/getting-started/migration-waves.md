@@ -28,12 +28,16 @@ curl -sk -X POST https://CTL:5093/api/v1/migration-waves -H "Authorization: Bear
 
 ## Run it
 
-Nothing runs on its own. **Advance** polls the jobs already started, then starts the next planned items, never more than
-`max_parallel` at once (1 to 20, default 3). Call it from a terminal loop or a cron job until the wave is `done`.
+**Start** a wave and the controller advances it for you every minute: it polls the jobs already started, then starts the next
+planned items, never more than `max_parallel` at once (1 to 20, default 3), and stops by itself when nothing is left. **Pause**
+stops the automatic advancing (jobs already running in Transiva keep running). You can also drive it by hand with **advance**,
+which does one poll-and-start pass.
 
 ```bash
-curl -sk -X POST https://CTL:5093/api/v1/migration-waves/<id>/advance -H "Authorization: Bearer $TOKEN" \
-  -d '{"max_parallel": 2}'
+curl -sk -X POST https://CTL:5093/api/v1/migration-waves/<id>/start -H "Authorization: Bearer $TOKEN" \
+  -d '{"max_parallel": 2}'          # the controller now advances it
+curl -sk -X POST .../migration-waves/<id>/pause     # stop advancing on its own
+curl -sk -X POST .../migration-waves/<id>/advance   # or one pass by hand
 ```
 
 An item moves `planned` → `submitted` → `running` → `completed` (or `failed`, `cancelled`) with Transiva's phase and percent. The wave
@@ -54,7 +58,7 @@ This is a record, not an action: Machina does not stop the source VM or change D
 
 ## Limits
 
-- Pacing and polling happen only when you call `advance`; there is no background scheduler yet.
+- Automatic advancing runs on the leader controller once a minute; a controller restart resumes started waves.
 - Each item is one Transiva job. Dependencies between VMs (database before app) are expressed only by order and wave.
 - No web page yet.
 - Not yet run against a live Transiva: see claims C62.

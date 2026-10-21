@@ -46,11 +46,11 @@ pub(crate) mod metric_stats;
 mod kubevirt;
 mod launchpad;
 mod load_balancers;
-mod desktop_pools;
-mod backup_replication;
+pub(crate) mod desktop_pools;
+pub(crate) mod backup_replication;
 mod k8s_clusters;
 mod maintenance;
-mod migration_waves;
+pub(crate) mod migration_waves;
 mod marketplace;
 mod mcp;
 mod tags;
@@ -1768,6 +1768,14 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/migration-waves/{id}/advance",
             post(migration_waves::advance),
+        )
+        .route(
+            "/api/v1/migration-waves/{id}/start",
+            post(migration_waves::start),
+        )
+        .route(
+            "/api/v1/migration-waves/{id}/pause",
+            post(migration_waves::pause),
         )
         .route(
             "/api/v1/migration-waves/{id}/cancel",

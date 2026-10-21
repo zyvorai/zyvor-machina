@@ -3,8 +3,8 @@
 
 use std::time::Duration;
 
-use chrono::{DateTime, Utc};
 use crate::db::DbPool;
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::state::AppState;
@@ -143,6 +143,13 @@ async fn recover_vms(state: &AppState) -> anyhow::Result<()> {
     // single least-loaded survivor.
     let mut reserved: std::collections::HashMap<Uuid, i64> = std::collections::HashMap::new();
 
+    // Anti-affinity groups by host, widened across racks, so a recovered VM lands away from a
+    // group peer and away from the rack it just lost. A failure to build it only loses the
+    // preference.
+    let anti = crate::engine::placement::anti_affinity_by_rack(&state.pool)
+        .await
+        .unwrap_or_default();
+
     for (
         vm_id,
         vm_name,
@@ -213,6 +220,17 @@ async fn recover_vms(state: &AppState) -> anyhow::Result<()> {
         .bind(failed_host)
         .fetch_all(&state.pool)
         .await?;
+        let vm_tags: Vec<String> = crate::db::query_scalar::<_, crate::db::Json<Vec<String>>>(
+            "SELECT COALESCE(tags, '[]') FROM vms WHERE id = ?",
+        )
+        .bind(vm_id)
+        .fetch_optional(&state.pool)
+        .await?
+        .map(|j| j.0)
+        .unwrap_or_default();
+        let candidates = crate::engine::failure_domains::prefer_non_conflicting(candidates, |h| {
+            crate::engine::placement::host_conflicts(&anti, h, &vm_tags)
+        });
         let dest = pick_ha_dest(&candidates, &reserved, vm_memory_mib);
 
         let Some(dest_host) = dest else {

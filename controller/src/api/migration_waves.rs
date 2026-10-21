@@ -27,6 +27,9 @@ pub struct WaveRow {
     pub description: String,
     pub planned_at: String,
     pub status: String,
+    /// When true the controller advances the wave on its own (see `start`).
+    pub auto_advance: bool,
+    pub max_parallel: i64,
     pub created_by: String,
     pub created_at: String,
     pub updated_at: String,
@@ -57,7 +60,7 @@ pub struct WaveDetail {
 }
 
 const WAVE_COLS: &str =
-    "id, name, description, planned_at, status, created_by, created_at, updated_at";
+    "id, name, description, planned_at, status, auto_advance, max_parallel, created_by, created_at, updated_at";
 const ITEM_COLS: &str = "id, wave_id, position, name, transiva_job_id, status, phase, progress_percent, message, cutover, cutover_note";
 
 async fn load(state: &AppState, id: Uuid) -> Result<WaveDetail, ApiError> {
@@ -234,24 +237,14 @@ async fn set_item(
     Ok(())
 }
 
-/// Poll the started jobs, then start the next planned items. Safe to call repeatedly.
-pub async fn advance(
-    State(state): State<AppState>,
-    Extension(actor): Extension<AuthUser>,
-    Path(id): Path<Uuid>,
-    body: Option<Json<AdvanceBody>>,
-) -> Result<Json<WaveDetail>, ApiError> {
-    require_operator(&actor)?;
-    let max_parallel = body
-        .and_then(|b| b.0.max_parallel)
-        .unwrap_or(rules::DEFAULT_PARALLEL);
-    if !(1..=rules::MAX_PARALLEL_LIMIT).contains(&max_parallel) {
-        return Err(ApiError::bad_request(format!(
-            "max_parallel must be 1 to {}",
-            rules::MAX_PARALLEL_LIMIT
-        )));
-    }
-    let detail = load(&state, id).await?;
+/// Poll the started jobs, then start the next planned items, never more than `max_parallel` in
+/// flight. Safe to call repeatedly; used by the `advance` call and by the background loop.
+pub(crate) async fn advance_wave(
+    state: &AppState,
+    id: Uuid,
+    max_parallel: u32,
+) -> Result<WaveDetail, ApiError> {
+    let detail = load(state, id).await?;
     if detail.wave.status == "cancelled" {
         return Err(ApiError::conflict(
             "the wave is cancelled",
@@ -268,12 +261,12 @@ pub async fn advance(
             Ok(Json(job)) => {
                 if let Some(v) = rules::job_view(&job) {
                     let status = rules::item_status_from_job(&v.status, &it.status);
-                    set_item(&state, it.id, &status, &v.phase, v.percent, &v.error).await?;
+                    set_item(state, it.id, &status, &v.phase, v.percent, &v.error).await?;
                 }
             }
             Err(e) => {
                 set_item(
-                    &state,
+                    state,
                     it.id,
                     &it.status,
                     &it.phase,
@@ -286,7 +279,7 @@ pub async fn advance(
     }
 
     // 2. Start what fits.
-    let current = load(&state, id).await?;
+    let current = load(state, id).await?;
     let to_start = rules::next_to_start(&states(&current.items), max_parallel);
     for item_id in to_start {
         let enc: String =
@@ -316,12 +309,12 @@ pub async fn advance(
                 .execute(&state.pool)
                 .await?;
             }
-            Err(msg) => set_item(&state, item_id, "failed", "", 0, &msg).await?,
+            Err(msg) => set_item(state, item_id, "failed", "", 0, &msg).await?,
         }
     }
 
     // 3. Wave status.
-    let after = load(&state, id).await?;
+    let after = load(state, id).await?;
     let status = rules::wave_status(&after.wave.status, &states(&after.items));
     crate::db::query(
         "UPDATE migration_waves SET status = ?, updated_at = datetime('now') WHERE id = ?",
@@ -330,16 +323,139 @@ pub async fn advance(
     .bind(id)
     .execute(&state.pool)
     .await?;
+    load(state, id).await
+}
+
+fn parallel_from(body: Option<Json<AdvanceBody>>) -> Result<u32, ApiError> {
+    let n = body
+        .and_then(|b| b.0.max_parallel)
+        .unwrap_or(rules::DEFAULT_PARALLEL);
+    if (1..=rules::MAX_PARALLEL_LIMIT).contains(&n) {
+        Ok(n)
+    } else {
+        Err(ApiError::bad_request(format!(
+            "max_parallel must be 1 to {}",
+            rules::MAX_PARALLEL_LIMIT
+        )))
+    }
+}
+
+pub async fn advance(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<Uuid>,
+    body: Option<Json<AdvanceBody>>,
+) -> Result<Json<WaveDetail>, ApiError> {
+    require_operator(&actor)?;
+    let max_parallel = parallel_from(body)?;
+    let detail = advance_wave(&state, id, max_parallel).await?;
     write_audit(
         &state,
         &actor.username,
         "migration_wave.advance",
         "migration_wave",
         Some(id),
-        serde_json::json!({ "max_parallel": max_parallel, "status": status }),
+        serde_json::json!({ "max_parallel": max_parallel, "status": detail.wave.status }),
+    )
+    .await?;
+    Ok(Json(detail))
+}
+
+/// Start a wave: the controller then advances it every minute until nothing is left to do.
+pub async fn start(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<Uuid>,
+    body: Option<Json<AdvanceBody>>,
+) -> Result<Json<WaveDetail>, ApiError> {
+    require_operator(&actor)?;
+    let max_parallel = parallel_from(body)?;
+    let wave = load(&state, id).await?;
+    if matches!(wave.wave.status.as_str(), "cancelled" | "done") {
+        return Err(ApiError::conflict(
+            format!("the wave is {}", wave.wave.status),
+            "create a new wave",
+        ));
+    }
+    crate::db::query(
+        "UPDATE migration_waves SET auto_advance = TRUE, max_parallel = ?, updated_at = datetime('now') WHERE id = ?",
+    )
+    .bind(max_parallel as i64)
+    .bind(id)
+    .execute(&state.pool)
+    .await?;
+    write_audit(
+        &state,
+        &actor.username,
+        "migration_wave.start",
+        "migration_wave",
+        Some(id),
+        serde_json::json!({ "max_parallel": max_parallel }),
+    )
+    .await?;
+    advance_wave(&state, id, max_parallel).await.map(Json)
+}
+
+/// Stop advancing on its own. Jobs already running in Transiva keep running.
+pub async fn pause(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<WaveDetail>, ApiError> {
+    require_operator(&actor)?;
+    load(&state, id).await?;
+    crate::db::query(
+        "UPDATE migration_waves SET auto_advance = FALSE, updated_at = datetime('now') WHERE id = ?",
+    )
+    .bind(id)
+    .execute(&state.pool)
+    .await?;
+    write_audit(
+        &state,
+        &actor.username,
+        "migration_wave.pause",
+        "migration_wave",
+        Some(id),
+        serde_json::json!({}),
     )
     .await?;
     load(&state, id).await.map(Json)
+}
+
+/// Waves the background loop should advance: started, not cancelled, with their pacing and
+/// whether any item still has work.
+pub(crate) const STARTED_WAVES_SQL: &str = "SELECT w.id, w.max_parallel,
+        EXISTS (SELECT 1 FROM migration_wave_items i
+                WHERE i.wave_id = w.id AND i.status IN ('planned', 'submitted', 'running')) AS has_work
+ FROM migration_waves w WHERE w.auto_advance = TRUE AND w.status <> 'cancelled' LIMIT 100";
+
+/// Advance every started wave that still has work; switch off one with nothing left. One wave's
+/// failure does not stop the others.
+pub(crate) async fn advance_started(state: &AppState) {
+    let waves: Vec<(Uuid, i64, bool)> = match crate::db::query_as(STARTED_WAVES_SQL)
+        .fetch_all(&state.pool)
+        .await
+    {
+        Ok(w) => w,
+        Err(e) => {
+            tracing::warn!("migration waves: listing started waves failed: {e}");
+            return;
+        }
+    };
+    for (id, max_parallel, has_work) in waves {
+        if !has_work {
+            let _ =
+                crate::db::query("UPDATE migration_waves SET auto_advance = FALSE WHERE id = ?")
+                    .bind(id)
+                    .execute(&state.pool)
+                    .await;
+            continue;
+        }
+        let n = (max_parallel.max(1) as u32).min(rules::MAX_PARALLEL_LIMIT);
+        if let Err(e) = advance_wave(state, id, n).await {
+            tracing::warn!(wave = %id, "migration wave advance failed: {}", e.message);
+        }
+    }
 }
 
 /// Stop: cancel the Transiva jobs in flight (best effort) and mark every unfinished item cancelled.
@@ -367,7 +483,7 @@ pub async fn cancel(
     .bind(id)
     .execute(&state.pool)
     .await?;
-    crate::db::query("UPDATE migration_waves SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?")
+    crate::db::query("UPDATE migration_waves SET status = 'cancelled', auto_advance = FALSE, updated_at = datetime('now') WHERE id = ?")
         .bind(id)
         .execute(&state.pool)
         .await?;

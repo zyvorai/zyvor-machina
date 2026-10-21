@@ -22,6 +22,9 @@ curl -sk -X PATCH https://HOST:5093/api/v1/hosts/$HOST_ID \
 - **Placement.** A VM tagged `anti-affinity:<group>` is steered away from any rack that already runs a peer, not only from
   the same host. It is a preference with the same fallback as host anti-affinity: if every rack would violate it, the VM is still
   placed. DRS rebalancing keeps its host-level rule and does not use racks.
+- **HA recovery.** When HA restarts a VM it tries hosts in racks that hold no member of the VM's anti-affinity group first, which
+  also puts it outside the rack it just lost if that rack still has online hosts. It is a preference: a rack with a peer is used
+  when nothing else has room.
 - **Readiness report.** `GET /api/v1/failure-domains` answers: if this rack went dark, could HA restart what ran in it on the
   hosts that remain?
 
@@ -46,8 +49,6 @@ hosts do not count as spare room.
 
 - No witness or quorum arbiter for the controller: losing the rack that holds the controller is a separate question. See
   [Controller HA](https://github.com/zyvorai/zyvor-machina/blob/main/docs/controller-ha.md).
-- HA recovery does not prefer another rack; when a whole rack is down, every host in it is already offline, so only survivors are
-  candidates.
 - Storage and network survival are not checked. Pair this with replicated storage that has its own failure domains.
 - Not yet run on real racks: see the claims ledger (C57).
 
