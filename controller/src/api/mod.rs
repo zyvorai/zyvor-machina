@@ -1654,6 +1654,7 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/network/segments/{id}/bind/{network_id}",
             post(network_segments::bind_network_to_segment),
         )
+        .route("/api/v1/failure-domains", get(placement::failure_domains))
         .route(
             "/api/v1/placement/recommendations",
             get(placement::list_recommendations),

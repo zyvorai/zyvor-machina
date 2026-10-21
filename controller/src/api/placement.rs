@@ -35,3 +35,14 @@ pub async fn refresh_recommendations(
     }
     Ok(Json(rows))
 }
+
+/// Rack-loss readiness: per failure domain (site/rack), whether HA could restart what runs in
+/// it on the hosts that remain. Read-only.
+pub async fn failure_domains(
+    State(state): State<AppState>,
+) -> Result<Json<crate::engine::failure_domains::FailureDomainsReport>, ApiError> {
+    crate::engine::failure_domains::load_report(&state.pool)
+        .await
+        .map(Json)
+        .map_err(|e| ApiError::internal(e.to_string()))
+}
