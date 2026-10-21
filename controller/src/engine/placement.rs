@@ -274,6 +274,11 @@ pub async fn pick_host_for_vm(
     }
 
     let anti_map = host_anti_affinity_map(pool).await?;
+    // A peer in the same rack counts like a peer on the same host (still a preference).
+    let anti_map = crate::engine::failure_domains::widen_to_domains(
+        &anti_map,
+        &crate::engine::failure_domains::host_domains(pool).await?,
+    );
     choose_host(&hosts, &anti_map, &placement_policy, vm_tags, memory_mib)
         .map(|(id, _)| id)
         .ok_or_else(|| anyhow::anyhow!("no suitable host for placement"))
@@ -356,9 +361,11 @@ pub async fn simulate_placement(
             .into_iter()
             .collect();
     let mut anti_map = host_anti_affinity_map(pool).await?;
+    let domains = crate::engine::failure_domains::host_domains(pool).await?;
     let mut out = Vec::with_capacity(asks.len());
     for a in asks {
-        match choose_host(&hosts, &anti_map, &placement_policy, &a.tags, a.memory_mib) {
+        let widened = crate::engine::failure_domains::widen_to_domains(&anti_map, &domains);
+        match choose_host(&hosts, &widened, &placement_policy, &a.tags, a.memory_mib) {
             Some((id, violates)) => {
                 if let Some(h) = hosts.iter_mut().find(|h| h.id == id) {
                     h.memory_used_mib += a.memory_mib;
