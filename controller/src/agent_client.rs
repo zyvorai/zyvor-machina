@@ -1703,6 +1703,7 @@ pub struct K3sNodeCall {
     pub node_name: String,
     pub advertise_address: String,
     pub install_url: String,
+    pub cluster_init: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -1727,6 +1728,7 @@ pub async fn k3s_node(addr: &str, call: K3sNodeCall) -> anyhow::Result<K3sNodeRe
             cluster_cidr: String::new(),
             service_cidr: String::new(),
             install_url: call.install_url,
+            cluster_init: call.cluster_init,
         })
         .await?
         .into_inner();
