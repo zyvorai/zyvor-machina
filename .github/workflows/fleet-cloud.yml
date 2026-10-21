@@ -58,6 +58,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: hypersdk/guestkit
+          # Pinned to the version Cargo.lock records; bump both together (cargo --locked fails on drift).
+          ref: v1.2.6
           path: guestkit
       - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable (pinned 2026-07-24)
         with:
