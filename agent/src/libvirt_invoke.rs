@@ -4,7 +4,7 @@
 use std::process::Command;
 
 use machina_core::libvirt::{
-    block_jobs, boot, device_tune, domain, extras, firmware, hostdev_pci, resize,
+    block_jobs, boot, device_tune, domain, extras, firmware, hostdev_pci, mdev, resize,
 };
 use machina_core::LibvirtError;
 use serde_json::Value;
@@ -239,6 +239,16 @@ pub fn vm_invoke(
         "pci.detach" => {
             let pci = payload_str(payload, "pci")?;
             let outcome = hostdev_pci::detach_pci_hostdev(conn, vm_name, &pci)?;
+            Ok(serde_json::json!({ "status": "detached", "live_removed": outcome.live_removed }))
+        }
+        "mdev.attach" => {
+            let uuid = payload_str(payload, "uuid")?;
+            mdev::attach_mdev(conn, vm_name, &uuid)?;
+            Ok(serde_json::json!({ "status": "attached" }))
+        }
+        "mdev.detach" => {
+            let uuid = payload_str(payload, "uuid")?;
+            let outcome = mdev::detach_mdev(conn, vm_name, &uuid)?;
             Ok(serde_json::json!({ "status": "detached", "live_removed": outcome.live_removed }))
         }
         "firmware.set" => {

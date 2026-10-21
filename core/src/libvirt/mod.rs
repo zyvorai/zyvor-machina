@@ -36,6 +36,7 @@ pub mod host_network;
 pub mod host_sysctl;
 pub mod hostdev_pci;
 pub mod linux_guestkit;
+pub mod mdev;
 pub mod metrics;
 pub mod migration_control;
 pub mod migrate;
