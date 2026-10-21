@@ -1744,3 +1744,45 @@ pub async fn k3s_node(addr: &str, call: K3sNodeCall) -> anyhow::Result<K3sNodeRe
         anyhow::bail!("{}: {}", resp.message, resp.output_tail)
     }
 }
+
+#[derive(Debug, Clone, Default)]
+pub struct ReplicateResult {
+    pub bytes: u64,
+    pub files: u32,
+    pub is_dir: bool,
+    pub remote_uri: String,
+    pub message: String,
+}
+
+/// Copy a backup to (`push`) or from (`fetch`) an S3-compatible store on the host that holds it.
+pub async fn replicate_backup(
+    addr: &str,
+    action: &str,
+    local_path: &str,
+    bucket: &str,
+    key: &str,
+    endpoint_url: &str,
+) -> anyhow::Result<ReplicateResult> {
+    let mut client = connect(addr).await?;
+    let resp = client
+        .replicate_backup(ReplicateBackupRequest {
+            action: action.to_string(),
+            local_path: local_path.to_string(),
+            bucket: bucket.to_string(),
+            key: key.to_string(),
+            endpoint_url: endpoint_url.to_string(),
+        })
+        .await?
+        .into_inner();
+    if resp.ok {
+        Ok(ReplicateResult {
+            bytes: resp.bytes,
+            files: resp.files,
+            is_dir: resp.is_dir,
+            remote_uri: resp.remote_uri,
+            message: resp.message,
+        })
+    } else {
+        anyhow::bail!(resp.message)
+    }
+}

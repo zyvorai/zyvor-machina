@@ -3,6 +3,7 @@
 
 pub mod api_error;
 pub mod audit;
+pub mod backup_replica;
 pub mod audit_ship;
 pub mod bpf_probe;
 pub mod build_precheck;

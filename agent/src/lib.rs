@@ -15,6 +15,7 @@ pub mod jwt;
 pub mod k3s;
 pub mod lbprobe;
 pub mod libvirt_invoke;
+pub mod replicate;
 pub mod natgw;
 pub mod libvirt_ops;
 pub mod provision_ops;

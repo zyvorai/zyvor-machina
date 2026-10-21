@@ -47,6 +47,7 @@ mod kubevirt;
 mod launchpad;
 mod load_balancers;
 mod desktop_pools;
+mod backup_replication;
 mod k8s_clusters;
 mod maintenance;
 mod migration_waves;
@@ -1679,6 +1680,20 @@ pub fn router(state: AppState) -> Router {
             "/api/v1/desktop-pools/{id}/release",
             post(desktop_pools::release),
         )
+        .route(
+            "/api/v1/backups/{backup_id}/replicate",
+            post(backup_replication::replicate),
+        )
+        .route(
+            "/api/v1/backups/{backup_id}/replicas",
+            get(backup_replication::list_for_backup),
+        )
+        .route("/api/v1/backup-replicas", get(backup_replication::list))
+        .route(
+            "/api/v1/backup-replicas/{replica_id}/fetch",
+            post(backup_replication::fetch),
+        )
+        .route("/api/v1/backup-replication/run", post(backup_replication::run))
         .route(
             "/api/v1/k8s-clusters",
             get(k8s_clusters::list).post(k8s_clusters::create),
