@@ -4,10 +4,11 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import PlatformFailureDomains from './PlatformFailureDomains'
 import PlatformDesktopPools from './PlatformDesktopPools'
+import PlatformVgpu from './PlatformVgpu'
 import { parseWaveItems } from './PlatformMigrationWaves'
 
 const toast = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() }
@@ -29,6 +30,11 @@ vi.mock('../../api/platformFleetFeatures', () => ({
   checkoutDesktop: vi.fn(),
   releaseDesktop: vi.fn(),
   deleteDesktopPool: vi.fn(),
+  getHostMdev: vi.fn(),
+  createHostMdev: vi.fn(),
+  deleteHostMdev: vi.fn(),
+  attachVmMdev: vi.fn(),
+  detachVmMdev: vi.fn(),
 }))
 import * as platform from '../../api/platform'
 import * as api from '../../api/platformFleetFeatures'
@@ -108,5 +114,30 @@ describe('PlatformDesktopPools', () => {
     expect(screen.getByText('5 desktops · non-persistent · linked clones')).toBeTruthy()
     expect(screen.getByRole('option', { name: 'golden-win11' })).toBeTruthy()
     expect(screen.queryByRole('option', { name: 'busy-vm' })).toBeNull()
+  })
+})
+
+describe('PlatformVgpu', () => {
+  it('shows a host\'s partitions with their owners and warns about ones lost in a reboot', async () => {
+    vi.mocked(platform.listPlatformHosts).mockResolvedValue([{ id: 'h1', hostname: 'gpu-01' }] as never)
+    vi.mocked(platform.listPlatformVms).mockResolvedValue([{ id: 'v1', name: 'render-vm', host_id: 'h1', observed_state: 'running' }] as never)
+    vi.mocked(api.getHostMdev).mockResolvedValue({
+      types: [{ parent: '0000:03:00.0', type_id: 'nvidia-222', name: 'GRID A16-4C', description: '', device_api: 'vfio-pci', available_instances: 2 }],
+      instances: [
+        { uuid: 'u-free', parent: '0000:03:00.0', type_id: 'nvidia-222', vm_id: null, vm_name: null },
+        { uuid: 'u-used', parent: '0000:03:00.0', type_id: 'nvidia-222', vm_id: 'v1', vm_name: 'render-vm' },
+      ],
+      assignments: [
+        { vm_id: 'v1', vm_name: 'render-vm', uuid: 'u-used', mdev_type: 'nvidia-222', parent: '0000:03:00.0', missing: false },
+        { vm_id: 'v2', vm_name: 'old-vm', uuid: 'u-gone', mdev_type: 'nvidia-222', parent: '0000:03:00.0', missing: true },
+      ],
+    })
+    render(<MemoryRouter><PlatformVgpu /></MemoryRouter>)
+    await waitFor(() => expect(screen.getByRole('option', { name: 'gpu-01' })).toBeTruthy())
+    fireEvent.change(screen.getByLabelText('Host'), { target: { value: 'h1' } })
+    await waitFor(() => expect(screen.getByText(/attached to render-vm/)).toBeTruthy())
+    expect(screen.getByText(/free · 0000:03:00.0/)).toBeTruthy()
+    expect(screen.getByText(/old-vm was given u-gone/)).toBeTruthy()
+    expect(screen.getByRole('option', { name: /GRID A16-4C on 0000:03:00.0 \(2 free\)/ })).toBeTruthy()
   })
 })

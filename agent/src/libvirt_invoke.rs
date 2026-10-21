@@ -433,6 +433,14 @@ pub fn host_query(conn: &Connect, action: &str, payload: &Value) -> Result<Value
             let devices = extras::list_pci_devices()?;
             Ok(serde_json::json!(devices))
         }
+        "host.mdev" => {
+            // vGPU partition types the GPUs offer and the partitions that exist.
+            let root = std::path::Path::new(mdev::SYSFS_ROOT);
+            Ok(serde_json::json!({
+                "types": mdev::list_types(root),
+                "instances": mdev::list_instances(root),
+            }))
+        }
         "host.node_devices" => {
             let cap = payload.get("capability").and_then(|v| v.as_str());
             let devices = machina_core::libvirt::node_device::list_node_devices(conn, cap)?;
@@ -516,6 +524,18 @@ pub fn host_query(conn: &Connect, action: &str, payload: &Value) -> Result<Value
 pub fn host_invoke(conn: &Connect, action: &str, payload: &Value) -> Result<Value, LibvirtError> {
     use machina_core::libvirt::{network, storage};
     match action {
+        "mdev.create" => {
+            let parent = payload_str(payload, "parent")?;
+            let type_id = payload_str(payload, "type")?;
+            let uuid = payload.get("uuid").and_then(|v| v.as_str());
+            let uuid = mdev::create(std::path::Path::new(mdev::SYSFS_ROOT), &parent, &type_id, uuid)?;
+            Ok(serde_json::json!({ "status": "created", "uuid": uuid }))
+        }
+        "mdev.remove" => {
+            let uuid = payload_str(payload, "uuid")?;
+            mdev::remove(std::path::Path::new(mdev::SYSFS_ROOT), &uuid)?;
+            Ok(serde_json::json!({ "status": "removed", "uuid": uuid }))
+        }
         "storage.pool.start" => {
             let name = payload_str(payload, "name")?;
             storage::start_pool(conn, &name)?;

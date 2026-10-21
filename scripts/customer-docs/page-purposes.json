@@ -110,5 +110,6 @@
   "/platform/failure-domains": "Failure Domains \u2014 racks defined by host site and rack labels, and whether HA could re-home each rack if it were lost. Page at `/platform/failure-domains`.",
   "/platform/k8s-clusters": "Kubernetes Clusters \u2014 create, scale, upgrade and delete k3s clusters across enrolled hosts (opt-in on the controller and each host). Page at `/platform/k8s-clusters`.",
   "/platform/desktop-pools": "Desktop Pools \u2014 clone a template VM into numbered desktops, check one out per user and recycle it on release. Page at `/platform/desktop-pools`.",
-  "/platform/migration-waves": "Migration Waves \u2014 plan a batch of VMs for Transiva, start them a few at a time, follow each job and record cutover. Page at `/platform/migration-waves`."
+  "/platform/migration-waves": "Migration Waves \u2014 plan a batch of VMs for Transiva, start them a few at a time, follow each job and record cutover. Page at `/platform/migration-waves`.",
+  "/platform/vgpu": "vGPU Partitions \u2014 split a GPU into mediated-device partitions, give each to a VM, and see which VMs are pinned to a host by one. Page at `/platform/vgpu`."
 }

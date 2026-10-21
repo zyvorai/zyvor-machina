@@ -48,6 +48,17 @@ pub async fn run_migrate_precheck(
     };
     checks.push(pass("vm_exists", &format!("VM '{vm_name}' found")));
 
+    // A vGPU partition lives on one host's GPU: the VM cannot leave it.
+    if crate::api::vgpu::is_pinned(pool, vm_id).await {
+        checks.push(fail(
+            "vgpu_pinned",
+            "The VM holds a vGPU partition on its current host",
+            "Detach the partition (DELETE /api/v1/vms/{id}/mdev/{uuid}) before migrating, then attach one on the destination",
+        ));
+    } else {
+        checks.push(pass("vgpu_pinned", "No vGPU partition pins the VM to its host"));
+    }
+
     let source_host_id = match source_host_id {
         Some(id) => id,
         None => {

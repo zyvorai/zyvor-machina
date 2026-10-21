@@ -122,6 +122,7 @@ const PlatformK8sClusters = lazyWithRetry(() => import('./pages/platform/Platfor
 const PlatformDesktopPools = lazyWithRetry(() => import('./pages/platform/PlatformDesktopPools'))
 const PlatformMigrationWaves = lazyWithRetry(() => import('./pages/platform/PlatformMigrationWaves'))
 const PlatformBackupReplication = lazyWithRetry(() => import('./pages/platform/PlatformBackupReplication'))
+const PlatformVgpu = lazyWithRetry(() => import('./pages/platform/PlatformVgpu'))
 const PlatformAlertRules = lazyWithRetry(() => import('./pages/platform/PlatformAlertRules'))
 const PlatformScheduledJobs = lazyWithRetry(() => import('./pages/platform/PlatformScheduledJobs'))
 const PlatformEnroll = lazyWithRetry(() => import('./pages/platform/PlatformEnroll'))
@@ -419,6 +420,7 @@ function AuthenticatedShellRoutes() {
                   <Route path="desktop-pools" element={<PlatformDesktopPools />} />
                   <Route path="migration-waves" element={<PlatformMigrationWaves />} />
                   <Route path="backup-replication" element={<PlatformBackupReplication />} />
+                  <Route path="vgpu" element={<PlatformVgpu />} />
                   <Route path="alert-rules" element={<PlatformAlertRules />} />
                   <Route path="scheduled-jobs" element={<PlatformScheduledJobs />} />
                   <Route path="enroll" element={<PlatformEnroll />} />

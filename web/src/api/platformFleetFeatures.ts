@@ -244,3 +244,48 @@ export const runBackupReplication = (target_id: string, limit = 10) =>
   )
 export const fetchBackupReplica = (replicaId: string, host_id: string) =>
   platformFetch<BackupReplica>(`/api/v1/backup-replicas/${replicaId}/fetch`, json('POST', { host_id }))
+
+// ── vGPU partitions ─────────────────────────────────────────────────────────
+
+export type MdevType = {
+  parent: string
+  type_id: string
+  name: string
+  description: string
+  device_api: string
+  available_instances: number
+}
+
+export type MdevInstance = {
+  uuid: string
+  parent: string
+  type_id: string
+  vm_id: string | null
+  vm_name: string | null
+}
+
+export type MdevAssignment = {
+  vm_id: string
+  vm_name: string
+  uuid: string
+  mdev_type: string
+  parent: string
+  /** The recorded partition no longer exists on the host (for example after a reboot). */
+  missing: boolean
+}
+
+export type HostMdev = {
+  types: MdevType[] | null
+  instances: MdevInstance[]
+  assignments: MdevAssignment[]
+}
+
+export const getHostMdev = (hostId: string) => platformFetch<HostMdev>(`/api/v1/hosts/${hostId}/mdev`)
+export const createHostMdev = (hostId: string, parent: string, type: string) =>
+  platformFetch<{ status: string; uuid: string }>(`/api/v1/hosts/${hostId}/mdev`, json('POST', { parent, type }))
+export const deleteHostMdev = (hostId: string, uuid: string) =>
+  platformFetch<{ status: string }>(`/api/v1/hosts/${hostId}/mdev/${uuid}`, json('DELETE'))
+export const attachVmMdev = (vmId: string, uuid: string) =>
+  platformFetch<unknown>(`/api/v1/vms/${vmId}/mdev`, json('POST', { uuid }))
+export const detachVmMdev = (vmId: string, uuid: string) =>
+  platformFetch<unknown>(`/api/v1/vms/${vmId}/mdev/${uuid}`, json('DELETE'))
