@@ -8,7 +8,7 @@ description: An honest look at Azure Local and Machina, including what Machina d
 
 Azure Local (formerly Azure Stack HCI) has grown into a family of deployment models: hyperconverged, rack-aware, external SAN, disaggregated, multi-rack and disconnected operations. It is the right answer when Azure is your control plane. Machina is the right answer when you want open KVM, no cloud account and one install. This post lays out the difference.
 
-<!-- truncate -->
+{/* truncate */}
 
 ## Where Machina is already strong
 
