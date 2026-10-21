@@ -51,6 +51,7 @@ pub mod fluxvm_fleet;
 pub mod guest_context;
 pub mod guestkit_bridge;
 pub mod failure_domains;
+pub mod k8s_clusters;
 pub mod ha;
 pub mod health_watchdog;
 pub mod host_revalidate;

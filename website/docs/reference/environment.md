@@ -18,6 +18,7 @@ environment variables from their env files.
 | `MACHINA_CONTROLLER_ID` | random `ctrl-xxxxxxxx` per start | Stable instance id; set it on every instance in a multi-controller deployment |
 | `MACHINA_AGENT_ADDR` | `http://127.0.0.1:50051` | Agent gRPC address |
 | `MACHINA_AGENT_CA`, `MACHINA_AGENT_CLIENT_CERT`, `MACHINA_AGENT_CLIENT_KEY` | unset | mTLS to agents |
+| `MACHINA_K3S_FLEET` | unset | `1` enables the fleet k3s cluster API (`/api/v1/k8s-clusters`); hosts must also opt in with `MACHINA_AGENT_K3S_ENABLED=1` |
 | `MACHINA_JWT_SECRET` | random per process | JWT signing secret; set it for sessions that survive restarts |
 | `MACHINA_ALLOW_DEV_SECRETS` | unset | Allow the well-known development secret (never in production) |
 | `MACHINA_API_KEY_MASTER_KEY` | unset | 64-hex-char AES-256-GCM key for stored LLM provider and BMC secrets (`openssl rand -hex 32`) |
@@ -46,6 +47,7 @@ environment variables from their env files.
 | `MACHINA_LIBVIRT_URI` | `qemu:///system` | libvirt connection |
 | `MACHINA_AGENT_TLS_CERT`, `MACHINA_AGENT_TLS_KEY` | unset | Agent TLS certificate |
 | `MACHINA_AGENT_TOKEN` | unset | Shared token between controller and agent |
+| `MACHINA_AGENT_K3S_ENABLED` | unset | `1` lets the controller install, upgrade and remove k3s on this host (runs root installers) |
 | `MACHINA_BPFD_SOCK` | `/run/machina-bpf/bpfd.sock` | Where to reach `machina-bpfd` |
 | `MACHINA_FLUXVM_URL` | the host's `[fluxvm] base_url` when enabled | fluxvm-api the controller manages FluxVM VMs through |
 | `MACHINA_FLUXVM_TOKEN` | `[fluxvm] token` | Bearer token for it |
