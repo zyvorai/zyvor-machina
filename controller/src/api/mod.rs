@@ -46,6 +46,7 @@ pub(crate) mod metric_stats;
 mod kubevirt;
 mod launchpad;
 mod load_balancers;
+mod desktop_pools;
 mod k8s_clusters;
 mod maintenance;
 mod migration_waves;
@@ -1657,6 +1658,27 @@ pub fn router(state: AppState) -> Router {
             post(network_segments::bind_network_to_segment),
         )
         .route("/api/v1/failure-domains", get(placement::failure_domains))
+        .route(
+            "/api/v1/desktop-pools",
+            get(desktop_pools::list).post(desktop_pools::create),
+        )
+        .route(
+            "/api/v1/desktop-pools/{id}",
+            get(desktop_pools::get).delete(desktop_pools::delete),
+        )
+        .route("/api/v1/desktop-pools/{id}/scale", post(desktop_pools::scale))
+        .route(
+            "/api/v1/desktop-pools/{id}/reconcile",
+            post(desktop_pools::reconcile),
+        )
+        .route(
+            "/api/v1/desktop-pools/{id}/checkout",
+            post(desktop_pools::checkout),
+        )
+        .route(
+            "/api/v1/desktop-pools/{id}/release",
+            post(desktop_pools::release),
+        )
         .route(
             "/api/v1/k8s-clusters",
             get(k8s_clusters::list).post(k8s_clusters::create),

@@ -50,6 +50,7 @@ pub mod fleet_users;
 pub mod fluxvm_fleet;
 pub mod guest_context;
 pub mod guestkit_bridge;
+pub mod desktop_pools;
 pub mod failure_domains;
 pub mod k8s_clusters;
 pub mod ha;
