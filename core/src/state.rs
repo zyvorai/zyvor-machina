@@ -372,6 +372,12 @@ pub struct CreateVmRequest {
     /// Firmware type: "bios" (default) or "uefi"
     #[serde(default = "default_firmware")]
     pub firmware: String,
+    /// Enforce UEFI Secure Boot with Microsoft/distribution keys enrolled (needs `firmware: "uefi"`).
+    #[serde(default)]
+    pub secure_boot: bool,
+    /// Add an emulated TPM 2.0 (swtpm). Windows 11 needs this and `secure_boot`.
+    #[serde(default)]
+    pub vtpm: bool,
     /// Libvirt VNC `listen=` address (IP only). Default `127.0.0.1`; use `0.0.0.0` to match hyper2kvm-style remote display (still reach via machina's WS proxy / TLS front).
     #[serde(default = "default_graphics_listen")]
     pub graphics_listen: String,
@@ -576,6 +582,8 @@ impl Default for CreateVmRequest {
             virtio_win_iso: String::new(),
             existing_disk: String::new(),
             firmware: default_firmware(),
+            secure_boot: false,
+            vtpm: false,
             graphics_listen: default_graphics_listen(),
             graphics_type: default_graphics_type(),
             cloud_init_iso: String::new(),

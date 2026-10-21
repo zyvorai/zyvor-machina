@@ -60,6 +60,7 @@ pub mod storage;
 pub mod subprocess;
 pub mod template_apply;
 pub mod virt_builder;
+pub mod trusted_launch;
 pub mod virt_install;
 pub mod vnc;
 pub mod windows_rdp;
