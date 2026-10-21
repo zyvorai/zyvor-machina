@@ -1,0 +1,1 @@
+1349192 /usr/bin/swtpm socket --ctrl type=unixio,path=/run/libvirt/qemu/swtpm/6-qual-tl-1792625510-swtpm.sock,mode=0600 --tpmstate dir=/var/lib/libvirt/swtpm/54653a4d-a13a-4719-abf2-272ea7599d96/tpm2,mode=0600,lock --log file=/var/log/swtpm/libvirt/qemu/qual-tl-1792625510-swtpm.log --terminate --tpm2

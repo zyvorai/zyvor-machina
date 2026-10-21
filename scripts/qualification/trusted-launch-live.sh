@@ -6,7 +6,8 @@
 # libvirt accepted the firmware auto-selection, SMM and the TPM, start it, and check the firmware
 # resolved to a signed build with keys enrolled. Also checks that Secure Boot on BIOS is refused.
 # Run against the DAEMON of a host with edk2-ovmf (signed build) and swtpm installed. The VM is
-# created and deleted by this script.
+# created and deleted by this script (disk, NVRAM and TPM state included). The daemon leaves the
+# cloud-init seed files for the VM under its cloud-init directory; remove `qual-tl-*` there afterwards.
 #
 # Windows 11 needs both options. This script cannot install Windows; for that claim, create a VM
 # the same way with a Windows 11 ISO, complete the installer's hardware check, and keep a screenshot.
@@ -27,7 +28,8 @@ cleanup() {
   if (( MADE )); then
     api -X POST "$MACHINA_URL/api/v1/vms/$NAME/stop" >/dev/null 2>&1 || true
     sleep 2
-    api -X DELETE "$MACHINA_URL/api/v1/vms/$NAME" >/dev/null 2>&1 || true
+    # Remove the disk, the variable store and the TPM state too, so a run leaves nothing behind.
+    api -X DELETE "$MACHINA_URL/api/v1/vms/$NAME?undefine_nvram=true&undefine_tpm=true&delete_disks=true" >/dev/null 2>&1 || true
   fi
 }
 trap cleanup EXIT
@@ -49,9 +51,12 @@ for needle in "firmware='efi'" "name='secure-boot'" "name='enrolled-keys'" "<smm
   grep -q -- "$needle" <<<"$xml" || q_fail "domain XML lacks: $needle"
 done
 
-q_step "4/6" "start it and wait until it is running"
-api -X POST "$MACHINA_URL/api/v1/vms/$NAME/start" >/dev/null
+q_step "4/6" "make sure it is running"
 is_running() { api "$MACHINA_URL/api/v1/vms/$NAME" | grep -Eq '"state"[[:space:]]*:[[:space:]]*"running"'; }
+# virt-install starts the new VM itself, so it is usually running already; start it only if it is not.
+if ! is_running; then
+  api -X POST "$MACHINA_URL/api/v1/vms/$NAME/start" >/dev/null
+fi
 wait_until 120 3 "the VM to be running" is_running
 
 q_step "5/6" "the firmware resolved to a signed build with the variable store enrolled"
