@@ -73,4 +73,4 @@ This path is only as automatic as you make it: Machina does not detect a site lo
   A copy whose local backup was already pruned has lost its record (it follows the backup) and is not seen: use a lifecycle rule on
   the bucket for those.
 - Automatic replication checks every 5 minutes (not the instant a backup finishes), copies at most 3 at a time per target, has no bandwidth limit, and there is no web page yet.
-- Not yet run against a real store: see claims C64.
+- Run on a real host against an S3-compatible mock (moto), not AWS (2026-10-22): copy, checksum, fetch back and `qemu-img check` all passed. A real AWS bucket, `auto_replicate` and `retain` have not been run: see claims C64.

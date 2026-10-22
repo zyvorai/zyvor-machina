@@ -44,4 +44,4 @@ An existing VM can still get a TPM later through the TPM attach call; it cannot 
 - The emulated TPM keeps its state on the host. It is not a hardware root of trust and does not provide remote attestation.
 - Confidential VMs (AMD SEV-SNP, Intel TDX) are not offered.
 - No web UI toggle yet; use the API or `machinactl`.
-- Not yet run on a host: see claims C60.
+- Run on a real host (2026-10-22): libvirt accepted and started a Secure Boot + vTPM VM. A Windows 11 install has not been run: see claims C60.
