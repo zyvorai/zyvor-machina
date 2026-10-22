@@ -57,4 +57,4 @@ checkout with no free desktop returns 409 until a clone is `ready`.
 - **Any authenticated user can check out and release for themselves**, which starts a VM: restrict who can log in accordingly.
 - A clone that never completes stays `cloning`; delete the stuck VM and reconcile.
 - No web page yet.
-- Not yet run on a host: see claims C63.
+- Run on one real libvirt host (2026-10-22): create, checkout, release, scale and delete, with linked clones of a stopped template that had no guest OS. Releasing a desktop used to leave its disk behind and the re-clone failed; that is fixed. A booting guest and more than one host are not shown: see claims C63.

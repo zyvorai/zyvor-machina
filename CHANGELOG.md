@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.3.1 — 2026-10-22
+
+Everything merged since v0.3.0 (#172 to #206). The claims ledger (`docs/claims.md`) says, row by row, what was run on a
+real host and what is unit-tested only.
+
+- **Failure domains and witness.** Host `site`/`rack` labels steer placement and HA recovery away from a rack that
+  holds an anti-affinity peer, `GET /api/v1/failure-domains` reports rack-loss headroom, and `MACHINA_WITNESS_URLS`
+  pauses HA when the controller cannot reach its witnesses (C57, C65). The witness pause was run on a real controller.
+- **Trusted launch.** `secure_boot` and `vtpm` on VM create (C60); run on a real host after fixing the machine type (#202).
+- **Desktop pools.** Simple VDI: clone, check out, release, recycle (C63). Run on a real host; releasing a desktop now
+  deletes its disk so the re-clone works (#203).
+- **Backup replication.** Copy backups to S3-compatible storage, SHA-256 manifests, checksum-verified fetch, opt-in
+  retention (C64). Run against a mock store, not AWS; a fetched single file is matched by size (#204).
+- **Fleet k3s clusters** with an HA control plane, **iSCSI storage pools**, **vGPU** partitions, **migration waves**.
+  Unit-tested; their live scripts are in `scripts/qualification/` and have not all been run.
+- **Air-gapped and sovereign guide**, comparison pages (Azure Local, VMware, Nutanix, Proxmox) and a blog.
+- **Fixes.** Guarded `localStorage` writes, read-only placement GET, Zeus firewall worker leader-gated, admin password
+  kept out of argv in `mint-join-command.sh` (#177, #178).
+
 ## v0.3.0 — 2026-10-17
 
 Everything merged since v0.2.1 (#140 to #171). The detailed entries are the dated sections below.

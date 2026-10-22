@@ -70,6 +70,6 @@ two controllers. A witness outage pauses HA, so use a reliable one.
 - No quorum between controllers: the witness only stops an isolated controller from acting. Losing the rack that holds the
   controller is a separate question. See [Controller HA](https://github.com/zyvorai/zyvor-machina/blob/main/docs/controller-ha.md).
 - Storage and network survival are not checked. Pair this with replicated storage that has its own failure domains.
-- Not yet run on real racks: see the claims ledger (C57).
+- The witness pause and resume were run on a real controller with a real witness (2026-10-22, claim C65). That was a witness outage on one host, not a network partition. Rack placement and the rack-loss report have not been run on real racks (C57).
 
 Run a drill on hardware you can afford to lose before relying on it: power off one rack's hosts and watch `ha_events`.
