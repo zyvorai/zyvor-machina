@@ -257,6 +257,19 @@ async fn fetch_manifest(req: &ReplicateBackupRequest) -> Option<(String, Vec<pla
     Some((text, manifest))
 }
 
+/// A fetched directory must list the same relative paths and sizes as the store. A fetched single
+/// file is saved under whatever name the caller chose (the controller prefixes an id), so only its
+/// size is compared; the checksum manifest still proves the bytes.
+fn fetched_matches(local: &[(String, u64)], expected: &[(String, u64)], is_dir: bool) -> bool {
+    if is_dir {
+        return local == expected;
+    }
+    match (local, expected) {
+        ([(_, have)], [(_, want)]) => have == want,
+        _ => false,
+    }
+}
+
 async fn fetch(req: &ReplicateBackupRequest) -> ReplicateBackupResponse {
     let dest = Path::new(&req.local_path);
     if dest.exists() {
@@ -289,7 +302,7 @@ async fn fetch(req: &ReplicateBackupRequest) -> ReplicateBackupResponse {
         Ok(l) => l,
         Err(e) => return fail(format!("downloaded, but reading it back failed: {e}")),
     };
-    if local != expected {
+    if !fetched_matches(&local, &expected, is_dir) {
         return fail("verification failed: the downloaded files do not match the store listing");
     }
     // Prove the bytes with the stored checksums. A copy made before manifests existed has none and
@@ -386,6 +399,17 @@ async fn delete(req: &ReplicateBackupRequest) -> ReplicateBackupResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_fetched_single_file_matches_by_size_whatever_it_is_called() {
+        let want = vec![("vm.qcow2".to_string(), 7)];
+        assert!(fetched_matches(&[("abc-vm.qcow2".to_string(), 7)], &want, false));
+        assert!(!fetched_matches(&[("abc-vm.qcow2".to_string(), 8)], &want, false));
+        assert!(!fetched_matches(&[], &want, false));
+        let dir = vec![("a/b".to_string(), 1)];
+        assert!(fetched_matches(&dir, &dir, true));
+        assert!(!fetched_matches(&[("c".to_string(), 1)], &dir, true));
+    }
 
     #[test]
     fn local_files_lists_a_file_and_a_nested_directory() {
