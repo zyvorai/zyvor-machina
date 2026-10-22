@@ -86,7 +86,7 @@ sys.exit(1 if bad else 0)
 ' "$K3S_VERSION" <<<"$detail" || q_fail "a node is not ready at $K3S_VERSION"
 
 q_step "5/8" "the kubeconfig points at the API, not 127.0.0.1"
-curl -fsS -H "Authorization: Bearer $MACHINA_TOKEN" -o "$QUAL_EVIDENCE_DIR/kubeconfig.yaml" \
+qcurl -fsS -H "Authorization: Bearer $MACHINA_TOKEN" -o "$QUAL_EVIDENCE_DIR/kubeconfig.yaml" \
   "$MACHINA_URL/api/v1/k8s-clusters/$CLUSTER_ID/kubeconfig"
 chmod 600 "$QUAL_EVIDENCE_DIR/kubeconfig.yaml"
 grep -q 'server: https://' "$QUAL_EVIDENCE_DIR/kubeconfig.yaml" || q_fail "kubeconfig has no server"

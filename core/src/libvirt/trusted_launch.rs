@@ -30,6 +30,23 @@ pub const SMM_FEATURE_XML: &str = "<smm state='on'/>";
 /// virt-install arguments (after `--boot`) that ask for the same firmware selection.
 pub const VIRT_INSTALL_SECURE_BOOT: &str = "firmware=efi,firmware.feature0.name=enrolled-keys,firmware.feature0.enabled=yes,firmware.feature1.name=secure-boot,firmware.feature1.enabled=yes";
 
+/// Secure Boot firmware (`requires-smm`) only exists for the q35 machine type; virt-install's default
+/// machine for a generic guest does not find it ("Unable to find 'efi' firmware that is compatible
+/// with the current configuration"), so Secure Boot VMs ask for q35 explicitly.
+pub const MACHINE: &str = "q35";
+
+/// The virt-install arguments that turn on Secure Boot: firmware selection, SMM and the machine type.
+pub fn virt_install_secure_boot_args() -> Vec<String> {
+    vec![
+        "--boot".into(),
+        VIRT_INSTALL_SECURE_BOOT.into(),
+        "--features".into(),
+        "smm=on".into(),
+        "--machine".into(),
+        MACHINE.into(),
+    ]
+}
+
 /// virt-install `--tpm` value.
 pub const VIRT_INSTALL_TPM: &str = "backend.type=emulator,backend.version=2.0,model=tpm-crb";
 
@@ -151,6 +168,19 @@ mod tests {
         let missing = std::env::temp_dir().join("machina-fwdesc-missing");
         assert!(!secure_boot_supported(&[missing.as_path()]));
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn secure_boot_virt_install_args_pick_the_q35_machine() {
+        let a = virt_install_secure_boot_args();
+        let pos = a.iter().position(|x| x == "--machine").unwrap();
+        assert_eq!(a[pos + 1], "q35");
+        assert!(a
+            .windows(2)
+            .any(|w| w[0] == "--features" && w[1] == "smm=on"));
+        assert!(a
+            .windows(2)
+            .any(|w| w[0] == "--boot" && w[1].starts_with("firmware=efi")));
     }
 
     #[test]

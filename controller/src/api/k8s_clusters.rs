@@ -227,6 +227,7 @@ pub async fn list(
     Extension(actor): Extension<AuthUser>,
 ) -> Result<Json<Vec<ClusterRow>>, ApiError> {
     crate::auth::require_operator(&actor)?;
+    require_enabled()?;
     let rows: Vec<ClusterRow> = crate::db::query_as(&format!(
         "SELECT {CLUSTER_COLS} FROM k8s_clusters ORDER BY name LIMIT 500"
     ))
@@ -241,6 +242,7 @@ pub async fn get(
     Path(id): Path<Uuid>,
 ) -> Result<Json<ClusterDetail>, ApiError> {
     crate::auth::require_operator(&actor)?;
+    require_enabled()?;
     load(&state, id).await.map(Json)
 }
 
@@ -442,6 +444,7 @@ pub async fn kubeconfig(
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     require_admin(&actor)?;
+    require_enabled()?;
     let (api_url, enc): (String, String) =
         crate::db::query_as("SELECT api_url, kubeconfig_enc FROM k8s_clusters WHERE id = ?")
             .bind(id)

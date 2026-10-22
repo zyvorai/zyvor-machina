@@ -288,10 +288,7 @@ pub fn create_vm_virt_install(
     super::trusted_launch::validate(req.secure_boot, req.vtpm, firmware)?;
     super::trusted_launch::preflight(req.secure_boot, req.vtpm)?;
     if req.secure_boot {
-        args.push("--boot".into());
-        args.push(super::trusted_launch::VIRT_INSTALL_SECURE_BOOT.into());
-        args.push("--features".into());
-        args.push("smm=on".into());
+        args.extend(super::trusted_launch::virt_install_secure_boot_args());
     } else if firmware == "uefi" {
         args.push("--boot".into());
         args.push("uefi".into());
