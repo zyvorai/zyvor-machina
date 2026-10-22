@@ -11,3 +11,9 @@ S3-compatible store (`moto_server` on loopback, bucket `qual-dr-backups`) and th
   not been re-run.
 
 Not shown: AWS itself, `auto_replicate`, `retain`, a second site. moto is a mock, so S3 edge cases (multipart, throttling) are untested.
+
+## Re-run after the fix (build `0.3.1-lab3`)
+
+The fetch fix was built on `main` and the script re-run against the same moto store: all six steps passed
+(`rerun/replica.json`, `rerun/replicate.json`), and `qemu-img check` on the fetched image reported no errors
+(`rerun/qemu-img-check.txt`).
