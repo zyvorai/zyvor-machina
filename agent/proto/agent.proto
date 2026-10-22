@@ -260,6 +260,8 @@ message DeleteVmRequest {
   string vm_name = 1;
   /// "fluxvm" routes to fluxvm-api; "" = libvirt.
   string backend = 2;
+  /// Also remove the VM's file-backed data disks (libvirt only).
+  bool delete_disks = 3;
 }
 
 message DeleteVmResponse {

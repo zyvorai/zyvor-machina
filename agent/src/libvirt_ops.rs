@@ -528,6 +528,16 @@ impl LibvirtCtx {
         machina_core::libvirt::domain::delete_vm(&self.conn, name)
     }
 
+    /// Undefine the VM and unlink its file-backed data disks.
+    pub fn delete_with_disks(&self, name: &str) -> Result<(), LibvirtError> {
+        let opts = machina_core::libvirt::domain::UndefineOptions {
+            delete_disks: true,
+            ..Default::default()
+        };
+        machina_core::libvirt::domain::delete_vm_with_options(&self.conn, name, &opts)
+            .map(|_network_disks| ())
+    }
+
     pub fn get_vm_details(
         &self,
         name: &str,

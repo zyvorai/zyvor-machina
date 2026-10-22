@@ -605,11 +605,16 @@ impl HostAgent for AgentService {
         }
         let libvirt = self.libvirt.clone();
         let vm_name = req.vm_name.clone();
+        let delete_disks = req.delete_disks;
         tokio::task::spawn_blocking(move || {
             let ctx = libvirt
                 .lock()
                 .map_err(|e| machina_core::LibvirtError::Internal(e.to_string()))?;
-            ctx.delete(&vm_name)
+            if delete_disks {
+                ctx.delete_with_disks(&vm_name)
+            } else {
+                ctx.delete(&vm_name)
+            }
         })
         .await
         .map_err(|e| Status::internal(e.to_string()))?

@@ -504,7 +504,8 @@ async fn vm_delete(state: &AppState, msg: &TaskMessage) -> anyhow::Result<()> {
     } else if let Some(host_id) = row.1 {
         let agent_addr = host_agent_addr(&state.pool, host_id).await?;
         let mut client = agent_client::connect(&agent_addr).await?;
-        agent_client::delete_vm(&mut client, &row.0).await?;
+        let delete_disks = msg.payload["delete_disks"].as_bool().unwrap_or(false);
+        agent_client::delete_vm(&mut client, &row.0, delete_disks).await?;
     } else {
         // No host assigned — inventory row only.
     }

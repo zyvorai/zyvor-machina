@@ -347,10 +347,15 @@ pub async fn get_domain_xml(client: &mut AgentClient, vm_name: &str) -> anyhow::
     .xml)
 }
 
-pub async fn delete_vm(client: &mut AgentClient, vm_name: &str) -> anyhow::Result<()> {
+pub async fn delete_vm(
+    client: &mut AgentClient,
+    vm_name: &str,
+    delete_disks: bool,
+) -> anyhow::Result<()> {
     client
         .delete_vm(DeleteVmRequest {
             vm_name: vm_name.to_string(),
+            delete_disks,
             ..Default::default()
         })
         .await?;
@@ -1547,6 +1552,7 @@ pub async fn fluxvm_delete(client: &mut AgentClient, vm_name: &str) -> anyhow::R
         .delete_vm(DeleteVmRequest {
             vm_name: vm_name.to_string(),
             backend: machina_core::fluxvm::BACKEND_NAME.into(),
+            ..Default::default()
         })
         .await?;
     Ok(())

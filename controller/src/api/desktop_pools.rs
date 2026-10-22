@@ -151,7 +151,8 @@ async fn delete_vm(state: &AppState, vm_id: Uuid) -> Result<(), ApiError> {
     enqueue_task(
         state,
         "vm.delete",
-        serde_json::json!({ "vm_id": vm_id.to_string() }),
+        // A desktop's clone is disposable; leaving its disk behind makes the re-clone refuse to overwrite it.
+        serde_json::json!({ "vm_id": vm_id.to_string(), "delete_disks": true }),
         Some("vm"),
         Some(vm_id),
         host,
