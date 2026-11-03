@@ -923,6 +923,22 @@ export interface FleetDigest {
 export const getFleetDigest = (hours = 24) =>
   platformFetch<FleetDigest>(`/api/v1/ai/digest?hours=${encodeURIComponent(String(hours))}`)
 
+export interface DigestSchedule {
+  enabled: boolean
+  frequency: 'daily' | 'weekly'
+  hour_utc: number
+  weekday: number
+  last_sent_at: string | null
+}
+export const getDigestSchedule = () => platformFetch<DigestSchedule>('/api/v1/ai/digest/schedule')
+export const setDigestSchedule = (s: Omit<DigestSchedule, 'last_sent_at'>) =>
+  platformFetch<DigestSchedule>('/api/v1/ai/digest/schedule', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(s),
+  })
+export const sendDigestNow = () => platformFetch<FleetDigest>('/api/v1/ai/digest/send', { method: 'POST' })
+
 export interface ZyraChangeReview {
   action_id: string
   action_type: string

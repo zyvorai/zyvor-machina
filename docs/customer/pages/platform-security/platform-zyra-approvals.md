@@ -36,6 +36,8 @@ Each pending action has a **What happens if I approve?** line. Expand it to see 
 
 Under the queue, **Fleet digest** summarises the last 24 hours, 7 days or 30 days: hosts not online, open incidents, pending approvals, what Zyra executed, failed and had undone, what a person rejected, and budget alerts. Use it to start the day or to hand over a shift.
 
+An admin can send it on a schedule: tick **Send this digest automatically**, choose daily or weekly and an hour (UTC), then **Save**. It goes to the notification channels and webhooks subscribed to `zyra.digest`, `zyra.*` or `*` (a new channel only receives `alert.*` until you add one). **Send now** sends one immediately.
+
 ## Related pages
 
 - [Incident Commander](platform-zyra-incidents.md)

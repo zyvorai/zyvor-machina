@@ -511,6 +511,11 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/ai/incidents/active", get(ai::incidents_active))
         .route("/api/v1/ai/digest", get(ai::fleet_digest))
         .route(
+            "/api/v1/ai/digest/schedule",
+            get(ai::digest_schedule).put(ai::set_digest_schedule),
+        )
+        .route("/api/v1/ai/digest/send", post(ai::send_digest_now))
+        .route(
             "/api/v1/ai/migration-waves/advise",
             post(ai::advise_migration_wave),
         )

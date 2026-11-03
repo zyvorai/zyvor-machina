@@ -1882,6 +1882,45 @@ pub async fn fleet_digest(
         .map(Json)
 }
 
+/// The scheduled-digest settings. Read-only.
+pub async fn digest_schedule(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+) -> Result<Json<ai::digest_schedule::Schedule>, ApiError> {
+    require_operator(&actor)?;
+    ai::digest_schedule::get(&state.pool)
+        .await
+        .map_err(|e| ApiError::internal(e.to_string()))
+        .map(Json)
+}
+
+/// Turn the scheduled digest on or off, or change when it goes out. It sends to the webhooks and notification
+/// channels subscribed to `zyra.digest`, so changing it needs the admin role.
+pub async fn set_digest_schedule(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Json(body): Json<ai::digest_schedule::ScheduleUpdate>,
+) -> Result<Json<ai::digest_schedule::Schedule>, ApiError> {
+    require_admin(&actor)?;
+    ai::digest_schedule::validate(&body).map_err(ApiError::bad_request)?;
+    ai::digest_schedule::save(&state.pool, &body, &actor.username)
+        .await
+        .map_err(|e| ApiError::internal(e.to_string()))
+        .map(Json)
+}
+
+/// Send the digest now to the subscribed webhooks and channels, outside the schedule. Admin only: it sends outward.
+pub async fn send_digest_now(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+) -> Result<Json<ai::digest::Digest>, ApiError> {
+    require_admin(&actor)?;
+    ai::digest_schedule::deliver(&state.pool)
+        .await
+        .map_err(|e| ApiError::internal(e.to_string()))
+        .map(Json)
+}
+
 /// Suggest an order and batches for a migration wave. Read-only: it creates nothing.
 pub async fn advise_migration_wave(
     State(state): State<AppState>,
