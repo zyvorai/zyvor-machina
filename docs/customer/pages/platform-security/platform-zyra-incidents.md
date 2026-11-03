@@ -29,6 +29,10 @@ Incident Commander — Machina Platform / Security page at `/platform/zyra/incid
 
 If the page stays empty, check daemon health (`/api/v1/health`), libvirt connectivity, and whether the feature requires Fleet Cloud or Mission Control enrollment.
 
+## Draft a postmortem
+
+On an open or closed incident, **Draft postmortem** downloads a Markdown file: severity, status, detection window, summary, impact, root cause, a timeline and the Zyra actions proposed in that window. Anything the platform does not know is stated as missing, not filled in. Read it and edit it before you share it.
+
 ## Related pages
 
 - [Zyra Approvals](platform-zyra-approvals.md)

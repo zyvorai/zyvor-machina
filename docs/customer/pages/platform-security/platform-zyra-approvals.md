@@ -28,6 +28,14 @@ Approvals — Machina Platform / Security page at `/platform/zyra/approvals`.
 
 If the page stays empty, check daemon health (`/api/v1/health`), libvirt connectivity, and whether the feature requires Fleet Cloud or Mission Control enrollment.
 
+## Review before you approve
+
+Each pending action has a **What happens if I approve?** line. Expand it to see a verdict (safe to approve, review first, or hold), the declared and assessed risk, whether the change can be undone and how, the machine, host and application groups in reach, and checks to do first (for example "make sure a recent backup exists"). It reads your data and changes nothing; the declared risk is never lowered. Needs the operator role.
+
+## Fleet digest
+
+Under the queue, **Fleet digest** summarises the last 24 hours, 7 days or 30 days: hosts not online, open incidents, pending approvals, what Zyra executed, failed and had undone, what a person rejected, and budget alerts. Use it to start the day or to hand over a shift.
+
 ## Related pages
 
 - [Incident Commander](platform-zyra-incidents.md)

@@ -36,11 +36,11 @@ const NEW: Feature[] = [
     doc: '/docs/operations/zyra-ai#fleet-digest',
   },
   {
-    name: 'Migration Wave Copilot',
+    name: 'Migration Order Advisor',
     tag: 'New',
-    text: 'Give it the machines you want to move. It proposes batches: powered-off machines first, small running machines next, never two from one application group at once.',
+    text: 'Give it machines already in Machina that you want to move. It proposes batches: powered-off machines first, small running machines next, never two from one application group at once.',
     how: 'POST /api/v1/ai/migration-waves/advise',
-    doc: '/docs/operations/zyra-ai#migration-wave-copilot',
+    doc: '/docs/operations/zyra-ai#migration-order-advisor',
   },
 ];
 
@@ -126,6 +126,23 @@ export default function AiPage(): ReactNode {
             />
           </div>
         </Reveal>
+
+        <div className={styles.shots2}>
+          <Reveal>
+            <BrowserFrame
+              src="/zyra-fleet-digest.jpg"
+              alt="Fleet digest: hosts not online, open incidents, pending approvals and what Zyra did"
+              url="https://machina:5092/platform/zyra/approvals"
+            />
+          </Reveal>
+          <Reveal delay={80}>
+            <BrowserFrame
+              src="/zyra-postmortem.jpg"
+              alt="Incident Commander with a Draft postmortem button on an open incident"
+              url="https://machina:5092/platform/zyra/incidents"
+            />
+          </Reveal>
+        </div>
 
         <Reveal>
           <Heading as="h2" className={styles.h2}>Already in the box</Heading>
