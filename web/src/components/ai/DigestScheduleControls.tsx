@@ -61,27 +61,27 @@ export default function DigestScheduleControls() {
         Send this digest automatically
       </label>
       <div className="flex flex-wrap items-center gap-2 mt-2">
-        <select aria-label="Digest frequency" className="input text-xs" value={frequency}
+        <select aria-label="Digest frequency" className="input w-auto text-xs" value={frequency}
           onChange={(e) => setFrequency(e.target.value as 'daily' | 'weekly')}>
           <option value="daily">Every day</option>
           <option value="weekly">Every week</option>
         </select>
         {frequency === 'weekly' && (
-          <select aria-label="Digest weekday" className="input text-xs" value={weekday}
+          <select aria-label="Digest weekday" className="input w-auto text-xs" value={weekday}
             onChange={(e) => setWeekday(Number(e.target.value))}>
             {DAYS.map((d, i) => <option key={d} value={i + 1}>{d}</option>)}
           </select>
         )}
-        <select aria-label="Digest hour (UTC)" className="input text-xs" value={hour}
+        <select aria-label="Digest hour (UTC)" className="input w-auto text-xs" value={hour}
           onChange={(e) => setHour(Number(e.target.value))}>
           {Array.from({ length: 24 }, (_, h) => (
             <option key={h} value={h}>{String(h).padStart(2, '0')}:00 UTC</option>
           ))}
         </select>
-        <button type="button" className="btn btn-primary text-xs" disabled={busy || !saved} onClick={() => void save()}>
+        <button type="button" className="btn-primary text-xs" disabled={busy || !saved} onClick={() => void save()}>
           Save
         </button>
-        <button type="button" className="btn text-xs" disabled={busy || !saved}
+        <button type="button" className="btn-secondary text-xs" disabled={busy || !saved}
           onClick={() => void run('Digest sent to the subscribed channels', sendDigestNow)}>
           Send now
         </button>
