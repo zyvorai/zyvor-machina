@@ -5,6 +5,9 @@ import { useEffect, useState } from 'react'
 import { getDigestSchedule, sendDigestNow, setDigestSchedule, type DigestSchedule } from '../../api/ai'
 import { formatUserError } from '../../utils/apiError'
 
+// .input is width: 100% and outranks Tailwind's layered utilities, so w-auto does not apply.
+const AUTO_WIDTH = { width: 'auto' } as const
+
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 /**
@@ -61,18 +64,18 @@ export default function DigestScheduleControls() {
         Send this digest automatically
       </label>
       <div className="flex flex-wrap items-center gap-2 mt-2">
-        <select aria-label="Digest frequency" className="input w-auto text-xs" value={frequency}
+        <select aria-label="Digest frequency" className="input text-xs" style={AUTO_WIDTH} value={frequency}
           onChange={(e) => setFrequency(e.target.value as 'daily' | 'weekly')}>
           <option value="daily">Every day</option>
           <option value="weekly">Every week</option>
         </select>
         {frequency === 'weekly' && (
-          <select aria-label="Digest weekday" className="input w-auto text-xs" value={weekday}
+          <select aria-label="Digest weekday" className="input text-xs" style={AUTO_WIDTH} value={weekday}
             onChange={(e) => setWeekday(Number(e.target.value))}>
             {DAYS.map((d, i) => <option key={d} value={i + 1}>{d}</option>)}
           </select>
         )}
-        <select aria-label="Digest hour (UTC)" className="input w-auto text-xs" value={hour}
+        <select aria-label="Digest hour (UTC)" className="input text-xs" style={AUTO_WIDTH} value={hour}
           onChange={(e) => setHour(Number(e.target.value))}>
           {Array.from({ length: 24 }, (_, h) => (
             <option key={h} value={h}>{String(h).padStart(2, '0')}:00 UTC</option>
