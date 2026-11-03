@@ -6,7 +6,7 @@ import { Link } from 'react-router'
 import { Siren, Sparkles } from 'lucide-react'
 import PlatformPageChrome, { PlatformRefreshButton } from '../../components/platform/PlatformPageChrome'
 import { MacGlassPanel } from '../../components/platform/mac/PlatformMacUi'
-import { ackIncident, analyzeIncident, getActiveIncidents, getIncidentRoom, type ActiveIncident, type IncidentAnalysis } from '../../api/ai'
+import { ackIncident, analyzeIncident, generatePostmortem, getActiveIncidents, getIncidentRoom, type ActiveIncident, type IncidentAnalysis } from '../../api/ai'
 import { executeOpsRunbook } from '../../api/platform'
 import RunbookExecutionSheet, { type RunbookExecutionResult } from '../../components/platform/RunbookExecutionSheet'
 import { useToastContext } from '../../contexts/ToastContext'
@@ -75,6 +75,21 @@ export default function PlatformIncidentCommander() {
       if (alive()) setRoom(r)
     } catch (e: unknown) {
       if (alive()) setError(formatUserError(e))
+    }
+  }
+
+  const downloadPostmortem = async (id: string) => {
+    try {
+      const pm = await generatePostmortem(id)
+      const url = URL.createObjectURL(new Blob([pm.markdown], { type: 'text/markdown' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `postmortem-${id.slice(0, 8)}.md`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Postmortem draft downloaded')
+    } catch (e: unknown) {
+      toast.error(formatUserError(e))
     }
   }
 
@@ -182,6 +197,7 @@ export default function PlatformIncidentCommander() {
                   <p className="text-xs text-[var(--text-muted)] mt-1">{inc.summary}</p>
                 </button>
                 <button type="button" className={`text-xs mt-2 ${hubLinkClasses()}`} onClick={() => void acknowledge(inc.id)}>Acknowledge</button>
+                <button type="button" className={`text-xs mt-2 ml-3 ${hubLinkClasses()}`} onClick={() => void downloadPostmortem(inc.id)}>Draft postmortem</button>
               </li>
             ))}
             {incidents.length === 0 && <p className="text-[var(--text-muted)]">No active incidents.</p>}

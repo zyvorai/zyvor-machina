@@ -903,6 +903,41 @@ export const executeZyraAction = (id: string) =>
 export const rejectZyraAction = (id: string) =>
   platformFetch<{ rejected: boolean }>(`/api/v1/ai/actions/${encodeURIComponent(id)}/reject`, { method: 'POST' })
 
+export interface FleetDigest {
+  hours: number
+  hosts_total: number
+  hosts_not_online: number
+  vms_total: number
+  vms_running: number
+  open_incidents: number
+  pending_approvals: number
+  actions_executed: number
+  actions_failed: number
+  actions_rejected: number
+  actions_undone: number
+  budget_status: string | null
+  budget_alerts: string[]
+  headline: 'ok' | 'attention' | 'critical'
+  markdown: string
+}
+export const getFleetDigest = (hours = 24) =>
+  platformFetch<FleetDigest>(`/api/v1/ai/digest?hours=${encodeURIComponent(String(hours))}`)
+
+export interface ZyraChangeReview {
+  action_id: string
+  action_type: string
+  risk: 'low' | 'medium' | 'high'
+  verdict: 'approve' | 'approve_with_care' | 'hold'
+  summary: string
+  blast_radius: string[]
+  rollback: string
+  reversible: boolean
+  checks: string[]
+  approved_streak: number
+}
+export const getZyraChangeReview = (id: string) =>
+  platformFetch<ZyraChangeReview>(`/api/v1/ai/actions/${encodeURIComponent(id)}/review`)
+
 export interface ZyraAgentStep {
   kind: 'tool_call' | 'tool_result' | 'note'
   tool?: string | null
@@ -1149,6 +1184,14 @@ export const getIncidentRoom = (id: string) =>
 
 export const ackIncident = (id: string) =>
   platformFetch<{ acknowledged: boolean }>(`/api/v1/ai/incidents/${encodeURIComponent(id)}/ack`, { method: 'POST' })
+
+export interface IncidentPostmortem {
+  incident_id: string
+  title: string
+  markdown: string
+}
+export const generatePostmortem = (id: string) =>
+  platformFetch<IncidentPostmortem>(`/api/v1/ai/incidents/${encodeURIComponent(id)}/postmortem`, { method: 'POST' })
 
 export const simulateTwinBatch = (scenarios: Array<{ action: string; target_kind: string; target_id: string }>) =>
   platformFetch<{ results: Array<ImpactAnalysis & { estimated_downtime_sec: number; vms_at_risk: number }> }>(

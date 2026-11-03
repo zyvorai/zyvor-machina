@@ -6,6 +6,10 @@ use crate::db::DbPool;
 use uuid::Uuid;
 
 pub mod action_audit;
+pub mod change_review;
+pub mod digest;
+pub mod postmortem;
+pub mod wave_advisor;
 pub mod actions;
 pub mod agent_loop;
 pub mod forecast;
