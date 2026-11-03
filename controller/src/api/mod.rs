@@ -516,6 +516,12 @@ pub fn router(state: AppState) -> Router {
         )
         .route("/api/v1/ai/digest/send", post(ai::send_digest_now))
         .route(
+            "/api/v1/ai/migration-order/advise",
+            post(ai::advise_migration_wave),
+        )
+        // Original name, kept so existing callers keep working. It has nothing to do with
+        // /api/v1/migration-waves (Transiva import waves).
+        .route(
             "/api/v1/ai/migration-waves/advise",
             post(ai::advise_migration_wave),
         )

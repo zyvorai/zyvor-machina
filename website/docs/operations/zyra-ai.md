@@ -72,10 +72,22 @@ one now (admin). Every five minutes the controller checks whether a send is due,
 ```bash
 curl -sk -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"vm_names":["web-1","web-2","db-1"],"max_parallel":3}' \
-  https://HOST:5092/api/v1/platform/controller/api/v1/ai/migration-waves/advise
+  https://HOST:5092/api/v1/platform/controller/api/v1/ai/migration-order/advise
 ```
 
 Batches: powered-off machines first, then running machines smallest memory first, never two running machines of one application
-group in a batch, at most `max_parallel` per batch. Unknown names are listed and left out. It is for machines that already exist in Machina (evacuating a host, rebalancing), found by name in the inventory. It does not
-know machines that are still being imported through Transiva, so it is not for the Migration waves page. It creates nothing and
-does not yet use the convergence oracle or the noisy-neighbour graph.
+group in a batch, at most `max_parallel` per batch. Unknown names are listed and left out. It is for machines that already exist
+in Machina (evacuating a host, rebalancing), found by name in the inventory. It does not know machines that are still being
+imported through Transiva, so it is not for the Migration waves page. It creates nothing. The older path
+`/api/v1/ai/migration-waves/advise` still works and is the same endpoint.
+
+Two optional inputs make it use data Machina already has. Both are off unless you ask:
+
+- `"dest_host_id": "<host id>"` runs each machine through the convergence oracle (the same prediction as `POST /api/v1/vms/{id}/migration-oracle`) for that destination.
+  A machine that fails the migration precheck or will not converge is **held**: it is not in any batch and appears in `held`
+  with the reason. Of the rest, safer predictions (`strong`, `likely`) go before `marginal` and `high_risk` ones.
+- `"use_interference": true` reads the noisy-neighbour graph. A machine that disturbs others moves earlier than a machine of the
+  same oracle rating, so its victims get relief sooner. It never moves ahead of a safer prediction.
+
+If the oracle cannot assess a machine, or interference data is unavailable, the advice says so in `notes` and uses the base
+rules for it. The oracle's numbers are estimates; the advisor changes the order, not what is safe.
