@@ -54,7 +54,9 @@ pub fn compose(d: &mut Digest) {
     let mut md = format!("# Fleet digest — last {} h\n\n", d.hours);
     md.push_str(&match d.headline.as_str() {
         "ok" => "**All quiet.** Nothing needs a person right now.\n\n".to_string(),
-        "critical" => "**Needs attention now.** Half or more of your hosts are not online.\n\n".to_string(),
+        "critical" => {
+            "**Needs attention now.** Half or more of your hosts are not online.\n\n".to_string()
+        }
         _ => "**A few things need a look.**\n\n".to_string(),
     });
     md.push_str("## Fleet\n\n");

@@ -38,8 +38,8 @@ const NEW: Feature[] = [
   {
     name: 'Migration Order Advisor',
     tag: 'New',
-    text: 'Give it machines already in Machina that you want to move. It proposes batches: powered-off machines first, small running machines next, never two from one application group at once.',
-    how: 'POST /api/v1/ai/migration-waves/advise',
+    text: 'Give it machines already in Machina that you want to move. It proposes batches: powered-off machines first, small running machines next, never two from one application group at once. Optionally checks each against the convergence oracle and moves noisy neighbours early.',
+    how: 'POST /api/v1/ai/migration-order/advise',
     doc: '/docs/operations/zyra-ai#migration-order-advisor',
   },
 ];

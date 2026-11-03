@@ -66,9 +66,16 @@ pub fn validate(u: &ScheduleUpdate) -> Result<(), String> {
 /// The most recent scheduled instant at or before `now`.
 pub fn latest_slot(s: &Schedule, now: DateTime<Utc>) -> DateTime<Utc> {
     let at_hour = |d: DateTime<Utc>| {
-        Utc.with_ymd_and_hms(d.year(), d.month(), d.day(), s.hour_utc.clamp(0, 23) as u32, 0, 0)
-            .single()
-            .unwrap_or(d)
+        Utc.with_ymd_and_hms(
+            d.year(),
+            d.month(),
+            d.day(),
+            s.hour_utc.clamp(0, 23) as u32,
+            0,
+            0,
+        )
+        .single()
+        .unwrap_or(d)
     };
     if s.frequency == "weekly" {
         for back in 0..=7 {
@@ -112,7 +119,13 @@ pub async fn get(pool: &DbPool) -> anyhow::Result<Schedule> {
     .await?;
     let (enabled, frequency, hour_utc, weekday, last_sent_at) =
         row.unwrap_or((false, "daily".into(), 8, 1, None));
-    Ok(Schedule { enabled, frequency, hour_utc, weekday, last_sent_at })
+    Ok(Schedule {
+        enabled,
+        frequency,
+        hour_utc,
+        weekday,
+        last_sent_at,
+    })
 }
 
 /// Save the schedule. Switching it on counts as "sent now", so the first digest goes out at the next slot and
@@ -206,27 +219,48 @@ mod tests {
     #[test]
     fn daily_slot_is_today_once_the_hour_has_passed() {
         let s = sched("daily", 8, 1, None);
-        assert_eq!(latest_slot(&s, at(2026, 11, 3, 9, 0)), at(2026, 11, 3, 8, 0));
-        assert_eq!(latest_slot(&s, at(2026, 11, 3, 7, 59)), at(2026, 11, 2, 8, 0));
+        assert_eq!(
+            latest_slot(&s, at(2026, 11, 3, 9, 0)),
+            at(2026, 11, 3, 8, 0)
+        );
+        assert_eq!(
+            latest_slot(&s, at(2026, 11, 3, 7, 59)),
+            at(2026, 11, 2, 8, 0)
+        );
     }
 
     #[test]
     fn weekly_slot_is_the_latest_matching_weekday() {
         // 2026-11-03 is a Tuesday. Monday 08:00 was the day before.
         let s = sched("weekly", 8, 1, None);
-        assert_eq!(latest_slot(&s, at(2026, 11, 3, 12, 0)), at(2026, 11, 2, 8, 0));
+        assert_eq!(
+            latest_slot(&s, at(2026, 11, 3, 12, 0)),
+            at(2026, 11, 2, 8, 0)
+        );
         // On Monday before the hour, the slot is the previous Monday.
-        assert_eq!(latest_slot(&s, at(2026, 11, 2, 7, 0)), at(2026, 10, 26, 8, 0));
+        assert_eq!(
+            latest_slot(&s, at(2026, 11, 2, 7, 0)),
+            at(2026, 10, 26, 8, 0)
+        );
         // On Monday after the hour it is today.
-        assert_eq!(latest_slot(&s, at(2026, 11, 2, 8, 0)), at(2026, 11, 2, 8, 0));
+        assert_eq!(
+            latest_slot(&s, at(2026, 11, 2, 8, 0)),
+            at(2026, 11, 2, 8, 0)
+        );
     }
 
     #[test]
     fn due_only_when_enabled_and_not_yet_sent_for_the_slot() {
         let now = at(2026, 11, 3, 9, 0);
         assert!(is_due(&sched("daily", 8, 1, None), now));
-        assert!(is_due(&sched("daily", 8, 1, Some("2026-11-02 08:00:10")), now));
-        assert!(!is_due(&sched("daily", 8, 1, Some("2026-11-03 08:00:10")), now));
+        assert!(is_due(
+            &sched("daily", 8, 1, Some("2026-11-02 08:00:10")),
+            now
+        ));
+        assert!(!is_due(
+            &sched("daily", 8, 1, Some("2026-11-03 08:00:10")),
+            now
+        ));
         let mut off = sched("daily", 8, 1, None);
         off.enabled = false;
         assert!(!is_due(&off, now));
@@ -241,15 +275,29 @@ mod tests {
 
     #[test]
     fn an_unreadable_last_sent_counts_as_never_sent() {
-        assert!(is_due(&sched("daily", 8, 1, Some("garbage")), at(2026, 11, 3, 9, 0)));
+        assert!(is_due(
+            &sched("daily", 8, 1, Some("garbage")),
+            at(2026, 11, 3, 9, 0)
+        ));
     }
 
     #[test]
     fn validation_rejects_bad_values() {
-        let ok = ScheduleUpdate { enabled: true, frequency: "daily".into(), hour_utc: 8, weekday: 1 };
+        let ok = ScheduleUpdate {
+            enabled: true,
+            frequency: "daily".into(),
+            hour_utc: 8,
+            weekday: 1,
+        };
         assert!(validate(&ok).is_ok());
         let bad = |f: &str, h: i64, w: i64| {
-            validate(&ScheduleUpdate { enabled: true, frequency: f.into(), hour_utc: h, weekday: w }).is_err()
+            validate(&ScheduleUpdate {
+                enabled: true,
+                frequency: f.into(),
+                hour_utc: h,
+                weekday: w,
+            })
+            .is_err()
         };
         assert!(bad("hourly", 8, 1));
         assert!(bad("daily", 24, 1));
@@ -276,13 +324,20 @@ mod tests {
     #[tokio::test]
     async fn enabling_marks_it_sent_so_it_does_not_fire_for_a_past_slot() {
         let pool = crate::db::testing::pool().await;
-        let u = ScheduleUpdate { enabled: true, frequency: "daily".into(), hour_utc: 0, weekday: 1 };
+        let u = ScheduleUpdate {
+            enabled: true,
+            frequency: "daily".into(),
+            hour_utc: 0,
+            weekday: 1,
+        };
         let s = save(&pool, &u, "tester").await.unwrap();
         assert!(s.enabled);
         assert!(s.last_sent_at.is_some());
         assert!(!is_due(&s, Utc::now()));
         // Changing the hour while already on keeps the last send.
-        let again = save(&pool, &ScheduleUpdate { hour_utc: 5, ..u }, "tester").await.unwrap();
+        let again = save(&pool, &ScheduleUpdate { hour_utc: 5, ..u }, "tester")
+            .await
+            .unwrap();
         assert_eq!(again.last_sent_at, s.last_sent_at);
         assert_eq!(again.hour_utc, 5);
     }
@@ -290,7 +345,12 @@ mod tests {
     #[tokio::test]
     async fn save_refuses_invalid_input() {
         let pool = crate::db::testing::pool().await;
-        let u = ScheduleUpdate { enabled: true, frequency: "yearly".into(), hour_utc: 8, weekday: 1 };
+        let u = ScheduleUpdate {
+            enabled: true,
+            frequency: "yearly".into(),
+            hour_utc: 8,
+            weekday: 1,
+        };
         assert!(save(&pool, &u, "tester").await.is_err());
     }
 

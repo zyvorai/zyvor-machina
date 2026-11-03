@@ -52,7 +52,12 @@ pub fn render(room: &IncidentRoom, actions: &[ActionTaken]) -> String {
     ));
     if let (Some(a), Some(b)) = (i.window_start, i.window_end) {
         let mins = (b - a).num_minutes().max(0);
-        md.push_str(&format!("- **Detection window:** {} to {} ({} min)\n", fmt(a), fmt(b), mins));
+        md.push_str(&format!(
+            "- **Detection window:** {} to {} ({} min)\n",
+            fmt(a),
+            fmt(b),
+            mins
+        ));
     }
     md.push_str("\n## Summary\n\n");
     if i.summary.trim().is_empty() {
@@ -72,12 +77,19 @@ pub fn render(room: &IncidentRoom, actions: &[ActionTaken]) -> String {
     }
 
     md.push_str("\n## Root cause\n\n");
-    match i.root_cause.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+    match i
+        .root_cause
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
         Some(rc) => {
             md.push_str(rc);
             md.push('\n');
         }
-        None => md.push_str("_Not determined. This needs a person to confirm before the postmortem is final._\n"),
+        None => md.push_str(
+            "_Not determined. This needs a person to confirm before the postmortem is final._\n",
+        ),
     }
 
     md.push_str("\n## Timeline\n\n");
@@ -139,7 +151,10 @@ pub fn render(room: &IncidentRoom, actions: &[ActionTaken]) -> String {
 
 pub async fn generate(pool: &DbPool, incident_id: Uuid) -> anyhow::Result<Postmortem> {
     let room = open_room(pool, incident_id).await?;
-    let from = room.incident.window_start.unwrap_or(room.incident.created_at);
+    let from = room
+        .incident
+        .window_start
+        .unwrap_or(room.incident.created_at);
     let to = room.incident.window_end.unwrap_or_else(Utc::now);
     let rows: Vec<(String, String, String, String, String)> = crate::db::query_as(
         "SELECT label, action_type, status, requested_by,
@@ -155,13 +170,15 @@ pub async fn generate(pool: &DbPool, incident_id: Uuid) -> anyhow::Result<Postmo
     .await?;
     let actions: Vec<ActionTaken> = rows
         .into_iter()
-        .map(|(label, action_type, status, requested_by, at)| ActionTaken {
-            label,
-            action_type,
-            status,
-            requested_by,
-            at,
-        })
+        .map(
+            |(label, action_type, status, requested_by, at)| ActionTaken {
+                label,
+                action_type,
+                status,
+                requested_by,
+                at,
+            },
+        )
         .collect();
     Ok(Postmortem {
         incident_id,

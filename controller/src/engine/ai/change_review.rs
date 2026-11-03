@@ -91,7 +91,9 @@ pub fn assess(
                 ));
             }
         }
-        None => checks.push("The action does not name a machine; its reach is unknown.".to_string()),
+        None => {
+            checks.push("The action does not name a machine; its reach is unknown.".to_string())
+        }
     }
     if !blast.groups.is_empty() {
         radius.push(format!(
@@ -112,7 +114,8 @@ pub fn assess(
 
     let reversible = is_reversible(action_type);
     let rollback = if reversible {
-        "Zyra records the machine's state first, verifies the result, and offers a one-click undo.".to_string()
+        "Zyra records the machine's state first, verifies the result, and offers a one-click undo."
+            .to_string()
     } else if DESTRUCTIVE.contains(&action_type) {
         "None. This cannot be undone; take a backup first.".to_string()
     } else {
@@ -192,10 +195,11 @@ pub async fn review(pool: &DbPool, id: Uuid) -> anyhow::Result<Option<ChangeRevi
             blast.observed_state = Some(state);
             blast.host = host;
             if let Some(hid) = host_id {
-                blast.host_peers = crate::db::query_scalar("SELECT COUNT(*) FROM vms WHERE host_id = ?")
-                    .bind(hid)
-                    .fetch_one(pool)
-                    .await?;
+                blast.host_peers =
+                    crate::db::query_scalar("SELECT COUNT(*) FROM vms WHERE host_id = ?")
+                        .bind(hid)
+                        .fetch_one(pool)
+                        .await?;
             }
             blast.groups = crate::db::query_scalar(
                 "SELECT g.name FROM application_group_vms agv
@@ -226,7 +230,13 @@ pub async fn review(pool: &DbPool, id: Uuid) -> anyhow::Result<Option<ChangeRevi
     .await?;
     let (streak, _, _) = super::trust::tally(&statuses);
 
-    Ok(Some(assess(id, &action.action_type, &action.risk, &blast, streak)))
+    Ok(Some(assess(
+        id,
+        &action.action_type,
+        &action.risk,
+        &blast,
+        streak,
+    )))
 }
 
 #[cfg(test)]
@@ -282,7 +292,10 @@ mod tests {
 
     #[test]
     fn machine_name_is_read_from_common_keys() {
-        assert_eq!(vm_name(&serde_json::json!({"vm_name": "a"})).as_deref(), Some("a"));
+        assert_eq!(
+            vm_name(&serde_json::json!({"vm_name": "a"})).as_deref(),
+            Some("a")
+        );
         assert_eq!(vm_name(&serde_json::json!({"vm": ""})), None);
     }
 
