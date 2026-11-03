@@ -50,8 +50,22 @@ curl -sk -H "Authorization: Bearer $TOKEN" \
 ```
 
 Returns counts and a ready-made `markdown` briefing: hosts and machines, open incidents, pending approvals, what Zyra executed,
-failed, had rejected and had undone, and budget alerts. `headline` is `ok`, `attention` or `critical`. There is no scheduled
-delivery yet; poll it from whatever sends your notifications.
+failed, had rejected and had undone, and budget alerts. `headline` is `ok`, `attention` or `critical`. 
+### Send it on a schedule
+
+Off by default. An admin turns it on in the **Fleet digest** panel on the Approvals page, or through the API:
+
+```bash
+curl -sk -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"enabled":true,"frequency":"weekly","weekday":1,"hour_utc":8}' \
+  https://HOST:5092/api/v1/platform/controller/api/v1/ai/digest/schedule
+```
+
+`frequency` is `daily` (covers 24 hours) or `weekly` (covers 7 days, on ISO `weekday` 1 to 7); `hour_utc` is 0 to 23. The digest goes
+out as event `zyra.digest` to every webhook and notification channel subscribed to `zyra.digest`, `zyra.*` or `*`. A new channel
+only receives `alert.*`, so add one of those to its events. Only the leader controller sends, so a cluster sends once. Turning it
+on does not send for a slot that already passed today; the first digest goes out at the next slot. `POST .../ai/digest/send` sends
+one now (admin). Every five minutes the controller checks whether a send is due, so delivery can be up to five minutes late.
 
 ## Migration Order Advisor
 

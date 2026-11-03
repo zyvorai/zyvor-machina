@@ -29,8 +29,9 @@ with them. A model may phrase things elsewhere in Zyra; none of these depends on
 
 ## What is not done
 
-These are unit-tested, not yet run on a real fleet (claims C67 to C70). The digest has no scheduled delivery. The wave
-copilot does not yet use the migration oracle or the noisy-neighbour graph. Change Review does not yet draw on the digital
+Change Review, the Fleet Digest and the Postmortem Writer have run on one demo controller; the Migration Order Advisor is
+unit-tested only (claims C67 to C70). The digest can be sent on a schedule to your notification channels (see the guide), but there
+are no per-user preferences. The advisor does not yet use the migration oracle or the noisy-neighbour graph. Change Review does not yet draw on the digital
 twin. The [guide](/docs/operations/zyra-ai) lists each gap.
 
 Try it from the [Zyra AI page](/ai), or [book a demo](https://zyvor.dev/schedule).

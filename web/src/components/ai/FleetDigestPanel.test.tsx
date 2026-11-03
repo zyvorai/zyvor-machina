@@ -14,6 +14,11 @@ vi.mock('../../api/ai', () => ({
     pending_approvals: 2, actions_executed: 4, actions_failed: 0, actions_rejected: 1, actions_undone: 0,
     budget_status: null, budget_alerts: [], headline: 'attention', markdown: '',
   }),
+  getDigestSchedule: vi.fn().mockResolvedValue({
+    enabled: false, frequency: 'daily', hour_utc: 8, weekday: 1, last_sent_at: null,
+  }),
+  setDigestSchedule: vi.fn(),
+  sendDigestNow: vi.fn(),
 }))
 
 describe('FleetDigestPanel', () => {

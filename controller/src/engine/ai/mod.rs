@@ -8,6 +8,7 @@ use uuid::Uuid;
 pub mod action_audit;
 pub mod change_review;
 pub mod digest;
+pub mod digest_schedule;
 pub mod postmortem;
 pub mod wave_advisor;
 pub mod actions;

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { MacGlassPanel } from '../platform/mac/PlatformMacUi'
 import { getFleetDigest, type FleetDigest } from '../../api/ai'
 import { formatUserError } from '../../utils/apiError'
+import DigestScheduleControls from './DigestScheduleControls'
 
 const HEADLINE: Record<FleetDigest['headline'], { text: string; cls: string }> = {
   ok: { text: 'All quiet', cls: 'text-emerald-500' },
@@ -67,6 +68,7 @@ export default function FleetDigestPanel() {
           )}
         </div>
       )}
+      <DigestScheduleControls />
     </MacGlassPanel>
   )
 }
