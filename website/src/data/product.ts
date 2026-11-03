@@ -17,6 +17,9 @@ export const SHOTS: Shot[] = [
   {src: '/machina-zyra-dark.png', title: 'Zyra AI', caption: 'Remediation hub, fleet intelligence, security graph and knowledge in one place.', url: 'https://machina:5092/platform/zyra'},
   {src: '/machina-native-ebpf-dark.png', title: 'Native eBPF', caption: 'machina-bpfd datapath: flows, L7, DNS, captures and lease-gated enforcement.', url: 'https://machina:5092/platform/zyra/security/native-bpf'},
   {src: '/machina-security-dark.png', title: 'Security Center', caption: 'Zeus firewall, SOC, threat hunting, runtime enforcement and the eBPF sensor matrix.', url: 'https://machina:5092/platform/zeus/security'},
+  {src: '/zyra-change-review.jpg', title: 'Change review', caption: '"What happens if I approve?": risk, reach, reversibility and rollback on every pending Zyra action.', url: 'https://machina:5092/platform/zyra/approvals'},
+  {src: '/zyra-fleet-digest.jpg', title: 'Fleet digest', caption: 'What happened, what Zyra did and undid, and what needs a person, for the last day or week.', url: 'https://machina:5092/platform/zyra/approvals'},
+  {src: '/zyra-postmortem.jpg', title: 'Draft postmortem', caption: 'One click on an incident drafts a Markdown postmortem from its room and the actions in its window.', url: 'https://machina:5092/platform/zyra/incidents'},
 ];
 
 export type Feature = {

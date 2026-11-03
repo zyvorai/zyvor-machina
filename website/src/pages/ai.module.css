@@ -41,11 +41,13 @@
 .tagNew { color: #fff; border-color: transparent; background: linear-gradient(135deg, #0071e3, #a97bff); }
 .how { font-size: 0.8rem; word-break: break-all; }
 .more { margin-top: auto; padding-top: 0.5rem; font-weight: 600; }
-.shot { margin: 1rem 0 3rem; }
+.shot { margin: 1rem 0 1.5rem; }
+.shots2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin: 0 0 3rem; }
 .trust ul { margin: 0; padding-left: 1.2rem; }
 .trust li { margin: 0.5rem 0; color: var(--mx-soft); }
 
 @media (max-width: 900px) {
+  .shots2 { grid-template-columns: 1fr; }
   .flow { grid-template-columns: 1fr 1fr; }
   .step:not(:last-child)::after { display: none; }
 }

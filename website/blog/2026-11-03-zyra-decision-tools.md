@@ -3,7 +3,7 @@ slug: zyra-decision-tools
 title: Four small AI tools for the moment you have to decide
 authors: [zyvor]
 tags: [ai, zyra, operations]
-description: Change review, postmortems, fleet digests and migration wave planning. Read-only, deterministic, and honest about what is not built.
+description: Change review, postmortems, fleet digests and migration ordering. Read-only, deterministic, and honest about what is not built.
 ---
 
 Most AI in operations tools tries to act for you. The hard part of on-call is different: someone has to decide, quickly, with
@@ -19,8 +19,8 @@ the approving.
 - **Postmortem Writer.** One click on an incident drafts a Markdown postmortem. A section with no data says so instead of
   guessing.
 - **Fleet Digest.** A briefing for the last N hours: what is down, what needs a person, what Zyra did and what it undid.
-- **Migration Wave Copilot.** Suggests batches for a migration wave: powered-off machines first, never two running machines of
-  one application group at once.
+- **Migration Order Advisor.** Suggests batches for moving machines that already run in Machina: powered-off machines first,
+  never two running machines of one application group at once. It does not know machines still being imported.
 
 ## What they deliberately are not
 

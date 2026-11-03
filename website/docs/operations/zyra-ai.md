@@ -1,7 +1,7 @@
 ---
 sidebar_position: 12
 title: Zyra AI decision tools
-description: Change review, postmortems, fleet digests and migration wave planning. Read-only advice that sits in front of every decision.
+description: Change review, postmortems, fleet digests and migration ordering. Read-only advice that sits in front of every decision.
 ---
 
 # Zyra AI decision tools
@@ -53,7 +53,7 @@ Returns counts and a ready-made `markdown` briefing: hosts and machines, open in
 failed, had rejected and had undone, and budget alerts. `headline` is `ok`, `attention` or `critical`. There is no scheduled
 delivery yet; poll it from whatever sends your notifications.
 
-## Migration Wave Copilot
+## Migration Order Advisor
 
 ```bash
 curl -sk -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
@@ -62,5 +62,6 @@ curl -sk -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application
 ```
 
 Batches: powered-off machines first, then running machines smallest memory first, never two running machines of one application
-group in a batch, at most `max_parallel` per batch. Unknown names are listed and left out. It creates nothing; feed the order to
-`POST /api/v1/migration-waves` yourself. It does not yet use the convergence oracle or the noisy-neighbour graph.
+group in a batch, at most `max_parallel` per batch. Unknown names are listed and left out. It is for machines that already exist in Machina (evacuating a host, rebalancing), found by name in the inventory. It does not
+know machines that are still being imported through Transiva, so it is not for the Migration waves page. It creates nothing and
+does not yet use the convergence oracle or the noisy-neighbour graph.
