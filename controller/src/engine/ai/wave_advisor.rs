@@ -94,10 +94,12 @@ pub fn hold_reason(
     first_risk: Option<&str>,
 ) -> Option<String> {
     if !precheck_ok {
-        return Some(format!(
-            "Migration precheck failed{}.",
-            first_risk.map(|r| format!(": {r}")).unwrap_or_default()
-        ));
+        // The oracle lists failed precheck checks first, as "Precheck '<name>' failed: ...". Quote one of those;
+        // any other first risk (a dirty-rate warning, say) is not the reason the precheck failed.
+        return Some(match first_risk.filter(|r| r.starts_with("Precheck '")) {
+            Some(r) => r.to_string(),
+            None => "Migration precheck failed.".to_string(),
+        });
     }
     match convergence {
         "blocked" => Some("No usable migration bandwidth to the destination.".to_string()),
@@ -181,6 +183,13 @@ pub async fn advise(pool: &DbPool, req: &AdviseRequest) -> anyhow::Result<WaveAd
     anyhow::ensure!(!req.vm_names.is_empty(), "vm_names must not be empty");
     anyhow::ensure!(req.vm_names.len() <= 200, "at most 200 machines per wave");
     let max_parallel = req.max_parallel.unwrap_or(3).clamp(1, 20);
+    if let Some(dest) = req.dest_host_id {
+        let known: i64 = crate::db::query_scalar("SELECT COUNT(*) FROM hosts WHERE id = ?")
+            .bind(dest)
+            .fetch_one(pool)
+            .await?;
+        anyhow::ensure!(known > 0, "destination host not found");
+    }
 
     let mut found = Vec::new();
     let mut unknown = Vec::new();
@@ -447,10 +456,26 @@ mod tests {
 
     #[test]
     fn hold_reason_follows_the_precheck_and_the_verdict() {
-        assert!(
-            hold_reason(false, "strong", Some("destination is in maintenance"))
-                .unwrap()
-                .contains("maintenance")
+        assert!(hold_reason(
+            false,
+            "strong",
+            Some("Precheck 'destination' failed: destination is in maintenance")
+        )
+        .unwrap()
+        .contains("maintenance"));
+        // An unrelated first risk is not passed off as the precheck's reason.
+        assert_eq!(
+            hold_reason(
+                false,
+                "strong",
+                Some("Dirty-page rate is at or above the transfer rate")
+            )
+            .unwrap(),
+            "Migration precheck failed."
+        );
+        assert_eq!(
+            hold_reason(false, "strong", None).unwrap(),
+            "Migration precheck failed."
         );
         assert!(hold_reason(true, "will_not_converge", None)
             .unwrap()
@@ -474,10 +499,16 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
+        let dest = uuid::Uuid::new_v4();
+        crate::db::query("INSERT INTO hosts (id, hostname, state) VALUES (?, 'dest', 'online')")
+            .bind(dest)
+            .execute(&pool)
+            .await
+            .unwrap();
         let req = AdviseRequest {
             vm_names: vec!["no-host-vm".into()],
             max_parallel: Some(2),
-            dest_host_id: Some(uuid::Uuid::new_v4()),
+            dest_host_id: Some(dest),
             use_interference: false,
         };
         let a = advise(&pool, &req).await.unwrap();
@@ -488,5 +519,18 @@ mod tests {
         );
         assert!(a.held.is_empty());
         assert!(a.notes.iter().any(|n| n.contains("could not assess")));
+    }
+
+    #[tokio::test]
+    async fn an_unknown_destination_host_is_refused() {
+        let pool = crate::db::testing::pool().await;
+        let req = AdviseRequest {
+            vm_names: vec!["whatever".into()],
+            max_parallel: None,
+            dest_host_id: Some(uuid::Uuid::new_v4()),
+            use_interference: false,
+        };
+        let err = advise(&pool, &req).await.unwrap_err().to_string();
+        assert!(err.contains("destination host not found"), "{err}");
     }
 }

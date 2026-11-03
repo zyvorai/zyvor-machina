@@ -212,6 +212,14 @@ pub async fn predict(
     let mut evidence = Vec::new();
     let mut recommendations = Vec::new();
 
+    // The precheck's failed checks are the first thing a person needs to read: say which one and how to fix it.
+    for c in pre.checks.iter().filter(|c| !c.passed) {
+        risks.push(format!("Precheck '{}' failed: {}", c.name, c.message));
+        if let Some(r) = &c.remediation {
+            recommendations.push(r.clone());
+        }
+    }
+
     evidence.push(format!(
         "VM memory {} MiB; dirty rate {:.1} MiB/s; effective migration bandwidth {:.1} MiB/s.",
         vm.2, dirty, bw_mib_s
