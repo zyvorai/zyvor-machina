@@ -2,6 +2,19 @@
 
 Rolling notes from deployed-host sweeps. Update as new loops complete.
 
+## 2026-11-03 — Zyra decision tools on the demo host (`80.79.5.173`, `feat/zyra-ai-decision-features` `7803cf35`)
+
+Controller, daemon and agent running (agent with mutual TLS from a throwaway CA). The host has no `chrome-e2e-vm`
+fixture, so every check that needs it fails by construction; nothing was created to hide that.
+
+| Suite | Result |
+|-------|--------|
+| `make regression-api LOOPS=1` | 11 pass, 3 fail: `GET /vms/chrome-e2e-vm`, `/guest-health`, `/interfaces` (404, VM not on host) |
+| `make regression-mission` | 15 pass, 5 fail: `ensure-running`, `leave-running`, and the three `platform-libvirt-*` checks, which build their URL from the missing VM (`vms//libvirt`) |
+| Zyra review, digest and postmortem routes | exercised by hand (claims C67 to C69); not part of these suites |
+
+Not run: `regression-ops`, `regression-catalog`, `regression-pages` (needs CDP), the PostgreSQL build.
+
 ## 2026-10-08 — FluxVM between two hosts (`175.110.122.71` controller, `212.8.248.187` second agent)
 
 A second, private `machina-agent` on 212 (port 50061, own env file and PKI) joined 175's controller over mTLS;

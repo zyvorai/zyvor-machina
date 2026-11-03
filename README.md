@@ -174,6 +174,8 @@ Flavors, images, instances, volumes and snapshots, security groups, keypairs, fl
 
 Autonomous diagnostics across the fleet, incident correlation, rightsizing and natural-language operations, with bring-your-own LLM providers (keys encrypted at rest) and an approval queue in front of every change. [Zyra AI →](docs/customer/pages/platform-security/platform-zyra.md)
 
+Decision tools in front of every approval: **Change Review** (what happens if I approve this?), **Postmortem Writer**, **Fleet Digest** and **Migration Wave Copilot**. All read-only; the status of each is in `docs/claims.md` (C67 to C70). [Guide →](website/docs/operations/zyra-ai.md)
+
 ![Zyra AI](docs/ux/machina-zyra-dark.png)
 
 ### Networking and security, in the kernel
