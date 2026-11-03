@@ -1422,6 +1422,20 @@ pub async fn zyra_approval_hub(
         .map(Json)
 }
 
+/// "What happens if I approve this?" for a pending action. Read-only.
+pub async fn review_zyra_action(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    axum::extract::Path(id): axum::extract::Path<Uuid>,
+) -> Result<Json<ai::change_review::ChangeReview>, ApiError> {
+    require_operator(&actor)?;
+    ai::change_review::review(&state.pool, id)
+        .await
+        .map_err(|e| ApiError::internal(e.to_string()))?
+        .ok_or_else(|| ApiError::not_found("action not found"))
+        .map(Json)
+}
+
 pub async fn create_zyra_action(
     State(state): State<AppState>,
     Extension(actor): Extension<AuthUser>,
@@ -1845,6 +1859,50 @@ pub async fn incident_room(
 ) -> Result<Json<ai::incident_commander::IncidentRoom>, ApiError> {
     require_operator(&actor)?;
     ai::incident_commander::open_room(&state.pool, id)
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))
+        .map(Json)
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct DigestQuery {
+    pub hours: Option<i64>,
+}
+
+/// Fleet briefing for the last `hours` (default 24). Read-only.
+pub async fn fleet_digest(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Query(q): Query<DigestQuery>,
+) -> Result<Json<ai::digest::Digest>, ApiError> {
+    require_operator(&actor)?;
+    ai::digest::build(&state.pool, q.hours.unwrap_or(24))
+        .await
+        .map_err(|e| ApiError::internal(e.to_string()))
+        .map(Json)
+}
+
+/// Suggest an order and batches for a migration wave. Read-only: it creates nothing.
+pub async fn advise_migration_wave(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Json(req): Json<ai::wave_advisor::AdviseRequest>,
+) -> Result<Json<ai::wave_advisor::WaveAdvice>, ApiError> {
+    require_operator(&actor)?;
+    ai::wave_advisor::advise(&state.pool, &req)
+        .await
+        .map_err(|e| ApiError::bad_request(e.to_string()))
+        .map(Json)
+}
+
+/// Draft a Markdown postmortem for an incident from recorded data. Read-only.
+pub async fn incident_postmortem(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    axum::extract::Path(id): axum::extract::Path<Uuid>,
+) -> Result<Json<ai::postmortem::Postmortem>, ApiError> {
+    require_operator(&actor)?;
+    ai::postmortem::generate(&state.pool, id)
         .await
         .map_err(|e| ApiError::bad_request(e.to_string()))
         .map(Json)

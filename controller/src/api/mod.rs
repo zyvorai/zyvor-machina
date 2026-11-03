@@ -509,8 +509,17 @@ pub fn router(state: AppState) -> Router {
             get(ai::analyze_blackbox_incident),
         )
         .route("/api/v1/ai/incidents/active", get(ai::incidents_active))
+        .route("/api/v1/ai/digest", get(ai::fleet_digest))
+        .route(
+            "/api/v1/ai/migration-waves/advise",
+            post(ai::advise_migration_wave),
+        )
         .route("/api/v1/ai/incidents/{id}/room", get(ai::incident_room))
         .route("/api/v1/ai/incidents/{id}/ack", post(ai::incident_ack))
+        .route(
+            "/api/v1/ai/incidents/{id}/postmortem",
+            post(ai::incident_postmortem),
+        )
         .route("/api/v1/ai/troubleshoot", post(ai::troubleshoot_vm))
         .route("/api/v1/ai/predictions", get(ai::predictions_unified))
         .route("/api/v1/ai/rightsizing/report", get(ai::rightsizing_report))
@@ -625,6 +634,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/ai/memory", delete(ai::purge_memory))
         .route("/api/v1/ai/actions/hub", get(ai::zyra_approval_hub))
         .route("/api/v1/ai/actions", post(ai::create_zyra_action))
+        .route("/api/v1/ai/actions/{id}/review", get(ai::review_zyra_action))
         .route(
             "/api/v1/ai/actions/{id}/execute",
             post(ai::execute_zyra_action),

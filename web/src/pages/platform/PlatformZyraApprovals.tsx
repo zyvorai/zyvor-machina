@@ -10,6 +10,8 @@ import { MacGlassPanel } from '../../components/platform/mac/PlatformMacUi'
 import ZyraInsightCard from '../../components/ai/ZyraInsightCard'
 import ZyraAgentPanel from '../../components/ai/ZyraAgentPanel'
 import ZyraTrustLadder from '../../components/ai/ZyraTrustLadder'
+import FleetDigestPanel from '../../components/ai/FleetDigestPanel'
+import ChangeReviewPanel from '../../components/ai/ChangeReviewPanel'
 import {
   executeZyraAction,
   getZyraApprovalHub,
@@ -139,16 +141,20 @@ export default function PlatformZyraApprovals() {
         )}
         <div className="space-y-2">
           {actions.map((a) => (
-            <ZyraInsightCard
-              key={a.id}
-              title={a.label}
-              detail={`${a.review} · Risk: ${a.risk} · ${a.source}`}
-              onApprove={busy === a.id ? undefined : () => setConfirmExecute(a)}
-              onDismiss={busy === a.id ? undefined : () => setRejectTargetId(a.id)}
-            />
+            <div key={a.id}>
+              <ZyraInsightCard
+                title={a.label}
+                detail={`${a.review} · Risk: ${a.risk} · ${a.source}`}
+                onApprove={busy === a.id ? undefined : () => setConfirmExecute(a)}
+                onDismiss={busy === a.id ? undefined : () => setRejectTargetId(a.id)}
+              />
+              <ChangeReviewPanel actionId={a.id} />
+            </div>
           ))}
         </div>
       </MacGlassPanel>
+
+      <FleetDigestPanel />
 
       <ZyraTrustLadder />
 
