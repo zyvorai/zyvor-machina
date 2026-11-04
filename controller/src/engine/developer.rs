@@ -3,12 +3,8 @@
 
 // Developer ecosystem — schema export for Terraform + SDK (Phase 30).
 
-use std::io::Write;
-
 use machina_spec::VirtualMachine;
 use serde::Serialize;
-use zip::write::SimpleFileOptions;
-use zip::ZipWriter;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct DeveloperOverview {
@@ -164,25 +160,15 @@ pub async fn export_vm_bundle_zip(
 ) -> anyhow::Result<(String, Vec<u8>)> {
     let bundle = export_vm_bundle(pool, agent_addr, vm_id).await?;
     let name = bundle.vm_name.clone();
-    let mut buf = Vec::new();
-    {
-        let mut zip = ZipWriter::new(std::io::Cursor::new(&mut buf));
-        let opts =
-            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
-        let manifest = serde_json::to_string_pretty(&bundle)?;
-        let files: [(&str, &str); 5] = [
-            ("terraform.tf", &bundle.terraform),
-            ("ansible-role.txt", &bundle.ansible_role),
-            ("cloud-init.txt", &bundle.cloud_init),
-            ("domain.xml", &bundle.domain_xml),
-            ("manifest.json", &manifest),
-        ];
-        for (path, content) in files {
-            zip.start_file(path, opts)?;
-            zip.write_all(content.as_bytes())?;
-        }
-        zip.finish()?;
-    }
+    let manifest = serde_json::to_string_pretty(&bundle)?;
+    let files = [
+        ("terraform.tf".into(), bundle.terraform.into_bytes()),
+        ("ansible-role.txt".into(), bundle.ansible_role.into_bytes()),
+        ("cloud-init.txt".into(), bundle.cloud_init.into_bytes()),
+        ("domain.xml".into(), bundle.domain_xml.into_bytes()),
+        ("manifest.json".into(), manifest.into_bytes()),
+    ];
+    let buf = crate::zip_write::deflated_zip(files)?;
     Ok((name, buf))
 }
 

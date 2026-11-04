@@ -2440,7 +2440,7 @@ dependencies = [
 
 [[package]]
 name = "guestkit"
-version = "1.2.6"
+version = "1.2.5"
 dependencies = [
  "aes 0.8.4",
  "anyhow",
@@ -3611,6 +3611,8 @@ dependencies = [
  "bytes",
  "chrono",
  "clap",
+ "crc32fast",
+ "flate2",
  "futures-util",
  "guestkit",
  "guestkit-job-spec",
@@ -3645,7 +3647,6 @@ dependencies = [
  "url",
  "urlencoding",
  "uuid",
- "zip",
 ]
 
 [[package]]
@@ -5635,9 +5636,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.45"
+version = "0.23.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634"
+checksum = "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
 dependencies = [
  "aws-lc-rs",
  "log",
@@ -8347,22 +8348,6 @@ dependencies = [
  "syn 3.0.6",
 ]
 
-[[package]]
-name = "zip"
-version = "2.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fabe6324e908f85a1c52063ce7aa26b68dcb7eb6dbc83a2d148403c9bc3eba50"
-dependencies = [
- "arbitrary",
- "crc32fast",
- "crossbeam-utils",
- "displaydoc",
- "flate2",
- "indexmap",
- "memchr",
- "thiserror 2.0.21",
- "zopfli",
-]
 
 [[package]]
 name = "zlib-rs"

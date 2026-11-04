@@ -311,14 +311,19 @@ pub fn unix_now() -> i64 {
 /// SHA-256 of the first certificate in `pem`, as lower-case hex (what an operator pins).
 pub fn cert_sha256(pem: &str) -> Result<String> {
     use sha2::{Digest, Sha256};
+    const HEX: &[u8; 16] = b"0123456789abcdef";
     let der = certs(pem)?
         .into_iter()
         .next()
         .ok_or_else(|| anyhow!("no certificate"))?;
-    Ok(Sha256::digest(der.as_ref())
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect())
+    // Fingerprint only — never log or print the PEM/DER itself.
+    let digest = Sha256::digest(der.as_ref());
+    let mut out = String::with_capacity(digest.len() * 2);
+    for b in digest {
+        out.push(HEX[(b >> 4) as usize] as char);
+        out.push(HEX[(b & 0xf) as usize] as char);
+    }
+    Ok(out)
 }
 
 /// Whether `pinned` (hex, `:` separators and case ignored) is the fingerprint of `pem`.
