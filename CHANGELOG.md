@@ -1,6 +1,18 @@
 # Changelog
 
-## v0.3.1 — 2026-10-22
+## v0.3.2 — 2026-11-04
+
+Everything merged since v0.3.1 (#207 to #216).
+
+- **FluxVM libvirt parity.** Day-2 ops that already worked on libvirt now work on FluxVM QEMU: browser VNC via
+  `ws-ticket`, data disk attach/resize/detach, clone/rename, console logs, balloon, Secure Boot/TPM create fields, and
+  controller/agent snapshot + backup for `inventory_source=fluxvm` (#216). Live-checked on a real host (`ops-fluxvm.js`
+  A+B **35/35**); Firecracker start-after-restore still fails on FluxVM 0.4.18 (host-side).
+- **Zyra decision tools.** Change review, fleet digest (optional schedule), postmortem, and migration wave / order
+  advisor wired to the convergence oracle and noisy-neighbour data (#207 to #214).
+- **Docs and site.** Zyra AI landing page, gallery, handbook and customer pages (#209, #210).
+- **Security.** Dependabot: npm and rustls patches; zip replaced with a write-only helper (#215).
+
 
 Everything merged since v0.3.0 (#172 to #206). The claims ledger (`docs/claims.md`) says, row by row, what was run on a
 real host and what is unit-tested only.
