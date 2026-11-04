@@ -1444,6 +1444,21 @@ async fn set_memory_balloon_handler(
     Query(conn_q): Query<ConnQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     require_write(&actor, "vms:write")?;
+    if conn_q.is_fluxvm() {
+        // FluxVM treats 0 as "deflate"; otherwise enforce the usual floor.
+        if mb != 0 {
+            machina_core::validate::validate_memory_mb(mb)?;
+        }
+        let v = super::fluxvm::client()?.balloon_set(&name, mb).await?;
+        return Ok(Json(serde_json::json!({
+            "status": "ok",
+            "name": name,
+            "memory_mb": mb,
+            "live_applied": true,
+            "backend": "fluxvm",
+            "balloon": v,
+        })));
+    }
     machina_core::validate::validate_memory_mb(mb)?;
     let name2 = name.clone();
     let outcome = spawn_libvirt_actor(manager, Some(&actor), conn_q, move |conn| {

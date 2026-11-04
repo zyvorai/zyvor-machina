@@ -182,7 +182,7 @@ as `?token=`:
 |------|--------|
 | `/ws/v1/watch` | Event / state change stream |
 | `/ws/v1/console/{name}` | Serial console |
-| `/ws/v1/vnc/{name}` | VNC |
+| `/ws/v1/vnc/{name}` | VNC (`?backend=fluxvm` → FluxVM QEMU via `ws-ticket`) |
 | `/ws/v1/spice/{name}` | SPICE |
 | `/ws/v1/rdp/{name}` | RDP |
 | `/ws/v1/terminal/{session_id}` | Terminal / PTY |
@@ -321,17 +321,20 @@ an IPMI serial-over-LAN console. Guide:
   See [../kubevirt-migration.md](../kubevirt-migration.md).
 - **FluxVM** (`[fluxvm]`) — VMs on a FluxVM host (QEMU, Cloud Hypervisor,
   Firecracker, flux-vm) appear next to libvirt VMs with `backend: "fluxvm"`.
-  Create (image or direct kernel boot, guest agent, shared disk), power,
-  serial console (read-only log on non-QEMU engines), guest-agent console,
-  snapshots, backups (every engine; a running VM only on QEMU), hot-add
-  vCPU/memory (QEMU, Cloud Hypervisor), extra NICs (QEMU), install ISOs
-  (attached at create, ejected live; QEMU) and live migration (QEMU on a shared
-  disk, ISOs ejected) from VM detail → **Manage**. With `MACHINA_FLUXVM_URL` on each
-  host's `machina-agent`, the controller lists them, powers and deletes
-  them, migrates them between hosts (`vm.migrate`, DRS) and re-creates them
-  on another host for HA (`ha.recover`, `POST /vms/{id}/fluxvm/recover`).
-  Fleet migration and HA re-create need QEMU on a shared disk. See
-  [../fluxvm.md](../fluxvm.md).
+  Create (image or direct kernel boot, guest agent, shared disk, Secure Boot /
+  TPM / firmware / balloon), power, QEMU VNC (`/ws/v1/vnc/…?backend=fluxvm`),
+  serial (read-only log on non-QEMU), guest-agent console, snapshots, backups
+  (every engine; a running VM only on QEMU), hot-add vCPU/memory (QEMU, Cloud
+  Hypervisor), data disks / extra NICs / balloon (QEMU), clone/rename, install
+  ISOs (attached at create, ejected live; QEMU) and live migration (QEMU on a
+  shared disk, ISOs ejected) from VM detail → **Manage** / **Console (VNC)**.
+  With `MACHINA_FLUXVM_URL` on each host's `machina-agent`, the controller lists
+  them, powers and deletes them, migrates them (`vm.migrate`, DRS), runs
+  `vm.snapshot*` / `vm.backup*` through FluxVM, and re-creates them on another
+  host for HA (`ha.recover`, `POST /vms/{id}/fluxvm/recover`). Fleet migration
+  and HA re-create need QEMU on a shared disk. See [../fluxvm.md](../fluxvm.md)
+  and the site page
+  [FluxVM backend](https://zyvorai.github.io/zyvor-machina/docs/core-concepts/fluxvm).
 - **Fleet Cloud** (`/fleet-cloud/*` in the UI) — manage instances, flavors,
   networks, images, security groups, stacks, keypairs, and load balancers
   (kernel-level weighted round-robin, not an Octavia amphora) entirely via

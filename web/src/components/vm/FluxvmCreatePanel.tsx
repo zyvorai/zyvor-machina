@@ -46,6 +46,10 @@ export function buildFluxvmCreateRequest(p: {
   sharedDisk?: boolean
   /** Install ISO paths, one per line or comma-separated. */
   isos?: string
+  secureBoot?: boolean
+  vtpm?: boolean
+  firmware?: string
+  balloon?: boolean
 }): CreateVmRequest {
   const network = p.network ?? 'netns'
   const isos = splitIsos(p.isos)
@@ -76,6 +80,10 @@ export function buildFluxvmCreateRequest(p: {
     fluxvm_agent: p.agent === false ? false : undefined,
     fluxvm_shared_disk: p.sharedDisk || undefined,
     fluxvm_isos: isos.length > 0 ? isos : undefined,
+    secure_boot: p.secureBoot || undefined,
+    vtpm: p.vtpm || undefined,
+    fluxvm_firmware: p.firmware?.trim() || undefined,
+    fluxvm_balloon: p.balloon || undefined,
   }
 }
 
@@ -106,6 +114,10 @@ export default function FluxvmCreatePanel({ initialName = '', defaultHypervisor,
   const [agent, setAgent] = useState(true)
   const [sharedDisk, setSharedDisk] = useState(false)
   const [isos, setIsos] = useState('')
+  const [secureBoot, setSecureBoot] = useState(false)
+  const [vtpm, setVtpm] = useState(false)
+  const [firmware, setFirmware] = useState('')
+  const [balloon, setBalloon] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [log, setLog] = useState<string[]>([])
 
@@ -133,6 +145,7 @@ export default function FluxvmCreatePanel({ initialName = '', defaultHypervisor,
       name: vmName, vcpus, memoryMb, diskGb, hypervisor, image,
       network, bridge, directUplink, directMode, directGuestIps,
       cloudInitUser, cloudInitSshKey, kernel, initrd, kernelArgs, agent, sharedDisk, isos,
+      secureBoot, vtpm, firmware, balloon,
     })
     setSubmitting(true)
     setLog([])
@@ -250,6 +263,26 @@ export default function FluxvmCreatePanel({ initialName = '', defaultHypervisor,
             <input type="checkbox" checked={agent} onChange={(e) => setAgent(e.target.checked)} data-testid="fluxvm-agent" />
             FluxVM guest agent (agent console and exec; the image must run fluxvm-agent)
           </label>
+        </div>
+        <div className="sm:col-span-2 grid gap-3 sm:grid-cols-2">
+          <div>
+            <label htmlFor="fluxvm-firmware" className="block text-sm text-[var(--text-muted)] mb-1">Firmware path (optional, QEMU)</label>
+            <input id="fluxvm-firmware" type="text" value={firmware} onChange={(e) => setFirmware(e.target.value)} className="input-field w-full font-mono text-sm" placeholder="/usr/share/OVMF/OVMF_CODE_4M.fd" />
+          </div>
+          <div className="flex flex-col gap-2 justify-end pb-1">
+            <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+              <input type="checkbox" checked={secureBoot} onChange={(e) => setSecureBoot(e.target.checked)} data-testid="fluxvm-secure-boot" />
+              UEFI Secure Boot (QEMU; needs host OVMF SB keys)
+            </label>
+            <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+              <input type="checkbox" checked={vtpm} onChange={(e) => setVtpm(e.target.checked)} data-testid="fluxvm-tpm" />
+              TPM 2.0 (swtpm; Windows 11)
+            </label>
+            <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+              <input type="checkbox" checked={balloon} onChange={(e) => setBalloon(e.target.checked)} data-testid="fluxvm-balloon" />
+              Virtio balloon (QEMU)
+            </label>
+          </div>
         </div>
         <div>
           <label htmlFor="fluxvm-ci-user" className="block text-sm text-[var(--text-muted)] mb-1">Cloud-init user (optional)</label>

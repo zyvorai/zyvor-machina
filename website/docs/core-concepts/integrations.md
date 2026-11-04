@@ -37,10 +37,10 @@ replaces Cilium, Tetragon, Netra and PacketWolf, and Machina no longer talks to 
 
 A second VM backend next to libvirt: VMs on QEMU, Cloud Hypervisor, Firecracker or flux-vm from a host's
 `fluxvm-api` appear with `backend: "fluxvm"`. Enable it on the daemon with `[fluxvm] enabled = true` and on each
-host's agent with `MACHINA_FLUXVM_URL`. Snapshots, backups (every engine; running VMs on QEMU), hot-add (QEMU,
-Cloud Hypervisor), extra NICs and install ISOs (QEMU),
-consoles, live migration and HA re-create (QEMU on a shared disk) are covered in the
-[FluxVM guide](https://github.com/zyvorai/zyvor-machina/blob/main/docs/fluxvm.md).
+host's agent with `MACHINA_FLUXVM_URL`. Day-2 covers QEMU VNC (noVNC via `ws-ticket`), serial and agent consoles,
+snapshots, backups, hot-add, data disks, clone/rename, balloon, Secure Boot/TPM at create, install ISOs, live
+migration and HA re-create (QEMU on a shared disk). See [FluxVM backend](fluxvm.md) and the full
+[operator guide](https://github.com/zyvorai/zyvor-machina/blob/main/docs/fluxvm.md).
 
 ## Containers and Kubernetes
 

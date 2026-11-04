@@ -17,6 +17,8 @@ provider, all over the same model.
   or virt-builder), or an existing volume.
 - **Cloud-init**: user, SSH keys, packages and user-data are injected on first boot.
 - **Windows**: Windows 10/11 golden images through dockur when `[libvirt] dockur_windows_allowed = true`.
+- **FluxVM**: Create VM → FluxVM for QEMU / Cloud Hypervisor / Firecracker / flux-vm guests (Secure Boot, TPM,
+  balloon, install ISOs). See [FluxVM backend](fluxvm.md).
 - **Atlas storage**: put the root disk on a Ceph RBD, NFS or ZFS volume when the Atlas integration is enabled.
 
 ## Operate
@@ -24,9 +26,9 @@ provider, all over the same model.
 | Task | Where |
 | --- | --- |
 | Start, shut down, reboot, force off | VM list row actions or VM detail header |
-| Console | VM detail leads with a live console; noVNC, SPICE, serial and SSH ([Consoles](consoles.md)) |
-| Change vCPUs, memory, balloon, boot order | VM detail actions |
-| Disks and CD-ROMs | VM detail → Disks (attach, detach, resize, insert ISO) |
+| Console | VM detail leads with a live console; noVNC, SPICE, serial and SSH ([Consoles](consoles.md)). FluxVM QEMU uses **Console (VNC)** |
+| Change vCPUs, memory, balloon, boot order | VM detail actions (FluxVM: **Manage** for hot-add and balloon) |
+| Disks and CD-ROMs | VM detail → Disks (attach, detach, resize, insert ISO). FluxVM: attach/resize/detach and ISO eject under **Manage** |
 | Networks | VM detail → Network (NICs, bridges, nwfilters) |
 | Devices | VM detail → Devices (GPU and PCI passthrough, USB) |
 | Snapshots | VM detail → Snapshots (create, revert, delete) |
@@ -44,8 +46,8 @@ provider, all over the same model.
 ## Move
 
 - **Live migration** between hosts in a fleet, from VM detail or the API (a `vm.migrate` task). FluxVM VMs move
-  the same way when they are QEMU VMs on a shared disk.
-- **Clone** a VM or turn it into a template.
+  the same way when they are QEMU VMs on a shared disk ([FluxVM](fluxvm.md)).
+- **Clone** a VM or turn it into a template (FluxVM: clone needs the guest stopped).
 - **Import** from other platforms with hyper2kvm, checked offline by GuestKit.
 
 ## Guest agent

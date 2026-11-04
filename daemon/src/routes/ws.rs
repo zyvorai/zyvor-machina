@@ -547,6 +547,22 @@ async fn vnc_handler(
     Query(conn_q): Query<ConnQuery>,
     State(manager): State<LibvirtManager>,
 ) -> impl IntoResponse {
+    // FluxVM QEMU: mint a ws-ticket (kind=vnc) and bridge binary RFB frames to
+    // fluxvm-api's `/console/ws/{ticket}` (same shape noVNC expects).
+    if conn_q.is_fluxvm() {
+        let upstream = match super::fluxvm::client() {
+            Ok(c) => match c.ws_ticket(&name, "vnc").await {
+                Ok(path) => Ok(c.ticket_ws_url(&path)),
+                Err(e) => Err(e.to_string()),
+            },
+            Err(_) => Err("FluxVM backend is disabled ([fluxvm] enabled = false)".to_string()),
+        };
+        return ws
+            .protocols(["binary"])
+            .on_upgrade(move |socket| handle_fluxvm_vnc(socket, name, upstream))
+            .into_response();
+    }
+
     let name2 = name.clone();
     let resolved = spawn_libvirt_actor(manager, Some(&actor), conn_q, move |conn| {
         machina_core::libvirt::vnc::resolve_vnc_tcp(conn, &name2)
@@ -572,6 +588,69 @@ async fn vnc_handler(
     // offered protocol back satisfies that requirement.
     ws.protocols(["binary"])
         .on_upgrade(move |socket| handle_vnc_proxy(socket, name, host, port))
+}
+
+/// Bridge noVNC's binary WebSocket to FluxVM's ticket-redeemed VNC socket.
+async fn handle_fluxvm_vnc(
+    socket: WebSocket,
+    name: String,
+    upstream: Result<String, String>,
+) {
+    use tokio_tungstenite::tungstenite::Message as UpMsg;
+
+    let (mut ws_sink, mut ws_stream) = socket.split();
+    let url = match upstream {
+        Ok(u) => u,
+        Err(e) => {
+            warn!("FluxVM VNC for '{}': {}", name, e);
+            let _ = ws_sink.close().await;
+            return;
+        }
+    };
+    // Ticket path needs no Authorization (the ticket is the credential).
+    let upstream = match super::fluxvm::connect_ws(&url, None).await {
+        Ok(s) => s,
+        Err(e) => {
+            warn!("FluxVM VNC connect failed for '{}': {}", name, e);
+            let _ = ws_sink.close().await;
+            return;
+        }
+    };
+    info!("FluxVM VNC WebSocket connected for VM '{}'", name);
+    let (mut up_sink, mut up_stream) = upstream.split();
+
+    let mut down = tokio::spawn(async move {
+        while let Some(Ok(msg)) = up_stream.next().await {
+            let out = match msg {
+                UpMsg::Binary(b) => Message::Binary(b.to_vec().into()),
+                UpMsg::Text(t) => Message::Binary(t.as_bytes().to_vec().into()),
+                UpMsg::Close(_) => break,
+                _ => continue,
+            };
+            if ws_sink.send(out).await.is_err() {
+                break;
+            }
+        }
+    });
+    let mut up = tokio::spawn(async move {
+        while let Some(Ok(msg)) = ws_stream.next().await {
+            let out = match msg {
+                Message::Binary(b) => UpMsg::Binary(b.to_vec().into()),
+                Message::Text(t) => UpMsg::Binary(t.as_bytes().to_vec().into()),
+                Message::Close(_) => break,
+                _ => continue,
+            };
+            if up_sink.send(out).await.is_err() {
+                break;
+            }
+        }
+        let _ = up_sink.send(UpMsg::Close(None)).await;
+    });
+    tokio::select! {
+        _ = &mut down => up.abort(),
+        _ = &mut up => down.abort(),
+    }
+    info!("FluxVM VNC WebSocket closed for VM '{}'", name);
 }
 
 async fn handle_vnc_proxy(socket: WebSocket, name: String, host: String, port: u16) {

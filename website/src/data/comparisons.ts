@@ -37,7 +37,7 @@ export const AZURE_LOCAL: Comparison = {
   lede:
     'Azure Local is the strongest answer when you want Azure as your control plane on your own hardware. Machina is for teams that want open KVM, no cloud dependency and one binary set. Here is where each fits, including what Machina does not do yet.',
   rows: [
-    {topic: 'Hypervisor', status: 'Yes', machina: 'KVM/QEMU through libvirt; FluxVM engine optional', other: 'Hyper-V'},
+    {topic: 'Hypervisor', status: 'Yes', machina: 'KVM/QEMU through libvirt; optional FluxVM second backend (QEMU VNC, migrate/HA)', other: 'Hyper-V'},
     {topic: 'Control plane', status: 'Yes', machina: 'Runs on your hosts; no cloud account required (C47)', other: 'Azure portal and Azure Arc; connected by default, local control plane only in disconnected operations'},
     {topic: 'Cluster size and HA', status: 'Yes', machina: 'Fleet of hosts, HA failover with fencing, DRS, live migration, controller HA', other: '1 to 16 machines hyperconverged; up to 64 disaggregated; 100+ multi-rack'},
     {topic: 'Rack / room failure domains', status: 'Partial', machina: 'Hosts carry site and rack labels (C57): new VMs are steered away from a rack that already runs a member of their anti-affinity group, and a report shows whether HA could re-home a rack\'s VMs on the remaining hosts. An optional witness stops HA acting when the controller is cut off (C65, run on one host); no quorum between controllers, and no multi-rack drill yet', other: 'Rack-aware cluster, two racks, 1 ms round trip'},

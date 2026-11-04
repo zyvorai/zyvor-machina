@@ -64,7 +64,7 @@ CPU scaling, and the explicit routing/peering limitations.
 | **Production profile** | Opt-in strict startup preflight, master key from a file, JWT key rollover, bounded audit retention, mandatory eBPF datapath, amd64 and arm64 packages. [Guide →](website/docs/operations/production-hardening.md) |
 | **Transiva gateway** | Provider discovery and VM migration preview, submit and batch through `/api/v1/transiva/*`. |
 | **Segmentation evidence** | Export a sealed (SHA-256) JSON or Markdown report of policies, the reachability matrix and denied traffic for audits. |
-| **FluxVM backend** | VMs from the FluxVM engine appear next to libvirt VMs, with eBPF networking, live migration and HA across hosts. [Guide →](docs/fluxvm.md) |
+| **FluxVM backend** | Second hypervisor next to libvirt: QEMU VNC, data disks, clone/rename, Secure Boot/TPM, snapshots, backups, live migration and fleet HA. [Guide →](docs/fluxvm.md) · [Site docs →](https://zyvorai.github.io/zyvor-machina/docs/core-concepts/fluxvm) |
 | **PostgreSQL controller** | Run the controller on PostgreSQL for large fleets or several controllers; `machinactl db setup pod --migrate` moves an SQLite site over. [Database →](#database-sqlite-or-postgresql) |
 | **Quick create and Fix-it** | Image, size, Create; then a one-click Fix-it list (guest agent, backups) in Command Center. |
 
@@ -200,7 +200,7 @@ Everything that can drop traffic starts in observe mode and enforces only under 
 - **Identity and access**: PAM, OIDC, SAML and [LDAP](docs/ldap-auth.md) sign-in, role-based access, a full audit trail. [Admin guide →](docs/handbook/admin-configuration.md)
 - **Containers**: local Podman/Docker containers and Podman pods next to your VMs. [Containers →](docs/customer/pages/infrastructure/containers.md)
 - **Kubernetes**: KubeVirt inventory and a documented migration path. [KubeVirt →](docs/kubevirt-migration.md)
-- **FluxVM**: QEMU, Cloud Hypervisor, Firecracker and flux-vm VMs from FluxVM next to libvirt VMs, with snapshots, backups, hot-add, install ISOs, live migration and fleet HA. [FluxVM →](docs/fluxvm.md)
+- **FluxVM**: QEMU, Cloud Hypervisor, Firecracker and flux-vm VMs next to libvirt, with VNC, data disks, clone/rename, Secure Boot/TPM, snapshots, backups, hot-add, install ISOs, live migration and fleet HA. [FluxVM →](docs/fluxvm.md)
 - **Observability**: Prometheus metrics, OTLP export, PSI/cgroup pressure, alerts and webhooks. [Observability →](docs/guides/observability.md)
 - **Storage**: Atlas integration puts VM disks on Ceph RBD, NFS or ZFS volumes with snapshot, backup and restore. [Atlas →](docs/atlas-storage.md)
 - **Automation**: [Terraform provider](terraform/machina/README.md), [TypeScript SDK](sdk/typescript/README.md), OpenAPI spec, `machinactl`.

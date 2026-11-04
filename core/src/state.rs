@@ -534,6 +534,12 @@ pub struct CreateVmRequest {
     /// live migration.
     #[serde(default)]
     pub fluxvm_isos: Vec<String>,
+    /// FluxVM: absolute path to a per-VM firmware image (OVMF). Empty = host default.
+    #[serde(default)]
+    pub fluxvm_firmware: String,
+    /// FluxVM QEMU: add a virtio balloon device at create.
+    #[serde(default)]
+    pub fluxvm_balloon: bool,
 }
 
 fn default_graphics_listen() -> String {
@@ -634,6 +640,8 @@ impl Default for CreateVmRequest {
             fluxvm_agent: None,
             fluxvm_shared_disk: false,
             fluxvm_isos: Vec::new(),
+            fluxvm_firmware: String::new(),
+            fluxvm_balloon: false,
         }
     }
 }
@@ -724,6 +732,9 @@ pub struct AttachDiskRequest {
     pub readonly: bool,
     #[serde(default)]
     pub shareable: bool,
+    /// FluxVM: create a blank data disk of this size (GiB) when `source` is empty.
+    #[serde(default)]
+    pub size_gb: u64,
 }
 
 fn default_disk_target() -> String {

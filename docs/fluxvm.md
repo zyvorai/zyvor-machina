@@ -68,6 +68,9 @@ Hosts that already set a mode (`cilium`, `legacy`, `ebpf` with `required = false
 | `fluxvm_agent: false` | Turn off the in-guest agent (on by default; needed for the agent console) |
 | `fluxvm_shared_disk: true` | Use the image in place as a shared disk (never cloned or deleted, guarded by `<disk>.fluxvm-lock`). Needed for migration and HA re-create. Not for flux-vm |
 | `fluxvm_isos` | Install ISOs on the host (QEMU, at most 4), attached read-only as SATA CD-ROMs `install`, `cd2`, `cd3`, `cd4`. `auto` picks QEMU. For a fresh install, point `fluxvm_image` at an empty raw file |
+| `secure_boot` / `vtpm` | QEMU Secure Boot and emulated TPM 2.0 (Windows 11) |
+| `fluxvm_firmware` | Optional per-VM OVMF path; empty = host `qemu_ovmf_code` |
+| `fluxvm_balloon` | QEMU virtio balloon at create |
 | `fluxvm_bridge` | Tap on an existing host bridge |
 | `fluxvm_direct_uplink` (+ `fluxvm_direct_mode`, `fluxvm_direct_guest_ips`) | Bridge-less eBPF redirect between a host NIC and the tap |
 | `fluxvm_network: "user"` / `"none"` | QEMU user-mode NAT (forces QEMU) / no network |
@@ -80,10 +83,11 @@ With none of the network fields, the VM gets a tap in its own network namespace 
 | Feature | QEMU | Cloud Hypervisor | Firecracker | flux-vm |
 | --- | --- | --- | --- | --- |
 | Power, metrics, snapshots | yes | yes | yes | yes |
+| Graphical VNC | yes | no | no | no |
 | Serial console | interactive | read-only log | read-only log | read-only log |
 | Agent console (guest shell) | yes | yes | yes | yes |
 | Hot-add vCPU / memory | yes | yes | no | no |
-| Extra NICs | yes | no | no | no |
+| Extra NICs / data disks / balloon | yes | no | no | no |
 | Install ISOs (CD-ROM) | yes | no | no | no |
 | Backups (default or shared storage) | running or stopped | stopped | stopped | stopped |
 | Live migration, HA re-create | shared disk | no | no | no |
@@ -137,19 +141,10 @@ Use this for guests that don't come as a ready disk image: Windows, BSDs, or a L
 
    `fluxvm_isos` with `fluxvm_backend: "auto"` picks QEMU. Any other engine, or more than four ISOs, is a 400.
 
-3. **Open the installer's screen.** Machina's consoles for FluxVM are serial and agent only; a graphical installer
-   needs the VM's VNC display. QEMU serves it on a UNIX socket in the VM's workspace,
-   `/var/lib/fluxvm/instances/<uuid>/vnc.sock` (`uuid` is in `GET /api/v1/vms/win01?backend=fluxvm`). The socket is
-   root-only, so forward it through the host:
-
-   ```bash
-   # on the FluxVM host
-   sudo socat TCP-LISTEN:5901,bind=127.0.0.1,reuseaddr,fork UNIX-CONNECT:/var/lib/fluxvm/instances/<uuid>/vnc.sock
-   # on your machine
-   ssh -N -L 5901:127.0.0.1:5901 user@HOST    # then point a VNC viewer at localhost:5901
-   ```
-
-   Linux installers that print to the serial console can use the **Serial** tab instead.
+3. **Open the installer's screen.** Use VM detail → **Console (VNC)** (or the Console button). Machina mints a
+   FluxVM `ws-ticket` (`kind: vnc`) and proxies noVNC to the QEMU display — no host `socat` needed. The same
+   WebSocket is at `/ws/v1/vnc/{name}?backend=fluxvm&token=…`. Linux installers that print to the serial console
+   can use the **Serial** tab instead.
 
 4. **Install.** The root disk is virtio-blk and the NIC virtio-net. Windows Setup lists no disk until you load the
    storage driver: **Load driver → `cd2` → `viostor\<version>\amd64`**. Install `NetKVM` from the same ISO for the
@@ -213,9 +208,15 @@ All VM routes take `?backend=fluxvm` (a name that isn't a libvirt domain falls b
   same host) or another host's fluxvm-api URL with `dest_token`; optional `listen_host`, `advertise_host`,
   `bandwidth_mbps`, `max_downtime_ms`. The disk is never copied. A VM with an ISO still in a drive is refused until
   it's ejected (the **Migrate** button stays disabled).
-- **Consoles** — serial at `/ws/v1/console/{name}?backend=fluxvm&token=…`; guest shell at
+- **Consoles** — QEMU VNC at `/ws/v1/vnc/{name}?backend=fluxvm&token=…` (FluxVM `ws-ticket`); serial at
+  `/ws/v1/console/{name}?backend=fluxvm&token=…`; guest shell at
   `/ws/v1/fluxvm-console/{name}?token=…&cols=&rows=` (needs `vms:write`; keystrokes as binary frames, resize as
   `{"type":"resize","cols":…,"rows":…}` text). Get `token` from `POST /api/v1/ws-token`.
+- **Disks** — `POST …/disk/attach` with `target` (FluxVM disk name) and either `size_gb` (blank disk) or `source`
+  (host path); `POST …/disk/resize/{target}` (`vda` maps to FluxVM `root`); `POST …/disk/detach/{target}`.
+- **Clone / rename** — `POST …/clone {new_name}` (source stopped); `POST …/rename {new_name}`.
+- **Balloon** — `POST …/balloon/{mb}` when the VM was created with a balloon device.
+- **Logs** — `GET …/logs?backend=fluxvm` (FluxVM console log, not libvirt qemu log).
 
 ## Fleet (controller)
 
@@ -278,10 +279,10 @@ removes `results/` mid-run.
 - Migration needs QEMU on a shared disk, no extra NICs, no install media in a CD-ROM, and no hot-add or NIC removal
   since the last start.
 - ISOs are attached only at create; an ejected drive can't be refilled.
-- Machina's create doesn't pass FluxVM's `tpm`, `secure_boot` or per-VM `firmware`. UEFI comes from the host-wide
-  `qemu_ovmf_code` in `/etc/fluxvm.toml` (all QEMU VMs); a guest that needs TPM 2.0 (Windows 11) has to be created
-  with `fluxctl` or fluxvm-api directly. It then shows up in Machina like any other FluxVM VM.
-- No graphical console in Machina for FluxVM; use the VNC socket (see step 3 of the ISO install).
+- Create passes FluxVM `tpm` (`vtpm`), `secure_boot`, optional `fluxvm_firmware` (OVMF path) and `fluxvm_balloon`.
+  When `fluxvm_firmware` is empty, UEFI still comes from the host-wide `qemu_ovmf_code` in `/etc/fluxvm.toml`.
+- CD-ROM insert and live-mig after hotplug / with extra NICs remain FluxVM limits (not Machina gaps). Cross-host
+  migrate between different QEMU versions still needs FluxVM to pin the source machine type on the receiver.
 
 ## Troubleshooting
 
@@ -295,7 +296,7 @@ removes `results/` mid-run.
 | Create fails with `fluxvm_isos need fluxvm_backend qemu` | Only QEMU has CD-ROMs; pick `qemu` or `auto` |
 | The VM boots the old OS instead of the installer | The root disk isn't blank; firmware boots it before the CD-ROM. Use an empty file |
 | Windows Setup finds no disk | Load `viostor` from the virtio-win ISO (`cd2`) |
-| Serial tab shows nothing during a Windows install | Windows doesn't use the serial port; open the VNC socket (ISO install step 3) |
+| Serial tab shows nothing during a Windows install | Windows doesn't use the serial port; open **Console (VNC)** (ISO install step 3) |
 | HA re-create fails on a missing ISO | The VM still had media in a drive and the ISO isn't on the target host; eject it, or put the ISO at the same path there |
 | Create fails with `fluxvm-api POST /v1/vms unreachable` after ~5 min | Disk provisioning outran the daemon's 300 s request timeout (FluxVM then reaps the VM stuck in `Creating`). Check host disk load (`/proc/pressure/io`) |
 | Create or start fails on a VM-edge attach error after a FluxVM upgrade | FluxVM now requires its eBPF edge by default; install the BPF objects or set `[sandbox.dataplane] mode = "legacy"` (see [Upgrading FluxVM](#upgrading-fluxvm)) |

@@ -128,9 +128,9 @@ export function vmDetailRoute(name: string, connection?: string | null): string 
   return appendRouteConnection(`/vms/${encodeURIComponent(name)}`, connection)
 }
 
-/** FluxVM guests have no libvirt console plan; their console is the serial tab on the detail page. */
+/** FluxVM QEMU graphical console (VNC via fluxvm-api ticket); other engines use serial. */
 export function vmConsoleRoute(name: string, connection?: string | null): string {
-  if (isFluxvmConnection(connection)) return `${vmDetailRoute(name, connection)}&tab=serial`
+  if (isFluxvmConnection(connection)) return `${vmDetailRoute(name, connection)}&tab=vnc`
   return appendRouteConnection(`/vms/${encodeURIComponent(name)}/consolehub`, connection)
 }
 
@@ -308,6 +308,10 @@ export interface CreateVmRequest {
   fluxvm_shared_disk?: boolean
   /** Install ISOs on the FluxVM host, attached as CD-ROMs `install`, `cd2`… (QEMU only, at most 4). */
   fluxvm_isos?: string[]
+  /** FluxVM: per-VM OVMF path (empty = host default). */
+  fluxvm_firmware?: string
+  /** FluxVM QEMU: add a virtio balloon at create. */
+  fluxvm_balloon?: boolean
 }
 
 export interface VmTemplate {
@@ -921,6 +925,23 @@ export const resizeDisk = (name: string, target: string, sizeGb: number, connect
   apiPostVoid(
     appendVmConnection(`${API}/vms/${encodeURIComponent(name)}/disk/resize/${encodeURIComponent(target)}`, connection),
     { size_gb: sizeGb },
+  )
+/** Attach a disk. FluxVM: pass `size_gb` (blank) or `source` (host path); `target` is the FluxVM disk name. */
+export const attachDisk = (
+  name: string,
+  body: { source?: string; target: string; size_gb?: number; driver?: string; bus?: string },
+  connection?: string | null,
+) =>
+  apiPostVoid(appendVmConnection(`${API}/vms/${encodeURIComponent(name)}/disk/attach`, connection), {
+    source: body.source ?? '',
+    target: body.target,
+    size_gb: body.size_gb ?? 0,
+    driver: body.driver,
+    bus: body.bus,
+  })
+export const detachDisk = (name: string, target: string, connection?: string | null) =>
+  apiPostVoid(
+    appendVmConnection(`${API}/vms/${encodeURIComponent(name)}/disk/detach/${encodeURIComponent(target)}`, connection),
   )
 export const attachInterface = (name: string, network: string, model: string = 'virtio', connection?: string | null) =>
   apiPostVoid(appendVmConnection(`${API}/vms/${encodeURIComponent(name)}/nic/attach`, connection), { network, model })

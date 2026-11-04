@@ -34,7 +34,7 @@ flowchart TB
 
 | Component | Port | Role |
 | --- | --- | --- |
-| `machina-daemon` | `:5092` | Single-host REST and WebSocket API, sign-in (PAM, OIDC, SAML, LDAP), RBAC, audit, console proxies. Serves the web UI and speaks to libvirt directly. |
+| `machina-daemon` | `:5092` | Single-host REST and WebSocket API, sign-in (PAM, OIDC, SAML, LDAP), RBAC, audit, console proxies. Speaks to libvirt and optionally [FluxVM](fluxvm.md) (`fluxvm-api`) as a second VM backend. |
 | `machina-controller` | `:5093` | Multi-host control plane: fleet inventory, desired-state reconciliation, HA failover, DRS, Fleet Cloud and Zyra AI. State in embedded SQLite; NATS fan-out is optional. |
 | `machina-agent` | `:50051` (gRPC), `:50052` (consoles) | Runs on each managed hypervisor. Executes libvirt and eBPF operations for the controller over gRPC with TLS and proxies consoles. |
 | `machina-bpfd` | `/run/machina-bpf/bpfd.sock` | Root eBPF service: load balancing, CNI datapath, DDoS shield, isolation, enforcement and telemetry. See [Native eBPF](../networking/ebpf-overview.md). |

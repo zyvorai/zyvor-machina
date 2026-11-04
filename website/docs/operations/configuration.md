@@ -44,7 +44,8 @@ backup_dir = "/var/lib/machina/backups"
 
 Other sections: `[fleet]` (peer daemons), `[vessel]` (Podman/Docker socket), `[metrics_history]`,
 `[observability.otlp]` (see [Observability](observability.md)) and `[fluxvm]` (`enabled`, `base_url`, `token` or
-`token_file`, `insecure_tls`, `default_backend`; see the [FluxVM guide](https://github.com/zyvorai/zyvor-machina/blob/main/docs/fluxvm.md)).
+`token_file`, `insecure_tls`, `default_backend`; see [FluxVM backend](../core-concepts/fluxvm.md) and the
+[operator guide](https://github.com/zyvorai/zyvor-machina/blob/main/docs/fluxvm.md)).
 
 ## Controller: environment
 

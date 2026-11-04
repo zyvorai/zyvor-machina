@@ -923,6 +923,25 @@ impl HostAgent for AgentService {
         request: Request<CreateSnapshotRequest>,
     ) -> Result<Response<CreateSnapshotResponse>, Status> {
         let req = request.into_inner();
+        let snap_out = req.snapshot_name.clone();
+        if let Some(c) = crate::fluxvm::client() {
+            if c.resolve(&req.vm_name).await.is_ok() {
+                return match c.snapshot(&req.vm_name, &req.snapshot_name).await {
+                    Ok(()) => Ok(Response::new(CreateSnapshotResponse {
+                        ok: true,
+                        snapshot_name: snap_out,
+                        message: "created (fluxvm)".into(),
+                        disk_path: String::new(),
+                    })),
+                    Err(e) => Ok(Response::new(CreateSnapshotResponse {
+                        ok: false,
+                        snapshot_name: String::new(),
+                        message: e.to_string(),
+                        disk_path: String::new(),
+                    })),
+                };
+            }
+        }
         let libvirt = self.libvirt.clone();
         let vm_name = req.vm_name.clone();
         let snap_name = req.snapshot_name.clone();
@@ -930,7 +949,6 @@ impl HostAgent for AgentService {
         let disk_only = req.disk_only;
         let quiesce = req.quiesce;
         let storage_mode = req.storage_mode.clone();
-        let snap_out = snap_name.clone();
         match tokio::task::spawn_blocking(move || {
             let ctx = libvirt
                 .lock()
@@ -975,6 +993,15 @@ impl HostAgent for AgentService {
         request: Request<DeleteSnapshotRequest>,
     ) -> Result<Response<DeleteSnapshotResponse>, Status> {
         let req = request.into_inner();
+        if let Some(c) = crate::fluxvm::client() {
+            if c.resolve(&req.vm_name).await.is_ok() {
+                return c
+                    .delete_snapshot(&req.vm_name, &req.snapshot_name)
+                    .await
+                    .map(|_| Response::new(DeleteSnapshotResponse { deleted: true }))
+                    .map_err(crate::fluxvm::status);
+            }
+        }
         let libvirt = self.libvirt.clone();
         let vm_name = req.vm_name.clone();
         let snap_name = req.snapshot_name.clone();
@@ -997,6 +1024,28 @@ impl HostAgent for AgentService {
         request: Request<ListSnapshotsRequest>,
     ) -> Result<Response<ListSnapshotsResponse>, Status> {
         let req = request.into_inner();
+        if let Some(c) = crate::fluxvm::client() {
+            if c.resolve(&req.vm_name).await.is_ok() {
+                let snaps = c
+                    .snapshots(&req.vm_name)
+                    .await
+                    .map_err(crate::fluxvm::status)?;
+                return Ok(Response::new(ListSnapshotsResponse {
+                    snapshots: snaps
+                        .into_iter()
+                        .map(|s| {
+                            let info = s.to_snapshot_info(&req.vm_name);
+                            SnapshotInfo {
+                                name: info.name,
+                                state: info.state,
+                                creation_time: info.creation_time,
+                                is_current: info.is_current,
+                            }
+                        })
+                        .collect(),
+                }));
+            }
+        }
         let libvirt = self.libvirt.clone();
         let vm_name = req.vm_name.clone();
         let snaps = tokio::task::spawn_blocking(move || {
@@ -1026,6 +1075,35 @@ impl HostAgent for AgentService {
         request: Request<BackupVmRequest>,
     ) -> Result<Response<BackupVmResponse>, Status> {
         let req = request.into_inner();
+        if let Some(c) = crate::fluxvm::client() {
+            if c.resolve(&req.vm_name).await.is_ok() {
+                // FluxVM names the backup itself; dest_path is ignored (stored under FluxVM state).
+                let backup_name = std::path::Path::new(&req.dest_path)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .filter(|s| !s.is_empty());
+                return match c.backup(&req.vm_name, backup_name, true).await {
+                    Ok(v) => {
+                        let path = v
+                            .get("name")
+                            .or_else(|| v.get("path"))
+                            .and_then(|x| x.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        Ok(Response::new(BackupVmResponse {
+                            ok: true,
+                            path,
+                            message: "backup complete (fluxvm)".into(),
+                        }))
+                    }
+                    Err(e) => Ok(Response::new(BackupVmResponse {
+                        ok: false,
+                        path: String::new(),
+                        message: e.to_string(),
+                    })),
+                };
+            }
+        }
         let libvirt = self.libvirt.clone();
         let vm_name = req.vm_name.clone();
         let dest = req.dest_path.clone();
@@ -1104,6 +1182,21 @@ impl HostAgent for AgentService {
         request: Request<DeleteBackupRequest>,
     ) -> Result<Response<DeleteBackupResponse>, Status> {
         let path = request.into_inner().backup_path;
+        // FluxVM backup ids are short names (not host paths under MACHINA_BACKUP_DIR).
+        if !path.starts_with('/') {
+            if let Some(c) = crate::fluxvm::client() {
+                return match c.delete_backup(&path).await {
+                    Ok(()) => Ok(Response::new(DeleteBackupResponse {
+                        ok: true,
+                        message: "deleted (fluxvm)".into(),
+                    })),
+                    Err(e) => Ok(Response::new(DeleteBackupResponse {
+                        ok: false,
+                        message: e.to_string(),
+                    })),
+                };
+            }
+        }
         // Safety: only ever delete a regular file under the managed backup directory, and
         // never a path containing traversal. This is invoked by retention (fleet_backup
         // scheduler) to reclaim on-disk backups, so it must not be a general file-delete.
@@ -1152,6 +1245,20 @@ impl HostAgent for AgentService {
         request: Request<RevertSnapshotRequest>,
     ) -> Result<Response<RevertSnapshotResponse>, Status> {
         let req = request.into_inner();
+        if let Some(c) = crate::fluxvm::client() {
+            if c.resolve(&req.vm_name).await.is_ok() {
+                return match c.restore(&req.vm_name, &req.snapshot_name).await {
+                    Ok(()) => Ok(Response::new(RevertSnapshotResponse {
+                        ok: true,
+                        message: "reverted (fluxvm)".into(),
+                    })),
+                    Err(e) => Ok(Response::new(RevertSnapshotResponse {
+                        ok: false,
+                        message: e.to_string(),
+                    })),
+                };
+            }
+        }
         let libvirt = self.libvirt.clone();
         let vm_name = req.vm_name.clone();
         let snap_name = req.snapshot_name.clone();
@@ -1180,6 +1287,24 @@ impl HostAgent for AgentService {
         request: Request<RestoreVmBackupRequest>,
     ) -> Result<Response<RestoreVmBackupResponse>, Status> {
         let req = request.into_inner();
+        if let Some(c) = crate::fluxvm::client() {
+            if c.resolve(&req.vm_name).await.is_ok() {
+                let backup = std::path::Path::new(&req.backup_path)
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(&req.backup_path);
+                return match c.restore_backup(&req.vm_name, backup).await {
+                    Ok(_) => Ok(Response::new(RestoreVmBackupResponse {
+                        ok: true,
+                        message: "restored (fluxvm)".into(),
+                    })),
+                    Err(e) => Ok(Response::new(RestoreVmBackupResponse {
+                        ok: false,
+                        message: e.to_string(),
+                    })),
+                };
+            }
+        }
         let libvirt = self.libvirt.clone();
         let vm_name = req.vm_name.clone();
         let backup_path = req.backup_path.clone();
