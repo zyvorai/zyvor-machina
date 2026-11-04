@@ -47,7 +47,8 @@ Moving off OpenStack? Read [Replacing OpenStack](getting-started/from-openstack.
 
 1. [Requirements](getting-started/requirements.md), then the [Quickstart](getting-started/quickstart.md).
 2. [Virtual machines](core-concepts/virtual-machines.md), [Consoles](core-concepts/consoles.md) and
-   [FluxVM](core-concepts/fluxvm.md) for day one.
+   [FluxVM](core-concepts/fluxvm.md) for day one — then [FluxVM day two](getting-started/fluxvm-day-two.md)
+   (VNC, disks, snapshot, backup, clone).
 3. [Fleet, HA and DRS](core-concepts/fleet-ha.md) when you add a second host.
 4. [Native eBPF](networking/ebpf-overview.md) for networking and security.
 5. [Configuration](operations/configuration.md), [Upgrade and backup](operations/upgrade-backup.md) and

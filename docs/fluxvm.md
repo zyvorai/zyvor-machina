@@ -8,6 +8,9 @@ flux-vm. Machina shows these VMs next to libvirt VMs and manages them from the s
 - **Controller** — the fleet: inventory, power and delete through each host's agent, migration between hosts (and
   DRS), HA re-create on another host.
 
+**Hands-on:** [Tutorial 07 — FluxVM day two](tutorials/07-fluxvm-day-two.md) (VNC, data disk, snapshot, backup, clone).
+Site: [FluxVM day two](https://zyvorai.github.io/zyvor-machina/docs/getting-started/fluxvm-day-two).
+
 ## Set up
 
 ### Daemon (`/etc/machina/config.toml`)

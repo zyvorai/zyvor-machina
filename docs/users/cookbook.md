@@ -1,7 +1,7 @@
 # Cookbook: common tasks
 
 Short recipes. Each assumes the `API`, `TOKEN` and `mc` setup from the [guides](../guides/README.md). For a walk-through, see
-the [tutorials](../tutorials/README.md).
+the [tutorials](../tutorials/README.md) (including [FluxVM day two](../tutorials/07-fluxvm-day-two.md)).
 
 ## Resize an instance
 `mc -X POST $API/vms/<name>/change-type -d '{"flavor_id":"<id>"}'`. It stops the instance cleanly, applies the new CPU and

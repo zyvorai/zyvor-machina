@@ -19,7 +19,7 @@ eBPF datapath (`machina-bpfd`) and a React web UI. The public site with the same
 
 | You want to… | Read |
 |----------|------|
-| Try it hands-on | [tutorials/](tutorials/README.md): first cloud, EC2 in ten minutes, scale and survive |
+| Try it hands-on | [tutorials/](tutorials/README.md): first cloud, EC2, FluxVM day two, scale and survive |
 | Look up one Fleet Cloud feature | [guides/](guides/README.md) |
 | Get tasks done quickly | [users/cookbook.md](users/cookbook.md) |
 | Decide whether to adopt it | [buyers/why-machina.md](buyers/why-machina.md), [alternatives](buyers/machina-vs-alternatives.md), [security](buyers/security-and-compliance.md), [30-day evaluation](buyers/evaluation-guide.md) |

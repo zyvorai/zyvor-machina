@@ -28,6 +28,13 @@
 
 ## What's new
 
+**v0.3.2 — FluxVM day two, same UI as libvirt.** Create a QEMU guest on FluxVM, open **browser VNC** (ws-ticket proxy),
+attach and grow a data disk, snapshot, backup, clone/rename, Secure Boot/TPM and fleet snap/backup — without leaving the
+Machina VM list. Hands-on: [Tutorial 07](docs/tutorials/07-fluxvm-day-two.md) · [site walkthrough](https://zyvorai.github.io/zyvor-machina/docs/getting-started/fluxvm-day-two) · [guide](docs/fluxvm.md). Live-checked A+B **35/35** on a real host.
+
+**Zyra decision tools.** Change review, scheduled fleet digest, postmortem and a migration order advisor that uses the
+convergence oracle. [Zyra on the site →](https://zyvorai.github.io/zyvor-machina/docs/operations/zyra-ai)
+
 **Bare-metal provisioning.** Discover or import BMCs, commission machines over PXE or BMC virtual media, write a
 checksum-verified OS image and let each machine join the fleet on first boot, driven from `machinactl metal …` or the
 Bare Metal page. Verified on VMs and BMC emulators, **not yet on physical servers**; see the
@@ -64,7 +71,7 @@ CPU scaling, and the explicit routing/peering limitations.
 | **Production profile** | Opt-in strict startup preflight, master key from a file, JWT key rollover, bounded audit retention, mandatory eBPF datapath, amd64 and arm64 packages. [Guide →](website/docs/operations/production-hardening.md) |
 | **Transiva gateway** | Provider discovery and VM migration preview, submit and batch through `/api/v1/transiva/*`. |
 | **Segmentation evidence** | Export a sealed (SHA-256) JSON or Markdown report of policies, the reachability matrix and denied traffic for audits. |
-| **FluxVM backend** | Second hypervisor next to libvirt: QEMU VNC, data disks, clone/rename, Secure Boot/TPM, snapshots, backups, live migration and fleet HA. [Guide →](docs/fluxvm.md) · [Site docs →](https://zyvorai.github.io/zyvor-machina/docs/core-concepts/fluxvm) |
+| **FluxVM backend** | Second hypervisor next to libvirt: QEMU VNC, data disks, clone/rename, Secure Boot/TPM, snapshots, backups, live migration and fleet HA. [Tutorial →](docs/tutorials/07-fluxvm-day-two.md) · [Guide →](docs/fluxvm.md) · [Site →](https://zyvorai.github.io/zyvor-machina/docs/core-concepts/fluxvm) |
 | **PostgreSQL controller** | Run the controller on PostgreSQL for large fleets or several controllers; `machinactl db setup pod --migrate` moves an SQLite site over. [Database →](#database-sqlite-or-postgresql) |
 | **Quick create and Fix-it** | Image, size, Create; then a one-click Fix-it list (guest agent, backups) in Command Center. |
 
@@ -81,7 +88,7 @@ CPU scaling, and the explicit routing/peering limitations.
 | Networking means Cilium + Tetragon + kube-proxy + a firewall agent | One eBPF service, `machina-bpfd`: load balancing, DDoS shield, VM isolation, flow visibility |
 | On-call means triaging the same incidents at 3 a.m. | Zyra AI diagnoses, correlates and proposes the fix, then waits for a human approval |
 
-**Evaluating?** [Why Machina](docs/buyers/why-machina.md) (five minutes) · [Alternatives](docs/buyers/machina-vs-alternatives.md) · [Security and compliance](docs/buyers/security-and-compliance.md) · [30-day evaluation plan](docs/buyers/evaluation-guide.md). **Using it?** [Tutorials](docs/tutorials/README.md) · [Cookbook](docs/users/cookbook.md).
+**Evaluating?** [Why Machina](docs/buyers/why-machina.md) (five minutes) · [Alternatives](docs/buyers/machina-vs-alternatives.md) · [Security and compliance](docs/buyers/security-and-compliance.md) · [30-day evaluation plan](docs/buyers/evaluation-guide.md). **Using it?** [Tutorials](docs/tutorials/README.md) (incl. [FluxVM day two](docs/tutorials/07-fluxvm-day-two.md)) · [Cookbook](docs/users/cookbook.md) · [Docs site](https://zyvorai.github.io/zyvor-machina/).
 
 ![Capabilities at a glance: Run, Secure, Scale, Operate](docs/ux/readme-capabilities.jpg)
 

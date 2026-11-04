@@ -102,6 +102,8 @@ export const WHY = [
 export type News = {title: string; body: string};
 
 export const WHATS_NEW: News[] = [
+  {title: 'FluxVM day two (v0.3.2)', body: 'Same UI as libvirt: browser VNC, data disks, clone/rename, Secure Boot/TPM, snapshots and backups on FluxVM QEMU — plus a hands-on tutorial.'},
+  {title: 'Zyra decision tools', body: 'Change review, scheduled fleet digest, postmortem and a migration order advisor that uses the convergence oracle.'},
   {title: 'VPC forwarding and ACLs', body: 'Peering, internet-gateway and blackhole routes and stateless network ACLs are enforced on the hosts, over the WireGuard overlay between them.'},
   {title: 'Production profile', body: 'A strict, opt-in startup check, key rollover for JWT and master keys, audit retention and a mandatory eBPF datapath.'},
   {title: 'ARM64 packages', body: 'DEB, RPM and tar bundles for amd64 and arm64, built and tested on native runners.'},
@@ -112,6 +114,4 @@ export const WHATS_NEW: News[] = [
   {title: 'VM quarantine', body: 'Isolate a suspect VM in the eBPF datapath under a lease that lapses on its own.'},
   {title: 'Just-in-time access', body: 'Open a VM for a set time, with two-person approval and automatic expiry.'},
   {title: 'Zyra verify and undo', body: 'Every AI action is checked afterwards and can be rolled back in one click.'},
-  {title: 'VM flow history', body: 'Service map, learn and replay of VM traffic, with lateral-movement alerts.'},
-  {title: 'DNS threat feeds', body: 'VM network policy blocks known-bad domains straight from threat feeds.'},
 ];

@@ -334,7 +334,8 @@ an IPMI serial-over-LAN console. Guide:
   host for HA (`ha.recover`, `POST /vms/{id}/fluxvm/recover`). Fleet migration
   and HA re-create need QEMU on a shared disk. See [../fluxvm.md](../fluxvm.md)
   and the site page
-  [FluxVM backend](https://zyvorai.github.io/zyvor-machina/docs/core-concepts/fluxvm).
+  [FluxVM backend](https://zyvorai.github.io/zyvor-machina/docs/core-concepts/fluxvm) ·
+  [day-two tutorial](../tutorials/07-fluxvm-day-two.md).
 - **Fleet Cloud** (`/fleet-cloud/*` in the UI) — manage instances, flavors,
   networks, images, security groups, stacks, keypairs, and load balancers
   (kernel-level weighted round-robin, not an Octavia amphora) entirely via

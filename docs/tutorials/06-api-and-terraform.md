@@ -46,3 +46,5 @@ that a second `plan` reports as unchanged.
 
 ## Clean up
 `terraform destroy`, delete the access key (`DELETE /api/v1/ec2/access-keys/<id>`) and the API key.
+
+Next: [FluxVM day two](07-fluxvm-day-two.md).

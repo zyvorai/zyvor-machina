@@ -13,6 +13,9 @@ libvirt guests (`backend: "fluxvm"`).
 Full operator guide (ISO installs, migrate/HA, regression):
 [docs/fluxvm.md](https://github.com/zyvorai/zyvor-machina/blob/main/docs/fluxvm.md).
 
+Hands-on (create → VNC → disk → snapshot → backup → clone):
+[FluxVM day two](../getting-started/fluxvm-day-two.md).
+
 ## Enable
 
 Daemon (`/etc/machina/config.toml`):
@@ -87,4 +90,4 @@ Discovered FluxVM VMs stay unmanaged unless you mark them managed.
 - Backups need default or shared storage (not LVM thin / NBD / Ceph RBD through FluxVM).
 
 Claims: [C72](https://github.com/zyvorai/zyvor-machina/blob/main/docs/claims.md), [C73](https://github.com/zyvorai/zyvor-machina/blob/main/docs/claims.md).
-Regression: `make regression-fluxvm`.
+Regression: `make regression-fluxvm`. Tutorial: [FluxVM day two](../getting-started/fluxvm-day-two.md).

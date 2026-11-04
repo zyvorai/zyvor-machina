@@ -122,6 +122,7 @@ const config: Config = {
           title: 'Docs',
           items: [
             {label: 'Quickstart', to: '/docs/getting-started/quickstart'},
+            {label: 'FluxVM day two', to: '/docs/getting-started/fluxvm-day-two'},
             {label: 'Architecture', to: '/docs/core-concepts/architecture'},
             {label: 'Native eBPF', to: '/docs/networking/ebpf-overview'},
             {label: 'Security', to: '/docs/operations/security'},
