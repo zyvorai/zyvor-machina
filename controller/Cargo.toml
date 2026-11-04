@@ -56,7 +56,8 @@ ring = "0.17"
 hex = "0.4"
 rand = { workspace = true }
 aes-gcm = { workspace = true }
-zip = { version = "2", default-features = false, features = ["deflate"] }
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+crc32fast = "1"
 tokio-tungstenite = { version = "0.30", features = ["native-tls"] }
 native-tls = "0.2"
 lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder"] }

@@ -24,5 +24,6 @@ pub mod state;
 pub mod sync;
 pub mod tasks;
 pub mod ws_tokens;
+pub mod zip_write;
 
 pub use config::ControllerConfig;
