@@ -39,8 +39,9 @@ import ClassicVmPlatformHardware from './classic/ClassicVmPlatformHardware'
 import ClassicVmSpiceToVncButton from './classic/ClassicVmSpiceToVncButton'
 import VmPortForwardPanel from '../components/vm/VmPortForwardPanel'
 import VmGuestPolicyPanel from '../components/vm/VmGuestPolicyPanel'
-import FluxvmManagePanel, { fluxvmSerialLabel } from '../components/vm/FluxvmManagePanel'
+import FluxvmManagePanel, { fluxvmCaps, fluxvmSerialLabel } from '../components/vm/FluxvmManagePanel'
 import FluxvmAgentConsole from '../components/vm/FluxvmAgentConsole'
+import VNCViewer from '../components/VNCViewer'
 import VmNetworkPolicyPanel from '../components/vm/VmNetworkPolicyPanel'
 import VmSshConnectDialog, { navigateVmSshSession } from '../components/vm/VmSshConnectDialog'
 import type { GuestAccessHints } from '../utils/guestAccessHints'
@@ -117,7 +118,7 @@ function SnapshotTableRows({
   )
 }
 
-const VM_DETAIL_TABS = ['overview', 'disks', 'network', 'snapshots', 'devices', 'guest-policy', 'xml', 'logs', 'advanced', 'serial', 'manage', 'agent-console'] as const
+const VM_DETAIL_TABS = ['overview', 'disks', 'network', 'snapshots', 'devices', 'guest-policy', 'xml', 'logs', 'advanced', 'serial', 'vnc', 'manage', 'agent-console'] as const
 type Tab = (typeof VM_DETAIL_TABS)[number]
 type Dialog = null | 'cdrom' | 'clone' | 'rename' | 'migrate' | 'snapshot' | 'boot-order' | 'vcpus' | 'memory' | 'balloon' | 'attach-disk' | 'resize-disk' | 'attach-nic' | 'attach-usb' | 'save-template' | 'linux-ssh-key' | 'linux-password' | 'linux-hostname'
   | 'delete-vm' | 'scheduler-tune' | 'memtune' | 'numa-tune' | 'emulator-pin' | 'pin-vcpu' | 'block-commit'
@@ -1318,10 +1319,12 @@ export default function VMDetailsPage() {
     { key: 'logs', label: 'Logs' },
     { key: 'advanced', label: 'Advanced' },
   ]
+  const fxCaps = fluxvmCaps(vm.fluxvm_backend)
   const tabs = isFluxvm
     ? [
-        ...allTabs.filter((t) => t.key === 'overview' || t.key === 'disks' || t.key === 'network'),
+        ...allTabs.filter((t) => t.key === 'overview' || t.key === 'disks' || t.key === 'network' || t.key === 'logs'),
         { key: 'manage' as Tab, label: 'Manage' },
+        ...(fxCaps.vnc ? [{ key: 'vnc' as Tab, label: 'Console (VNC)' }] : []),
         { key: 'serial' as Tab, label: fluxvmSerialLabel(vm.fluxvm_backend) },
         { key: 'agent-console' as Tab, label: 'Agent console' },
       ]
@@ -2640,6 +2643,7 @@ export default function VMDetailsPage() {
           memoryMb={vm.memory_mb}
           interfaces={vm.interfaces}
           cdroms={vm.disks?.filter((d) => d.device === 'cdrom')}
+          disks={vm.disks}
           onChanged={load}
         />
       )}
@@ -2647,6 +2651,17 @@ export default function VMDetailsPage() {
       {tab === 'agent-console' && isFluxvm && (
         <div className="apple-section apple-section--tight px-0 flex flex-col min-h-[28rem]">
           <FluxvmAgentConsole vmName={vm.name} />
+        </div>
+      )}
+
+      {tab === 'vnc' && isFluxvm && (
+        <div className="apple-section apple-section--tight px-0 flex flex-col min-h-[28rem]" data-testid="fluxvm-vnc">
+          <p className="text-xs text-[var(--text-muted)] px-1 mb-2">
+            QEMU graphical display via FluxVM (noVNC). Needed for installers that do not print to serial.
+          </p>
+          <div className="flex-1 min-h-[24rem] rounded-xl overflow-hidden border border-[var(--apple-hairline)]">
+            <VNCViewer vmName={vm.name} libvirtConnection={FLUXVM_CONNECTION} defaultScaledFit />
+          </div>
         </div>
       )}
 

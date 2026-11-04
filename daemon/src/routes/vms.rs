@@ -842,6 +842,15 @@ async fn clone_vm_handler(
         )
         .into());
     }
+    if targets_fluxvm(&manager, &actor, &conn_q, &name).await {
+        super::fluxvm::client()?
+            .clone_vm(&name, &req.new_name)
+            .await?;
+        log_audit("clone", &format!("{name} -> {}", req.new_name), "ok");
+        return Ok(Json(serde_json::json!({
+            "status": "cloned", "source": name, "clone": req.new_name, "backend": "fluxvm"
+        })));
+    }
     let name2 = name.clone();
     let new_name = req.new_name.clone();
     let mode = if req.clone_mode.trim().is_empty() {
@@ -1196,8 +1205,22 @@ async fn attach_disk_handler(
     Json(req): Json<AttachDiskRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     require_write(&actor, "vms:write")?;
-    let name2 = name.clone();
     let target = req.target.clone();
+    if targets_fluxvm(&manager, &actor, &conn_q, &name).await {
+        let path = req.source.trim();
+        super::fluxvm::client()?
+            .attach_disk(
+                &name,
+                &target,
+                (!path.is_empty()).then_some(path),
+                Some(req.size_gb).filter(|g| *g > 0),
+            )
+            .await?;
+        return Ok(Json(serde_json::json!({
+            "status": "attached", "name": name, "target": target, "backend": "fluxvm"
+        })));
+    }
+    let name2 = name.clone();
     let req2 = req.clone();
     spawn_libvirt_actor(manager, Some(&actor), conn_q, move |conn| {
         device::attach_disk(conn, &name2, &req2)
@@ -1215,6 +1238,19 @@ async fn detach_disk_handler(
     Query(conn_q): Query<ConnQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     require_write(&actor, "vms:write")?;
+    if targets_fluxvm(&manager, &actor, &conn_q, &name).await {
+        super::fluxvm::client()?
+            .detach_disk(&name, &target)
+            .await?;
+        return Ok(Json(serde_json::json!({
+            "status": "detached",
+            "name": name,
+            "target": target,
+            "live_removed": true,
+            "requires_restart": false,
+            "backend": "fluxvm"
+        })));
+    }
     let name2 = name.clone();
     let target2 = target.clone();
     let outcome = spawn_libvirt_actor(manager, Some(&actor), conn_q, move |conn| {
@@ -1238,6 +1274,14 @@ async fn rename_vm_handler(
     Json(req): Json<RenameVmRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     require_write(&actor, "vms:write")?;
+    if targets_fluxvm(&manager, &actor, &conn_q, &name).await {
+        super::fluxvm::client()?
+            .rename(&name, &req.new_name)
+            .await?;
+        return Ok(Json(serde_json::json!({
+            "status": "renamed", "old_name": name, "new_name": req.new_name, "backend": "fluxvm"
+        })));
+    }
     let name2 = name.clone();
     let new_name = req.new_name.clone();
     spawn_libvirt_actor(manager, Some(&actor), conn_q, move |conn| {
@@ -1262,6 +1306,16 @@ async fn resize_disk_handler(
     Json(req): Json<ResizeDiskRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     require_write(&actor, "vms:write")?;
+    if targets_fluxvm(&manager, &actor, &conn_q, &name).await {
+        // FluxVM uses "root" for the boot disk; Machina details show it as vda.
+        let disk = if target == "vda" { "root" } else { target.as_str() };
+        super::fluxvm::client()?
+            .resize_disk(&name, disk, req.size_gb)
+            .await?;
+        return Ok(Json(serde_json::json!({
+            "status": "resized", "name": name, "target": target, "size_gb": req.size_gb, "backend": "fluxvm"
+        })));
+    }
     let name2 = name.clone();
     let target2 = target.clone();
     let size_gb = req.size_gb;
@@ -1373,7 +1427,8 @@ async fn set_vm_tags_handler(
 async fn get_vm_logs(
     Path(name): Path<String>,
     Query(params): Query<HashMap<String, String>>,
-    State(_manager): State<LibvirtManager>,
+    State(manager): State<LibvirtManager>,
+    Extension(actor): Extension<RequestActor>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     // Validate name has no path separators
     if name.contains('/') || name.contains('\\') || name.contains("..") {
@@ -1384,6 +1439,19 @@ async fn get_vm_logs(
         .and_then(|l| l.parse().ok())
         .unwrap_or(500)
         .min(5000);
+    let conn_q = ConnQuery {
+        connection: params.get("connection").cloned(),
+        backend: params.get("backend").cloned(),
+    };
+    if targets_fluxvm(&manager, &actor, &conn_q, &name).await {
+        let content = super::fluxvm::client()?.logs(&name, lines).await?;
+        return Ok(Json(serde_json::json!({
+            "vm_name": name,
+            "log_path": "fluxvm",
+            "content": content,
+            "backend": "fluxvm",
+        })));
+    }
     let log_path = format!("/var/log/libvirt/qemu/{}.log", name);
     let content = match std::fs::read_to_string(&log_path) {
         Ok(c) => {

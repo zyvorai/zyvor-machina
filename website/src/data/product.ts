@@ -107,7 +107,7 @@ export const WHATS_NEW: News[] = [
   {title: 'ARM64 packages', body: 'DEB, RPM and tar bundles for amd64 and arm64, built and tested on native runners.'},
   {title: 'EC2-compatible API', body: 'Point awscli, boto3 and Terraform at the controller: 288 actions, each applied, recorded or refused by name.'},
   {title: 'PostgreSQL controller', body: 'Run the controller on PostgreSQL for large fleets or several controllers; one command migrates an SQLite site.'},
-  {title: 'FluxVM backend', body: 'FluxVM VMs sit next to libvirt VMs, with eBPF networking, live migration and HA across hosts.'},
+  {title: 'FluxVM backend', body: 'Second hypervisor next to libvirt: QEMU VNC, disks, clone, Secure Boot/TPM, snapshots, live migration and fleet HA.'},
   {title: 'Boot Doctor', body: "A VM that won't boot is diagnosed and repaired offline through GuestKit, after a backup."},
   {title: 'VM quarantine', body: 'Isolate a suspect VM in the eBPF datapath under a lease that lapses on its own.'},
   {title: 'Just-in-time access', body: 'Open a VM for a set time, with two-person approval and automatic expiry.'},

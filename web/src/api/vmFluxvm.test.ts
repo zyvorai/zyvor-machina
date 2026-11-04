@@ -18,9 +18,9 @@ describe('FluxVM VM scope', () => {
     expect(appendVmConnection('/api/v1/vms/a?x=1', 'fluxvm')).toBe('/api/v1/vms/a?x=1&backend=fluxvm')
   })
 
-  it('keeps connection=fluxvm on in-app routes and sends the console to the serial tab', () => {
+  it('keeps connection=fluxvm on in-app routes and sends the console to the VNC tab', () => {
     expect(vmDetailRoute('a b', 'fluxvm')).toBe('/vms/a%20b?connection=fluxvm')
-    expect(vmConsoleRoute('a', 'fluxvm')).toBe('/vms/a?connection=fluxvm&tab=serial')
+    expect(vmConsoleRoute('a', 'fluxvm')).toBe('/vms/a?connection=fluxvm&tab=vnc')
     expect(vmConsoleRoute('a', 'session')).toBe('/vms/a/consolehub?connection=session')
     expect(vmConsoleRoute('a')).toBe('/vms/a/consolehub')
   })
@@ -85,12 +85,25 @@ describe('FluxVM create extras', () => {
     expect(r.fluxvm_isos).toEqual(['/iso/win11.iso', '/iso/virtio.iso'])
     expect(buildFluxvmCreateRequest({ ...base, isos: ' \n ' }).fluxvm_isos).toBeUndefined()
   })
+
+  it('passes Secure Boot, TPM, firmware and balloon', () => {
+    const r = buildFluxvmCreateRequest({
+      ...base, secureBoot: true, vtpm: true, firmware: ' /ovmf.fd ', balloon: true,
+    })
+    expect(r).toMatchObject({
+      secure_boot: true, vtpm: true, fluxvm_firmware: '/ovmf.fd', fluxvm_balloon: true,
+    })
+    expect(buildFluxvmCreateRequest(base).secure_boot).toBeUndefined()
+  })
 })
 
 describe('FluxVM per-engine features', () => {
   it('gates hotplug, NICs, backups and migration by engine', () => {
-    expect(fluxvmCaps('qemu')).toEqual({ hotplug: true, nic: true, backup: true, liveBackup: true, migrate: true, interactiveSerial: true })
-    expect(fluxvmCaps('cloud-hypervisor')).toMatchObject({ hotplug: true, nic: false, backup: true, liveBackup: false, migrate: false })
+    expect(fluxvmCaps('qemu')).toEqual({
+      hotplug: true, nic: true, backup: true, liveBackup: true, migrate: true,
+      interactiveSerial: true, vnc: true, disks: true, balloon: true,
+    })
+    expect(fluxvmCaps('cloud-hypervisor')).toMatchObject({ hotplug: true, nic: false, backup: true, liveBackup: false, migrate: false, vnc: false })
     expect(fluxvmCaps('firecracker')).toMatchObject({ hotplug: false, backup: true, liveBackup: false, migrate: false })
     expect(fluxvmCaps('flux-vm')).toMatchObject({ backup: true, liveBackup: false })
     expect(fluxvmCaps(undefined)).toMatchObject({ hotplug: false, backup: false })

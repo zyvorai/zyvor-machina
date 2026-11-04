@@ -536,6 +536,136 @@ impl FluxvmClient {
         .map(|(_, text)| text)
     }
 
+    /// Mint a single-use browser WebSocket ticket (`kind`: `vnc` | `serial` | `console`).
+    /// Returns the redeem path `/console/ws/{ticket}` (no Authorization on the upgrade).
+    pub async fn ws_ticket(&self, name: &str, kind: &str) -> Result<String, LibvirtError> {
+        let id = self.resolve(name).await?.id;
+        let v: Value = self
+            .call(
+                Method::POST,
+                &format!("/v1/vms/{id}/ws-ticket"),
+                Some(json!({ "kind": kind })),
+            )
+            .await?;
+        v.get("path")
+            .and_then(Value::as_str)
+            .filter(|p| !p.is_empty())
+            .map(str::to_string)
+            .ok_or_else(|| {
+                LibvirtError::Internal("fluxvm-api ws-ticket response missing path".into())
+            })
+    }
+
+    /// Full `ws(s)://…/console/ws/{ticket}` URL for a redeem path from [`Self::ws_ticket`].
+    pub fn ticket_ws_url(&self, path: &str) -> String {
+        let path = if path.starts_with('/') {
+            path.to_string()
+        } else {
+            format!("/{path}")
+        };
+        format!("{}{path}", self.ws_base())
+    }
+
+    /// Clone a stopped VM (`POST …/clone`). `clone_mode` is ignored (FluxVM always copies).
+    pub async fn clone_vm(&self, name: &str, new_name: &str) -> Result<FluxRecord, LibvirtError> {
+        let id = self.resolve(name).await?.id;
+        self.call(
+            Method::POST,
+            &format!("/v1/vms/{id}/clone"),
+            Some(json!({ "name": new_name })),
+        )
+        .await
+    }
+
+    /// Rename via `PATCH /v1/vms/{id}` `{ "name": … }`.
+    pub async fn rename(&self, name: &str, new_name: &str) -> Result<FluxRecord, LibvirtError> {
+        let id = self.resolve(name).await?.id;
+        self.call(
+            Method::PATCH,
+            &format!("/v1/vms/{id}"),
+            Some(json!({ "name": new_name })),
+        )
+        .await
+    }
+
+    /// List data disks (QEMU). Root is reported separately on the VM record.
+    pub async fn disks(&self, name: &str) -> Result<Vec<Value>, LibvirtError> {
+        let id = self.resolve(name).await?.id;
+        let v: Value = self
+            .call(Method::GET, &format!("/v1/vms/{id}/disks"), None)
+            .await?;
+        if let Some(items) = v.get("items").and_then(Value::as_array) {
+            return Ok(items.clone());
+        }
+        Ok(v.as_array().cloned().unwrap_or_default())
+    }
+
+    /// Attach a blank sized disk (`size_gib`) or an existing `path`. `disk_name` is the FluxVM disk name.
+    pub async fn attach_disk(
+        &self,
+        name: &str,
+        disk_name: &str,
+        path: Option<&str>,
+        size_gib: Option<u64>,
+    ) -> Result<Value, LibvirtError> {
+        let id = self.resolve(name).await?.id;
+        let mut body = json!({ "name": disk_name });
+        if let Some(p) = path.filter(|p| !p.is_empty()) {
+            body["path"] = json!(p);
+        } else if let Some(g) = size_gib.filter(|g| *g > 0) {
+            body["size_gib"] = json!(g);
+        } else {
+            return Err(LibvirtError::Invalid(
+                "FluxVM disk attach needs source (path) or size_gb > 0".into(),
+            ));
+        }
+        self.call(Method::POST, &format!("/v1/vms/{id}/disks"), Some(body))
+            .await
+    }
+
+    pub async fn detach_disk(&self, name: &str, disk_name: &str) -> Result<(), LibvirtError> {
+        let id = self.resolve(name).await?.id;
+        self.send(
+            Method::DELETE,
+            &format!("/v1/vms/{id}/disks/{}", urlencode(disk_name)),
+            None,
+        )
+        .await
+        .map(|_| ())
+    }
+
+    pub async fn resize_disk(
+        &self,
+        name: &str,
+        disk_name: &str,
+        size_gib: u64,
+    ) -> Result<Value, LibvirtError> {
+        let id = self.resolve(name).await?.id;
+        self.call(
+            Method::PATCH,
+            &format!("/v1/vms/{id}/disks/{}", urlencode(disk_name)),
+            Some(json!({ "size_gib": size_gib })),
+        )
+        .await
+    }
+
+    /// Set balloon target MiB (`0` deflates). Needs a balloon device (create with balloon).
+    pub async fn balloon_set(&self, name: &str, balloon_mib: u64) -> Result<Value, LibvirtError> {
+        let id = self.resolve(name).await?.id;
+        self.call(
+            Method::POST,
+            &format!("/v1/vms/{id}/balloon"),
+            Some(json!({ "balloon_mib": balloon_mib })),
+        )
+        .await
+    }
+
+    pub async fn balloon_get(&self, name: &str) -> Result<Value, LibvirtError> {
+        let id = self.resolve(name).await?.id;
+        self.call(Method::GET, &format!("/v1/vms/{id}/balloon"), None)
+            .await
+    }
+
     pub fn build_create(&self, req: &CreateVmRequest) -> Result<FluxCreate, LibvirtError> {
         let hv = match req.fluxvm_backend.trim() {
             "" => self.default_backend.as_str(),
@@ -581,6 +711,13 @@ impl FluxvmClient {
             "ssh_authorized_keys": if key.is_empty() { vec![] } else { vec![key.to_string()] },
         }));
         let vcpus = req.vcpus.clamp(1, u8::MAX as u32);
+        let firmware = opt(&req.fluxvm_firmware);
+        let balloon = req.fluxvm_balloon.then(|| {
+            json!({
+                "free_page_reporting": true,
+                "deflate_on_oom": true,
+            })
+        });
         Ok(FluxCreate {
             name: req.name.clone(),
             backend: hv.to_string(),
@@ -596,6 +733,10 @@ impl FluxvmClient {
             agent: Some(json!({ "enabled": req.fluxvm_agent.unwrap_or(true) })),
             storage: req.fluxvm_shared_disk.then(|| "shared".to_string()),
             cdroms,
+            tpm: req.vtpm.then_some(true),
+            secure_boot: req.secure_boot.then_some(true),
+            firmware,
+            balloon,
         })
     }
 }
@@ -934,6 +1075,26 @@ mod tests {
         let b = c.build_create(&req).unwrap();
         assert_eq!(b.backend, "qemu");
         assert_eq!(b.network["mode"], "user");
+    }
+
+    #[test]
+    fn create_body_passes_tpm_secure_boot_firmware_balloon() {
+        let c = client();
+        let req = CreateVmRequest {
+            name: "win11".into(),
+            fluxvm_backend: "qemu".into(),
+            fluxvm_image: "/images/blank.raw".into(),
+            secure_boot: true,
+            vtpm: true,
+            fluxvm_firmware: "/usr/share/OVMF/OVMF_CODE.fd".into(),
+            fluxvm_balloon: true,
+            ..Default::default()
+        };
+        let v = serde_json::to_value(c.build_create(&req).unwrap()).unwrap();
+        assert_eq!(v["tpm"], true);
+        assert_eq!(v["secure_boot"], true);
+        assert_eq!(v["firmware"], "/usr/share/OVMF/OVMF_CODE.fd");
+        assert_eq!(v["balloon"]["free_page_reporting"], true);
     }
 
     #[test]

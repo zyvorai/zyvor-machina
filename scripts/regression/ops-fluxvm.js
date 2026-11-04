@@ -308,6 +308,29 @@ async function waitTask(taskId, timeoutMs = 600000) {
       return `added+removed ${r.mac}`;
     });
 
+    await step('logs-fluxvm', async () => {
+      const j = await must('GET', `/api/v1/vms/${encodeURIComponent(A)}/logs?backend=fluxvm&lines=20`);
+      if (j.backend !== 'fluxvm') throw new Error(`backend=${j.backend}`);
+      return `${(j.content || '').length} chars`;
+    });
+
+    await step('disk-attach-resize-detach', async () => {
+      await must('POST', q(A, '/disk/attach'), { target: 'data1', source: '', size_gb: 1 });
+      await must('POST', q(A, '/disk/resize/data1'), { size_gb: 2 });
+      await must('POST', q(A, '/disk/detach/data1'));
+      return 'data1 1→2 GiB then detached';
+    });
+
+    await step('vnc-ws-opens', async () => {
+      const token = await wsToken();
+      const out = await wsExchange(`/ws/v1/vnc/${encodeURIComponent(A)}?token=${encodeURIComponent(token)}&backend=fluxvm`, {
+        waitMs: 2500,
+      });
+      // RFB greeting starts with ASCII "RFB "; any payload means the ticket proxy worked.
+      if (!out || out.length < 4) throw new Error(`no RFB bytes (${out?.length ?? 0})`);
+      return `${out.length} bytes`;
+    });
+
     await step('stop', async () => {
       await must('POST', q(A, '/stop'));
       await waitState(A, 'shutoff', 90000);
@@ -350,6 +373,16 @@ async function waitTask(taskId, timeoutMs = 600000) {
     await step('backup-delete', async () => {
       if (!backupId) throw new Error('no backup');
       await must('DELETE', `/api/v1/backups/${encodeURIComponent(backupId)}?backend=fluxvm`);
+    });
+
+    const cloneName = `${A}-clone`;
+    await step('clone-rename', async () => {
+      await must('POST', q(A, '/clone'), { new_name: cloneName });
+      await must('POST', `/api/v1/vms/${encodeURIComponent(cloneName)}/rename?backend=fluxvm`, {
+        new_name: `${cloneName}-r`,
+      });
+      await must('DELETE', `/api/v1/vms/${encodeURIComponent(`${cloneName}-r`)}?backend=fluxvm`);
+      return `${cloneName} → ${cloneName}-r deleted`;
     });
   }
 

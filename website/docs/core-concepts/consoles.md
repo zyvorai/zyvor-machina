@@ -31,12 +31,15 @@ sequenceDiagram
 | Guest | Default console |
 | --- | --- |
 | Linux with VNC graphics | noVNC |
-| Headless Linux | SSH (in-browser terminal) |
+| FluxVM QEMU | noVNC (`/ws/v1/vnc/{name}?backend=fluxvm`, FluxVM `ws-ticket`) |
+| FluxVM non-QEMU / headless | Serial (read-only log) or agent shell (`/ws/v1/fluxvm-console/{name}`) |
+| Headless Linux (libvirt) | SSH (in-browser terminal) |
 | SPICE graphics | SPICE |
 | Recovery / boot issues | Serial |
 | Windows with Remote Desktop enabled | Native RDP through a hypervisor NAT port-forward, with a downloadable `.rdp` file |
 
-RDP only appears once the agent confirms the guest is listening on port 3389.
+RDP only appears once the agent confirms the guest is listening on port 3389. FluxVM guests use VM detail →
+**Console (VNC)** (QEMU) plus **Serial** and **Agent console**; they do not use Console Hub.
 
 ## VM detail
 

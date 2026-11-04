@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
 
 import { useCallback, useEffect, useState } from 'react'
-import { Archive, ArrowRightLeft, Camera, Cpu, Disc, Network, RotateCcw, Trash2 } from 'lucide-react'
-import { FLUXVM_CONNECTION, attachInterface, detachInterface, ejectCdrom, migrateVM, setMemory, setVcpus } from '../../api/vm'
+import { Archive, ArrowRightLeft, Camera, Cpu, Disc, HardDrive, Network, RotateCcw, Trash2 } from 'lucide-react'
+import {
+  FLUXVM_CONNECTION, attachDisk, attachInterface, cloneVM, detachDisk, detachInterface, ejectCdrom,
+  migrateVM, renameVM, resizeDisk, setMemory, setMemoryBalloon, setVcpus,
+} from '../../api/vm'
 import { createSnapshot, deleteSnapshot, listSnapshots, revertSnapshot, type SnapshotInfo } from '../../api/snapshot'
 import { deleteBackup, fetchBackups, restoreBackup, triggerBackup, type BackupInfo } from '../../api/backup'
 import { formatUserError } from '../../utils/apiError'
@@ -20,6 +23,9 @@ export function fluxvmCaps(engine?: string | null) {
     liveBackup: qemu,
     migrate: qemu,
     interactiveSerial: qemu,
+    vnc: qemu,
+    disks: qemu,
+    balloon: qemu,
   }
 }
 
@@ -32,6 +38,8 @@ type Iface = { mac_address: string; source: string }
 /** A FluxVM CD-ROM: `target` is the drive name, `source` the ISO (empty once ejected). */
 type Cdrom = { target: string; source: string }
 
+type DiskRow = { target: string; source: string; device: string }
+
 type Props = {
   name: string
   engine?: string | null
@@ -40,6 +48,7 @@ type Props = {
   memoryMb: number
   interfaces: Iface[]
   cdroms?: Cdrom[]
+  disks?: DiskRow[]
   onChanged: () => void
 }
 
@@ -47,7 +56,7 @@ const section = 'tahoe-glass-card p-5 space-y-3'
 const heading = 'text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2'
 const hint = 'text-xs text-[var(--text-muted)]'
 
-export default function FluxvmManagePanel({ name, engine, state, vcpus, memoryMb, interfaces, cdroms = [], onChanged }: Props) {
+export default function FluxvmManagePanel({ name, engine, state, vcpus, memoryMb, interfaces, cdroms = [], disks = [], onChanged }: Props) {
   const toast = useToastContext()
   const caps = fluxvmCaps(engine)
   const running = state === 'running'
@@ -56,7 +65,13 @@ export default function FluxvmManagePanel({ name, engine, state, vcpus, memoryMb
   const [busy, setBusy] = useState<string | null>(null)
   const [wantVcpus, setWantVcpus] = useState(vcpus)
   const [wantMem, setWantMem] = useState(memoryMb)
+  const [balloonMb, setBalloonMb] = useState(Math.max(64, Math.floor(memoryMb / 2)))
   const [bridge, setBridge] = useState('')
+  const [diskName, setDiskName] = useState('data')
+  const [diskSizeGb, setDiskSizeGb] = useState(10)
+  const [diskPath, setDiskPath] = useState('')
+  const [cloneName, setCloneName] = useState('')
+  const [renameTo, setRenameTo] = useState('')
   const [snaps, setSnaps] = useState<SnapshotInfo[]>([])
   const [snapName, setSnapName] = useState('')
   const [backups, setBackups] = useState<BackupInfo[]>([])
@@ -98,9 +113,89 @@ export default function FluxvmManagePanel({ name, engine, state, vcpus, memoryMb
   const primaryMac = interfaces[0]?.mac_address
   const extraNics = interfaces.filter((i, idx) => idx > 0 && i.mac_address && i.mac_address !== primaryMac)
   const loadedMedia = cdroms.filter((c) => c.source)
+  const dataDisks = disks.filter((d) => d.device === 'disk' && d.target !== 'vda')
 
   return (
     <div className="space-y-4" data-testid="fluxvm-manage-panel">
+      <div className={section}>
+        <h3 className={heading}>Clone / rename</h3>
+        <p className={hint}>Clone needs the VM stopped. Rename updates the FluxVM name (same UUID).</p>
+        <div className="flex items-end gap-3 flex-wrap">
+          <div>
+            <label htmlFor="fx-clone" className="block text-xs text-[var(--text-muted)] mb-1">Clone as</label>
+            <input id="fx-clone" type="text" value={cloneName} onChange={(e) => setCloneName(e.target.value)} className="input-field w-40 text-sm" placeholder={`${name}-copy`} />
+          </div>
+          <button type="button" className="btn-secondary text-sm disabled:opacity-50" disabled={running || busy !== null || !cloneName.trim()}
+            onClick={() => run('clone', () => cloneVM(name, cloneName.trim(), conn).then(() => setCloneName('')), `Cloned as ${cloneName.trim()}`)}>Clone</button>
+          <div>
+            <label htmlFor="fx-rename" className="block text-xs text-[var(--text-muted)] mb-1">Rename to</label>
+            <input id="fx-rename" type="text" value={renameTo} onChange={(e) => setRenameTo(e.target.value)} className="input-field w-40 text-sm" placeholder={name} />
+          </div>
+          <button type="button" className="btn-secondary text-sm disabled:opacity-50" disabled={busy !== null || !renameTo.trim() || renameTo.trim() === name}
+            onClick={() => run('rename', () => renameVM(name, renameTo.trim(), conn), `Renamed to ${renameTo.trim()}`)}>Rename</button>
+        </div>
+      </div>
+
+      {caps.balloon && (
+        <div className={section}>
+          <h3 className={heading}><Cpu className="w-4 h-4" /> Balloon</h3>
+          <p className={hint}>Needs a balloon device (create with &quot;Balloon&quot; checked). Target MiB; 0 deflates.</p>
+          <div className="flex items-end gap-3 flex-wrap">
+            <div>
+              <label htmlFor="fx-balloon" className="block text-xs text-[var(--text-muted)] mb-1">Target MiB</label>
+              <input id="fx-balloon" type="number" min={0} step={64} value={balloonMb} onChange={(e) => setBalloonMb(Number(e.target.value) || 0)} className="input-field w-32 text-sm" />
+            </div>
+            <button type="button" className="btn-secondary text-sm disabled:opacity-50" disabled={!running || busy !== null}
+              onClick={() => run('balloon', () => setMemoryBalloon(name, balloonMb, conn), `Balloon → ${balloonMb} MiB`)}>Set balloon</button>
+          </div>
+        </div>
+      )}
+
+      {caps.disks && (
+        <div className={section} data-testid="fluxvm-disks">
+          <h3 className={heading}><HardDrive className="w-4 h-4" /> Data disks</h3>
+          <p className={hint}>Attach a blank disk (size GiB) or an existing host path. Name becomes the FluxVM disk id (not vda — that is root).</p>
+          <div className="flex items-end gap-3 flex-wrap">
+            <div>
+              <label htmlFor="fx-disk-name" className="block text-xs text-[var(--text-muted)] mb-1">Name</label>
+              <input id="fx-disk-name" type="text" value={diskName} onChange={(e) => setDiskName(e.target.value)} className="input-field w-28 font-mono text-sm" />
+            </div>
+            <div>
+              <label htmlFor="fx-disk-size" className="block text-xs text-[var(--text-muted)] mb-1">Size GiB</label>
+              <input id="fx-disk-size" type="number" min={1} value={diskSizeGb} onChange={(e) => setDiskSizeGb(Math.max(1, Number(e.target.value) || 1))} className="input-field w-24 text-sm" />
+            </div>
+            <div className="min-w-[12rem] flex-1">
+              <label htmlFor="fx-disk-path" className="block text-xs text-[var(--text-muted)] mb-1">Or host path</label>
+              <input id="fx-disk-path" type="text" value={diskPath} onChange={(e) => setDiskPath(e.target.value)} className="input-field w-full font-mono text-sm" placeholder="/dev/rbd0" />
+            </div>
+            <button type="button" className="btn-secondary text-sm disabled:opacity-50" disabled={busy !== null || !diskName.trim()}
+              onClick={() => run('disk-attach', () => attachDisk(name, {
+                target: diskName.trim(),
+                source: diskPath.trim() || undefined,
+                size_gb: diskPath.trim() ? undefined : diskSizeGb,
+              }, conn), `Attached ${diskName.trim()}`)}>Attach</button>
+          </div>
+          {dataDisks.length === 0 ? <p className={hint}>No extra data disks.</p> : (
+            <ul className="text-sm space-y-1">
+              {dataDisks.map((d) => (
+                <li key={d.target} className="flex items-center gap-3 flex-wrap">
+                  <span className="font-mono text-xs">{d.target}</span>
+                  <span className="text-xs text-[var(--text-muted)] font-mono truncate">{d.source || '—'}</span>
+                  <button type="button" className="btn-ghost text-xs" disabled={busy !== null}
+                    onClick={() => {
+                      const gb = window.prompt(`New size in GiB for ${d.target}`, '20')
+                      if (!gb) return
+                      void run(`resize-${d.target}`, () => resizeDisk(name, d.target, Number(gb) || 0, conn), `Resized ${d.target}`)
+                    }}>Resize</button>
+                  <button type="button" className="btn-ghost text-xs" disabled={busy !== null}
+                    onClick={() => run(`detach-${d.target}`, () => detachDisk(name, d.target, conn), `Detached ${d.target}`)}>Detach</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {caps.hotplug && (
         <div className={section}>
           <h3 className={heading}><Cpu className="w-4 h-4" /> Size (hot-add)</h3>

@@ -129,6 +129,18 @@ pub struct FluxCreate {
     pub storage: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub cdroms: Vec<FluxCdrom>,
+    /// Emulated TPM 2.0 (`swtpm`); QEMU. Windows 11 needs this with Secure Boot.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tpm: Option<bool>,
+    /// UEFI Secure Boot; QEMU (needs host OVMF with SB keys).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secure_boot: Option<bool>,
+    /// Per-VM firmware image path (OVMF). Empty = FluxVM host default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub firmware: Option<String>,
+    /// Add a virtio balloon (QEMU). `true` → default balloon options.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub balloon: Option<Value>,
 }
 
 /// One entry of `GET /v1/vms/{id}/snapshots`.
@@ -268,6 +280,37 @@ impl FluxRecord {
                 readonly: false,
                 shareable: false,
                 capacity_bytes: None,
+                allocation_bytes: None,
+                physical_bytes: None,
+            });
+        }
+        for (i, d) in self.request.data_disks.iter().enumerate() {
+            let name = d
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or("data")
+                .to_string();
+            let path = d
+                .get("path")
+                .or_else(|| d.get("file"))
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            let size_gib = d.get("size_gib").and_then(Value::as_u64);
+            disks.push(DiskInfo {
+                device: "disk".into(),
+                source: path,
+                driver: "qcow2".into(),
+                target: if name.is_empty() {
+                    format!("vd{}", (b'b' + i as u8) as char)
+                } else {
+                    name
+                },
+                bus: "virtio".into(),
+                cache: String::new(),
+                readonly: false,
+                shareable: false,
+                capacity_bytes: size_gib.map(|g| g.saturating_mul(1024 * 1024 * 1024)),
                 allocation_bytes: None,
                 physical_bytes: None,
             });

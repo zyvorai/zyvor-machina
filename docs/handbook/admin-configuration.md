@@ -254,14 +254,14 @@ TLS is active only when `enabled=true` **and** both paths are non-empty.
   integration blocks, all `enabled=false` by default (see
   [Product Guide → Integrations](product-guide.md#integrations)).
 - `[fluxvm]` — `enabled`, `base_url` (`http://127.0.0.1:7788`), `token` or
-  `token_file`, `insecure_tls` (also covers `wss://` serial and agent
+  `token_file`, `insecure_tls` (also covers `wss://` VNC, serial and agent
   console), `default_backend` (`auto` | `qemu` | `cloud-hypervisor` |
-  `firecracker` | `flux-vm`). Snapshots, backups (QEMU, default storage),
-  hot-add vCPU/memory (QEMU and Cloud Hypervisor), extra NICs (QEMU on a host
-  bridge) and live migration (QEMU on a shared disk) go through it. For the
-  controller to manage these VMs, set `MACHINA_FLUXVM_URL` for
+  `firecracker` | `flux-vm`). Day-2: QEMU VNC (`ws-ticket`), snapshots, backups
+  (QEMU, default/shared storage), hot-add, data disks, clone/rename, balloon,
+  Secure Boot/TPM at create, extra NICs and live migration (QEMU on a shared
+  disk). For the controller to manage these VMs, set `MACHINA_FLUXVM_URL` for
   `machina-agent` (below); fleet migration and HA re-create need the disk on
-  storage every host can reach (`fluxvm_shared_disk`).
+  storage every host can reach (`fluxvm_shared_disk`). See [../fluxvm.md](../fluxvm.md).
 
 ---
 
