@@ -234,3 +234,243 @@ extension ClientTests {
         #expect(pts.count == 1 && pts[0].vmMetrics?[0].netRxBytes == 29156161 && pts[0].load1 == 5.11)
     }
 }
+
+// MARK: Console (RFB, keys, terminal)
+
+final class ScriptedTransport: ConsoleTransport, @unchecked Sendable {
+    private let lock = NSLock()
+    private var chunks: [Data]
+    private(set) var sent: [Data] = []
+    init(_ chunks: [[UInt8]]) { self.chunks = chunks.map { Data($0) } }
+    func receive() async throws -> Data {
+        let next: Data? = lock.withLock { chunks.isEmpty ? nil : chunks.removeFirst() }
+        guard let next else { throw RFBError.closed }
+        return next
+    }
+    func send(_ data: Data) async throws { lock.withLock { sent.append(data) } }
+    func close() {}
+    var sentBytes: [[UInt8]] { lock.withLock { sent.map { Array($0) } } }
+}
+
+private func be16(_ v: Int) -> [UInt8] { [UInt8(v >> 8), UInt8(v & 0xff)] }
+private func be32(_ v: Int) -> [UInt8] { [UInt8(v >> 24 & 255), UInt8(v >> 16 & 255), UInt8(v >> 8 & 255), UInt8(v & 255)] }
+private func handshake(w: Int, h: Int, version: String = "RFB 003.008\n") -> [[UInt8]] {
+    var first = Array(version.utf8)
+    var rest: [UInt8] = version.contains("003.008") ? [1, 1] + be32(0) : version.contains("003.007") ? [1, 1] : be32(1)
+    rest += be16(w) + be16(h) + [UInt8](repeating: 0, count: 16) + be32(4) + Array("test".utf8)
+    first += rest   // one chunk on purpose: the client must split a stream, not rely on message boundaries
+    return [first]
+}
+
+extension ClientTests {
+    @Test func rfbHandshakeSendsExpectedMessages() async throws {
+        let t = ScriptedTransport(handshake(w: 4, h: 2))
+        let c = RFBClient(transport: t)
+        try await c.connect()
+        let (w, h, name) = (await c.width, await c.height, await c.desktopName)
+        #expect(w == 4 && h == 2 && name == "test")
+        let sent = t.sentBytes
+        #expect(sent[0] == Array("RFB 003.008\n".utf8))
+        #expect(sent[1] == [1])                                   // security None
+        #expect(sent[2] == [1])                                   // ClientInit shared
+        #expect(sent[3].count == 20 && sent[3][0] == 0 && sent[3][4] == 32)    // SetPixelFormat, 32 bpp
+        #expect(sent[4][0] == 2 && sent[4].count == 4 + 16)       // SetEncodings, 4 encodings
+        #expect(sent[5] == [3, 0] + be16(0) + be16(0) + be16(4) + be16(2))     // full update request
+    }
+
+    @Test func rfbOlderVersionsAndPasswordRefusal() async throws {
+        let c37 = RFBClient(transport: ScriptedTransport(handshake(w: 1, h: 1, version: "RFB 003.007\n")))
+        try await c37.connect()
+        let c33 = RFBClient(transport: ScriptedTransport(handshake(w: 1, h: 1, version: "RFB 003.003\n")))
+        try await c33.connect()
+        let pw = RFBClient(transport: ScriptedTransport([Array("RFB 003.008\n".utf8) + [1, 2]]))   // only VNC auth offered
+        await #expect(throws: RFBError.self) { try await pw.connect() }
+        let junk = RFBClient(transport: ScriptedTransport([Array("HTTP/1.1 400 \n".utf8)]))
+        await #expect(throws: RFBError.self) { try await junk.connect() }
+    }
+
+    @Test func rfbDecodesRawCopyRectAndHextile() async throws {
+        var msgs = handshake(w: 4, h: 2)
+        // Raw: pixel (1,0) = B10 G20 R30; pixel (2,0) = B1 G2 R3.
+        var upd: [UInt8] = [0, 0] + be16(3)
+        upd += be16(1) + be16(0) + be16(2) + be16(1) + be32(0) + [10, 20, 30, 0, 1, 2, 3, 0]
+        // CopyRect: copy (1,0) 1x1 to (0,1).
+        upd += be16(0) + be16(1) + be16(1) + be16(1) + be32(1) + be16(1) + be16(0)
+        // Hextile over (2,1) 2x1: bg+fg specified, subrects, not coloured: bg red(0,0,255), fg green, one subrect at x=1,y=0 1x1.
+        upd += be16(2) + be16(1) + be16(2) + be16(1) + be32(5) + [2 | 4 | 8, 0, 0, 255, 0, 0, 255, 0, 0, 1, 0x10, 0x00]
+        msgs.append(upd)
+        let t = ScriptedTransport(msgs)
+        let c = RFBClient(transport: t)
+        try await c.connect()
+        await c.run()      // consumes the update, then the scripted stream ends
+        let px = await c.rawPixels()
+        func at(_ x: Int, _ y: Int) -> [UInt8] { Array(px.bgra[((y * px.width + x) * 4)..<((y * px.width + x) * 4 + 4)]) }
+        #expect(at(1, 0) == [10, 20, 30, 255] && at(2, 0) == [1, 2, 3, 255])
+        #expect(at(0, 1) == [10, 20, 30, 255])                  // copied
+        #expect(at(2, 1) == [0, 0, 255, 255])                   // hextile background (red)
+        #expect(at(3, 1) == [0, 255, 0, 255])                   // hextile foreground subrect (green)
+        #expect(t.sentBytes.last == [3, 1] + be16(0) + be16(0) + be16(4) + be16(2))    // asks for the next incremental update
+    }
+
+    @Test func rfbInputMessages() async throws {
+        let t = ScriptedTransport(handshake(w: 100, h: 50))
+        let c = RFBClient(transport: t)
+        try await c.connect()
+        await c.key(0xff0d, down: true)
+        await c.pointer(x: 500, y: -3, buttonMask: 1)           // clamped into the framebuffer
+        await c.sendClipboard("hi")
+        let s = t.sentBytes.suffix(3)
+        #expect(Array(s[s.startIndex]) == [4, 1, 0, 0] + be32(0xff0d))
+        #expect(Array(s[s.startIndex + 1]) == [5, 1] + be16(99) + be16(0))
+        #expect(Array(s[s.startIndex + 2]) == [6, 0, 0, 0] + be32(2) + [104, 105])
+    }
+
+    @Test func keyMapping() {
+        #expect(KeySyms.keysym(keyCode: 36, characters: "\r") == 0xff0d)
+        #expect(KeySyms.keysym(keyCode: 0, characters: "a") == 0x61)
+        #expect(KeySyms.keysym(keyCode: 0, characters: "é") == 0xe9)
+        #expect(KeySyms.keysym(keyCode: 0, characters: "€") == 0x0100_20ac)
+        #expect(KeySyms.modifier(keyCode: 56) == 0xffe1 && KeySyms.modifier(keyCode: 55) == 0xffeb)
+        #expect(TerminalKeys.bytes(keyCode: 0, characters: "c", control: true) == [3])           // Ctrl-C
+        #expect(TerminalKeys.bytes(keyCode: 126, characters: nil, control: false) == Array("\u{1b}[A".utf8))
+        #expect(TerminalKeys.bytes(keyCode: 36, characters: "\r", control: false) == [13])
+        #expect(TerminalKeys.bytes(keyCode: 0, characters: "é", control: false) == Array("é".utf8))
+    }
+
+    @Test func terminalBufferRendersLikeAConsole() {
+        var t = TerminalBuffer()
+        t.feed("login: root\r\nPassword: ")
+        t.feed("\u{1b}[31mred\u{1b}[0m\u{1b}]0;title\u{07} ok\r\n")
+        #expect(t.text == "login: root\nPassword: red ok\n")
+        t.feed("abc\u{08}\u{08}X")                                   // backspace then overwrite
+        #expect(t.text.hasSuffix("\naXc"))
+        t.feed("\r\u{1b}[K")                                        // CR + erase line
+        #expect(t.text.hasSuffix("\n"))
+        var split = TerminalBuffer(); split.feed("a\u{1b}"); split.feed("[3"); split.feed("1mb")     // sequence split across chunks
+        #expect(split.text == "ab")
+        var cap = TerminalBuffer(maxLines: 3); for i in 0..<10 { cap.feed("l\(i)\n") }
+        #expect(cap.lines.count == 3)
+    }
+}
+
+extension ClientTests {
+    @Test func dottedPathsAndFlattening() throws {
+        let json = try JSONDecoder().decode(JSONValue.self, from: Data(#"{"items":[{"metadata":{"name":"p","uid":"u1"},"status":{"phase":"Running"}}],"a":{"b":{"c":1,"d":{"e":2}},"f":"x"},"l":[1]}"#.utf8))
+        let spec = ResourceSpec("t", "T", group: "g", icon: "i", endpoint: .get("/x"), rowsPath: ["items"], idKey: "metadata.uid",
+                                columns: [.init("Name", "metadata.name"), .init("Phase", "status.phase"), .init("Missing", "status.nope")])
+        let rows = spec.rows(from: json)
+        #expect(rows[0].id == "u1")
+        #expect(spec.columns.map { $0.render(rows[0]) } == ["p", "Running", "–"])
+        let kv = ResourceSpec("k", "K", group: "g", icon: "i", endpoint: .get("/x"), layout: .keyValue).rows(from: json)
+        // Objects are expanded two levels; deeper values stay as one cell.
+        #expect(kv.map(\.id) == ["a.b.c", "a.b.d", "a.f", "items", "l"])
+    }
+
+    @Test func actionQueryAndStaticBody() {
+        let row = ResourceRow(id: "0", values: .object(["id": .string("abc"), "name": .string("n")]))
+        let rm = ResourceAction("Remove", "DELETE", "/api/v1/vessel/containers/{id}", destructive: true, query: [.init(name: "force", value: "false")])
+        let e = rm.endpoint(for: row)
+        #expect(e?.method == "DELETE" && e?.path == "/api/v1/vessel/containers/abc" && e?.query == [.init(name: "force", value: "false")])
+        let ap = ResourceAction("Approve", "/api/v1/zeus-firewall/approvals/{id}/approve", controller: true, staticBody: .object([:]))
+        #expect(ap.endpoint(for: row)?.body == .object([:]) && ap.endpoint(for: row)?.resolvedPath.hasPrefix("/api/v1/platform/controller/") == true)
+    }
+
+    @Test func newPendingApprovalsOnlyAfterFirstPoll() {
+        let now = [(id: "a", status: "pending"), (id: "b", status: "approved"), (id: "c", status: "Pending")]
+        #expect(Approvals.newPending(seen: nil, current: now).isEmpty)                       // first poll: stay quiet
+        #expect(Approvals.newPending(seen: ["a"], current: now) == ["c"])                   // b is not pending, a already seen
+    }
+
+    @Test func registryHasPhase5Pages() {
+        let ids = Set(FeatureRegistry.all.map(\.id))
+        #expect(["containers", "k8s-pods", "k8s-events", "approvals", "users", "fw-targets", "drs"].allSatisfy(ids.contains))
+        #expect(FeatureRegistry.spec("approvals")?.actions.map(\.title) == ["Approve", "Reject"])
+    }
+}
+
+extension ClientTests {
+    @Test func bytesFormatAndPhase6Registry() {
+        let row = ResourceRow(id: "0", values: .object(["n": .number(1_048_576), "s": .string("x")]))
+        #expect(ResourceColumn("c", "n", .bytes).render(row).contains("MB"))
+        #expect(ResourceColumn("c", "s", .bytes).render(row) == "x")          // not a number: shown as is
+        let groups = Dictionary(grouping: FeatureRegistry.all, by: \.group)
+        #expect(groups["Security"]?.count ?? 0 >= 10 && groups["Fleet security"] != nil && groups["Bare metal"] != nil && groups["Insight"] != nil)
+        // Phase 6 is read-only: none of its groups carries an action.
+        #expect(["Security", "Fleet security", "Bare metal", "Insight"].allSatisfy { g in groups[g]!.allSatisfy { $0.actions.isEmpty } })
+    }
+}
+
+extension ClientTests {
+    @Test func createFormBuildsTypedBodyAndValidates() throws {
+        let c = FeatureRegistry.spec("fc-flavors")!.create!
+        let body = try c.body(from: ["name": " small ", "vcpus": "2", "memory_mib": "2048", "disk_gib": "20", "description": ""])
+        #expect(body["name"]?.text == "small" && body["vcpus"]?.double == 2 && body["description"] == nil)   // trimmed, typed, empty optional left out
+        #expect(throws: ResourceCreate.Invalid.self) { try c.body(from: ["name": "", "vcpus": "2", "memory_mib": "1", "disk_gib": "1"]) }
+        #expect(throws: ResourceCreate.Invalid.self) { try c.body(from: ["name": "x", "vcpus": "two", "memory_mib": "1", "disk_gib": "1"]) }
+        #expect(throws: ResourceCreate.Invalid.self) { try c.body(from: ["name": "x", "vcpus": "-1", "memory_mib": "1", "disk_gib": "1"]) }
+        #expect(c.endpoint.resolvedPath == "/api/v1/platform/controller/api/v1/flavors" && c.endpoint.method == "POST")
+    }
+
+    @Test func serverGroupsAreDerivedFromTags() async throws {
+        MockProtocol.handler = { _ in (200, #"[{"name":"a","tags":["anti-affinity:db","x"]},{"name":"b","tags":["anti-affinity:db"]},{"name":"c","tags":["anti-affinity:web"]},{"name":"d","tags":[]}]"#) }
+        let spec = FeatureRegistry.spec("fc-servergroups")!
+        let rows = spec.rows(from: try await makeClient().load(spec))
+        #expect(rows.map(\.id) == ["0", "1"])
+        #expect(spec.columns.map { $0.render(rows[0]) } == ["db", "2", "a, b"] && spec.columns.map { $0.render(rows[1]) } == ["web", "1", "c"])
+    }
+
+    @Test func fanOutMergesChildrenAndToleratesOneFailure() async throws {
+        MockProtocol.handler = { req in
+            switch req.url!.path {
+            case "/api/v1/platform/controller/api/v1/vms": return (200, #"[{"id":"1","name":"a"},{"id":"2","name":"b"},{"id":"3","name":"c"}]"#)
+            case "/api/v1/platform/controller/api/v1/vms/1/port-forwards": return (200, #"[{"port":80},{"port":443}]"#)
+            case "/api/v1/platform/controller/api/v1/vms/2/port-forwards": return (404, "no")
+            default: return (200, #"{"items":[{"port":22}]}"#)
+            }
+        }
+        let spec = FeatureRegistry.spec("fc-portforwards")!
+        let rows = spec.rows(from: try await makeClient().load(spec))
+        #expect(rows.count == 3)
+        #expect(rows.map { $0.values["_parent"]?.text ?? "" } == ["a", "a", "c"])      // b failed and is skipped, order follows the parents
+        #expect(spec.effectiveColumns(for: rows).first?.title == "Parent")
+        MockProtocol.handler = { req in req.url!.path.hasSuffix("/vms") ? (200, #"[{"id":"1","name":"a"}]"#) : (500, "boom") }
+        await #expect(throws: MachinaError.self) { _ = try await makeClient().load(spec) }                // every child failed: report it
+    }
+
+    @Test func fleetCloudRegistry() {
+        let fc = FeatureRegistry.all.filter { $0.group == "Fleet Cloud" }
+        #expect(fc.count >= 17)
+        #expect(fc.filter { $0.create != nil }.map(\.id).sorted() == ["fc-flavors", "fc-keypairs", "fc-projects", "fc-volumes"])
+        #expect(fc.allSatisfy { $0.actions.allSatisfy { $0.method != "GET" } })
+    }
+}
+
+extension ClientTests {
+    @Test func deepLinksParseAndRoundTrip() {
+        #expect(DeepLink(url: URL(string: "machina://vm/web-frontend-01")!) == .vm("web-frontend-01"))
+        #expect(DeepLink(url: URL(string: "machina://vm/my%20vm")!) == .vm("my vm"))
+        #expect(DeepLink(url: URL(string: "machina://page/k8s-pods")!) == .page("k8s-pods"))
+        #expect(DeepLink(url: URL(string: "MACHINA://Fleet")!) == .fleet)
+        #expect(DeepLink(url: URL(string: "https://vm/x")!) == nil)
+        #expect(DeepLink(url: URL(string: "machina://vm")!) == nil)            // a VM link needs a name
+        #expect(DeepLink(url: URL(string: "machina://nope/x")!) == nil)
+        for l in [DeepLink.vm("a b"), .page("ai-cost"), .fleet, .tasks, .alerts] { #expect(DeepLink(url: l.url) == l) }
+    }
+
+    @Test func savedServersDedupeAndOrder() {
+        let a = URL(string: "https://Host-A:5092")!, b = URL(string: "https://host-b:5092")!
+        var l = ServerList.remembering([], url: a, username: "sus")
+        l = ServerList.remembering(l, url: b, username: "sus")
+        #expect(l.map { $0.url.host } == ["host-b", "Host-A"] || l.map { $0.url.host?.lowercased() } == ["host-b", "host-a"])
+        l = ServerList.remembering(l, url: URL(string: "https://host-a:5092")!, username: "sus", name: "Lab")      // same server, other case: moves to the front
+        #expect(l.count == 2 && l[0].name == "Lab")
+        l = ServerList.remembering(l, url: a, username: "root")                                                  // other user = separate entry
+        #expect(l.count == 3)
+        #expect(ServerList.removing(l, id: l[0].id).count == 2)
+        let json = try? JSONEncoder().encode(l)
+        #expect((try? JSONDecoder().decode([ServerProfile].self, from: json ?? Data()))?.count == 3)
+        // Profiles saved before `username` existed still decode.
+        let old = #"[{"id":"7D1F3C52-0B0E-4C5B-8E43-1E6F2B1D9A10","name":"x","url":"https://h:5092"}]"#
+        #expect((try? JSONDecoder().decode([ServerProfile].self, from: Data(old.utf8)))?.first?.username == nil)
+    }
+}

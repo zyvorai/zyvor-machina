@@ -1,40 +1,6 @@
 import SwiftUI
 import MachinaKit
 
-struct LoginView: View {
-    @Environment(AppModel.self) private var model
-    @State private var password = ""
-
-    var body: some View {
-        @Bindable var model = model
-        VStack(spacing: 18) {
-            Text("machina").font(.system(size: 44, weight: .semibold, design: .rounded))
-            Text("Connect to a Machina daemon").foregroundStyle(.secondary)
-            VStack(spacing: 10) {
-                TextField("https://host:5092", text: $model.serverURL).textContentType(.URL)
-                TextField("Username", text: $model.username)
-                SecureField("Password", text: $password).onSubmit(go)
-            }
-            .textFieldStyle(.roundedBorder).frame(width: 320)
-            if let e = model.error { Text(e).foregroundStyle(.red).font(.callout).frame(width: 320) }
-            Button(action: go) {
-                if model.phase == .connecting { ProgressView().controlSize(.small) } else { Text("Sign In") }
-            }
-            .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
-            .disabled(model.phase == .connecting || password.isEmpty)
-        }
-        .padding(40).frame(minWidth: 460, minHeight: 420)
-        .alert("Trust this certificate?", isPresented: .constant(model.pendingFingerprint != nil)) {
-            Button("Trust") { model.resolveTrust(true) }
-            Button("Cancel", role: .cancel) { model.resolveTrust(false) }
-        } message: {
-            Text("This server uses a self-signed certificate. Verify the SHA-256 fingerprint:\n\n\(model.pendingFingerprint ?? "")")
-        }
-    }
-
-    private func go() { Task { await model.signIn(password: password) } }
-}
-
 struct StateBadge: View {
     let state: String
     var color: Color {
@@ -55,6 +21,9 @@ struct MainWindow: View {
     @Environment(AppModel.self) private var model
     @State private var search = ""
     @State private var confirmStop: VmInfo?
+    @Environment(\.openWindow) private var openWindow
+    // Long sections start collapsed; the Cmd-K palette reaches every page regardless.
+    @State private var collapsed: Set<String> = ["Containers", "Kubernetes", "Control plane", "Security", "Fleet security", "Bare metal", "Insight", "Storage & network", "Fleet Cloud"]
 
     private var filtered: [VmInfo] {
         search.isEmpty ? model.vms : model.vms.filter { $0.name.localizedCaseInsensitiveContains(search) }
@@ -77,8 +46,11 @@ struct MainWindow: View {
                     Label("Alerts", systemImage: "bell").badge(model.unackedAlerts).tag(SidebarItem.alerts)
                 }
                 ForEach(FeatureRegistry.groups, id: \.name) { group in
-                    Section(group.name) {
-                        ForEach(group.specs) { spec in Label(spec.title, systemImage: spec.icon).tag(SidebarItem.page(spec.id)) }
+                    Section(group.name, isExpanded: Binding(get: { !collapsed.contains(group.name) },
+                                                           set: { if $0 { collapsed.remove(group.name) } else { collapsed.insert(group.name) } })) {
+                        ForEach(group.specs) { spec in
+                            Label(spec.title, systemImage: spec.icon).badge(spec.id == "approvals" ? model.pendingApprovals : 0).tag(SidebarItem.page(spec.id))
+                        }
                     }
                 }
                 Section("VMs") {
@@ -89,6 +61,7 @@ struct MainWindow: View {
                             Image(systemName: "circle.fill").font(.caption2)
                                 .foregroundStyle(vm.isRunning ? .green : .gray)
                         }.tag(SidebarItem.vm(vm.name))
+                        .contextMenu { Button("Open in New Window") { openWindow(id: "vm-window", value: vm.name) } }
                     }
                 }
             }
@@ -128,6 +101,12 @@ struct MainWindow: View {
             }
         }
         .onAppear { if model.selection == nil { model.selection = .fleet } }
+        .task {
+            while !Task.isCancelled {
+                await model.refreshApprovals()
+                try? await Task.sleep(nanoseconds: 30_000_000_000)
+            }
+        }
         .sheet(isPresented: $model.showPalette) { CommandPalette().environment(model) }
         .prompt($model.prompt)
         .confirm($model.pendingAction)
@@ -135,7 +114,15 @@ struct MainWindow: View {
         .toolbar {
             ToolbarItem { Button { Task { await model.presentCreateVM() } } label: { Image(systemName: "plus") }.help("New VM").disabled(!model.canWrite) }
             ToolbarItem { Button { Task { await model.refresh(); await model.refreshPlatform() } } label: { Image(systemName: "arrow.clockwise") } }
-            ToolbarItem { Button("Sign Out") { Task { await model.signOut() } } }
+            ToolbarItem {
+                Menu {
+                    ForEach(model.servers) { p in
+                        Button("\(p.name)\(p.username.map { " (\($0))" } ?? "")\(model.hasSavedPassword(p) ? "" : " — password needed")") { Task { await model.switchTo(p) } }
+                    }
+                    Divider()
+                    Button("Sign Out") { Task { await model.signOut() } }
+                } label: { Label("Server", systemImage: "externaldrive.connected.to.line.below") }
+            }
         }
         .confirmationDialog("Force stop \(confirmStop?.name ?? "")?", isPresented: .constant(confirmStop != nil),
                             titleVisibility: .visible) {

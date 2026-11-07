@@ -115,3 +115,23 @@ public extension MachinaClient {
         return v["content"]?.text ?? ""
     }
 }
+
+public enum Approvals {
+    /// Ids that are pending now and were not in the previous poll. The first poll (`seen == nil`) reports nothing,
+    /// so starting the app never fires a notification for requests that were already waiting.
+    public static func newPending(seen: Set<String>?, current: [(id: String, status: String)]) -> [String] {
+        guard let seen else { return [] }
+        return current.filter { $0.status.lowercased() == "pending" && !seen.contains($0.id) }.map(\.id)
+    }
+}
+
+public extension MachinaClient {
+    /// Pending firewall approvals as (id, summary) pairs.
+    func pendingApprovals() async throws -> [(id: String, summary: String)] {
+        let v = try await call(.controllerGet("/api/v1/zeus-firewall/approvals", query: [URLQueryItem(name: "status", value: "pending")]))
+        return (v.array ?? []).compactMap { a in
+            guard let id = a["id"]?.text else { return nil }
+            return (id, "\(a["target_kind"]?.text ?? "target") · requested by \(a["requested_by"]?.text ?? "?")")
+        }
+    }
+}

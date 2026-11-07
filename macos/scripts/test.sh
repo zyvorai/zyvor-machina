@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+
 # Run MachinaKit tests with swiftc + Swift Testing (macOS only). Fast alternative to `swift test`,
 # whose build backend stalled on some volumes. Usage: macos/scripts/test.sh
 set -euo pipefail

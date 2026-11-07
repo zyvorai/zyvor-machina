@@ -125,7 +125,7 @@ public extension MachinaClient {
         return FleetAlerts(totalUnacknowledged: env.totalUnacknowledged ?? flat.filter { !$0.acknowledged }.count, alerts: flat)
     }
 
-    internal static func seg(_ s: String) -> String {
+    public static func seg(_ s: String) -> String {
         var set = CharacterSet.urlPathAllowed; set.remove("/")
         return s.addingPercentEncoding(withAllowedCharacters: set) ?? s
     }
