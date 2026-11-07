@@ -101,12 +101,6 @@ struct MainWindow: View {
             }
         }
         .onAppear { if model.selection == nil { model.selection = .fleet } }
-        .task {
-            while !Task.isCancelled {
-                await model.refreshApprovals()
-                try? await Task.sleep(nanoseconds: 30_000_000_000)
-            }
-        }
         .sheet(isPresented: $model.showPalette) { CommandPalette().environment(model) }
         .prompt($model.prompt)
         .confirm($model.pendingAction)
@@ -192,21 +186,40 @@ struct MenuBarContent: View {
         if model.phase != .ready {
             Text("Not connected")
         } else {
+            let h = model.health
+            Label(h.summary, systemImage: h.level == .ok ? "checkmark.circle" : h.symbol)
             Text("\(model.runningCount) of \(model.vms.count) VMs running")
-            Divider()
-            ForEach(model.vms.prefix(15)) { vm in
-                Menu("\(vm.isRunning ? "●" : "○") \(vm.name)") {
-                    if vm.isRunning {
-                        Button("Shut Down") { Task { await model.power(.shutdown, vm) } }
-                        Button("Reboot") { Task { await model.power(.reboot, vm) } }
-                    } else {
-                        Button("Start") { Task { await model.power(.start, vm) } }
-                    }
-                }
+            if model.pendingApprovals > 0 { Button("Review \(model.pendingApprovals) pending approval\(model.pendingApprovals == 1 ? "" : "s")") { show(.page("approvals")) } }
+            if model.unackedAlerts > 0 { Button("Open \(model.unackedAlerts) alert\(model.unackedAlerts == 1 ? "" : "s")") { show(.alerts) } }
+            if !model.recentVMs.isEmpty {
+                Divider()
+                Text("Recent")
+                ForEach(model.recentVMs) { vm in vmMenu(vm) }
             }
+            Divider()
+            Menu("All VMs") { ForEach(model.vms.prefix(30)) { vm in vmMenu(vm) } }
+            Button("Fleet") { show(.fleet) }
         }
         Divider()
         Button("Open Machina") { openWindow(id: "main"); NSApp.activate(ignoringOtherApps: true) }
+        SettingsLink { Text("Settings…") }
         Button("Quit") { NSApp.terminate(nil) }
+    }
+
+    private func show(_ link: DeepLink) { openWindow(id: "main"); model.open(link) }
+
+    private func vmMenu(_ vm: VmInfo) -> some View {
+        Menu("\(vm.isRunning ? "●" : "○") \(vm.name)") {
+            Button("Open") { show(.vm(vm.name)) }
+            Divider()
+            if vm.isRunning {
+                Button("Shut Down") { Task { await model.power(.shutdown, vm) } }
+                Button("Reboot") { Task { await model.power(.reboot, vm) } }
+            } else if vm.state.lowercased() == "paused" {
+                Button("Resume") { Task { await model.power(.resume, vm) } }
+            } else {
+                Button("Start") { Task { await model.power(.start, vm) } }
+            }
+        }
     }
 }

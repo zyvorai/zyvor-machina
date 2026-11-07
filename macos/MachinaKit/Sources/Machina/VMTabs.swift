@@ -4,7 +4,7 @@ import MachinaKit
 struct VMDetail: View {
     let vm: VmInfo
     @Binding var confirmStop: VmInfo?
-    enum Tab: String, CaseIterable, Identifiable { case overview = "Overview", console = "Console", metrics = "Metrics", disks = "Disks", network = "Network", snapshots = "Snapshots", backups = "Backups", logs = "Logs", settings = "Settings"
+    enum Tab: String, CaseIterable, Identifiable { case overview = "Overview", doctor = "Doctor", console = "Console", metrics = "Metrics", disks = "Disks", network = "Network", snapshots = "Snapshots", backups = "Backups", logs = "Logs", settings = "Settings"
         var id: String { rawValue } }
     @State private var tab: Tab = .overview
 
@@ -15,6 +15,7 @@ struct VMDetail: View {
             Group {
                 switch tab {
                 case .overview: VMOverview(vm: vm, confirmStop: $confirmStop)
+                case .doctor: VMDoctorTab(vm: vm)
                 case .console: VMConsoleTab(vm: vm)
                 case .metrics: VMMetricsTab(vm: vm)
                 case .logs: VMLogsTab(vm: vm)

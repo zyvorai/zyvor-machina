@@ -18,7 +18,14 @@ final class AppModel {
     var error: String?
     var live = false
     var pendingFingerprint: String?
-    var selection: SidebarItem?
+    var selection: SidebarItem? { didSet { if case .vm(let n) = selection { settings.recentVMs = RecentVMs.touching(settings.recentVMs, n) } } }
+    let settings = AppSettings.shared
+    private var ambientTask: Task<Void, Never>?
+    private var seenAlerts: Set<String>?
+    var health: FleetHealth {
+        FleetHealth.evaluate(alerts: alerts, hosts: hosts, pendingApprovals: pendingApprovals, connected: phase == .ready)
+    }
+    var recentVMs: [VmInfo] { RecentVMs.existing(settings.recentVMs, in: vms) }
 
     // Fleet / tasks / alerts (controller + fleet endpoints)
     var hosts: [PlatformHost] = []
@@ -53,6 +60,8 @@ final class AppModel {
     /// Switches to a saved server, signing in with its stored password; without one the login form is prefilled.
     func switchTo(_ p: ServerProfile) async {
         if phase == .ready { await signOut() }
+        if hasSavedPassword(p), settings.biometric.storedPasswords,
+           !(await Biometric.authenticate("Sign in to \(p.name) with the saved password")) { error = "Authentication cancelled"; return }
         serverURL = p.url.absoluteString; username = p.username ?? ""
         if let pw = Keychain.get(passwordAccount(p)) { await signIn(password: pw) }
     }
@@ -96,7 +105,11 @@ final class AppModel {
 
     func confirmAction(_ title: String, message: String, label: String, destructive: Bool = true,
                        run: @escaping @MainActor () async -> Void) {
-        pendingAction = PendingAction(title: title, message: message, label: label, destructive: destructive, run: run)
+        let gated = settings.biometric.required(destructive: destructive)
+        pendingAction = PendingAction(title: title, message: message, label: label, destructive: destructive, run: {
+            if gated, !(await Biometric.authenticate("\(label): \(title)")) { self.notice = "Cancelled: authentication required"; return }
+            await run()
+        })
     }
 
     var serverURL: String = UserDefaults.standard.string(forKey: "serverURL") ?? "https://"
@@ -132,12 +145,14 @@ final class AppModel {
             await refresh()
             phase = .ready
             startWatching(c)
+            startAmbientLoop()
             notifications.model = self
             let center = UNUserNotificationCenter.current()
             center.delegate = notifications
-            // Review opens the app on the approvals page. Reject (the safe direction) needs the Mac to be unlocked;
-            // approving stays in the app, behind a confirmation, because a banner does not show the plan.
+            // Approve and Reject need the Mac unlocked; Approve also asks for Touch ID (see approveApproval), and the
+            // notification body carries the target and requester. Review opens the approvals page for the full plan.
             center.setNotificationCategories([UNNotificationCategory(identifier: "APPROVAL", actions: [
+                UNNotificationAction(identifier: "APPROVE", title: "Approve", options: [.authenticationRequired]),
                 UNNotificationAction(identifier: "REVIEW", title: "Review", options: [.foreground]),
                 UNNotificationAction(identifier: "REJECT", title: "Reject", options: [.authenticationRequired, .destructive]),
             ], intentIdentifiers: [], options: [])])
@@ -149,7 +164,7 @@ final class AppModel {
     }
 
     func signOut() async {
-        watchTask?.cancel(); watchTask = nil
+        watchTask?.cancel(); watchTask = nil; ambientTask?.cancel(); ambientTask = nil; seenAlerts = nil
         await client?.logout()
         SpotlightIndexer.shared.clear(); client = nil; seenApprovals = nil; pendingApprovals = 0; role = nil; vms = []; hosts = []; tasks = []; alerts = []; metrics = nil
         platformLoaded = false; selection = nil; live = false; phase = .signedOut
@@ -161,13 +176,50 @@ final class AppModel {
         pendingApprovals = pending.count
         let fresh = Approvals.newPending(seen: seenApprovals, current: pending.map { ($0.id, "pending") })
         seenApprovals = Set(pending.map(\.id))
-        for id in fresh {
+        for id in fresh where settings.notifyApprovals && settings.mayNotify(severity: "warning") {
             let content = UNMutableNotificationContent()
             content.title = "Firewall change needs approval"
             content.body = pending.first { $0.id == id }?.summary ?? ""
             content.categoryIdentifier = "APPROVAL"
             content.userInfo = ["approvalId": id]
             try? await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "approval-\(id)", content: content, trigger: nil))
+        }
+    }
+
+    /// Approve from a notification action. Asks for Touch ID first when `biometric.approvals` is on; a banner never approves silently.
+    func approveApproval(_ id: String) async {
+        if settings.biometric.approvals, !(await Biometric.authenticate("Approve firewall change \(id.prefix(8))")) {
+            notice = "Approval cancelled: authentication required"; return
+        }
+        if await perform("Approve", { _ = try await $0.call(Endpoint("POST", "/api/v1/zeus-firewall/approvals/\(MachinaClient.seg(id))/approve", body: .object([:]), controller: true)) }) {
+            notice = "Approved firewall change"; await refreshApprovals()
+        }
+    }
+
+    /// Background poll (settings.refreshSeconds): keeps the menu bar glyph, badge and notifications current without a page open.
+    private func startAmbientLoop() {
+        ambientTask?.cancel()
+        ambientTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                await self.refreshPlatform()
+                await self.refreshApprovals()
+                self.notifyNewAlerts()
+                try? await Task.sleep(for: .seconds(self.settings.refreshSeconds))
+            }
+        }
+    }
+
+    private func notifyNewAlerts() {
+        let open = alerts.filter { !$0.acknowledged }
+        defer { seenAlerts = Set(open.map(\.id)) }
+        guard let seen = seenAlerts, settings.notifyAlerts else { return }
+        for a in open where !seen.contains(a.id) && settings.mayNotify(severity: a.severity) {
+            let content = UNMutableNotificationContent()
+            content.title = "\(a.severity.capitalized) alert: \(a.ruleName)"
+            content.body = a.message
+            content.threadIdentifier = "alerts"
+            UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "alert-\(a.id)", content: content, trigger: nil))
         }
     }
 
@@ -229,6 +281,8 @@ final class AppModel {
 
     func power(_ action: PowerAction, _ vm: VmInfo) async {
         guard let client else { return }
+        if action == .stop, settings.biometric.required(destructive: true),
+           !(await Biometric.authenticate("Force stop \(vm.name)")) { error = "Force stop cancelled: authentication required"; return }
         do { try await client.power(action, vm: vm); error = nil }
         catch { self.error = "\(action.rawValue) \(vm.name): \(error.localizedDescription)" }
     }
@@ -268,6 +322,7 @@ final class AppModel {
     }
 
     private func notify(_ changes: [VmChange]) {
+        guard settings.notifyStateChanges, settings.mayNotify(severity: "info") else { return }
         for ch in changes where ch.event == "state_change" {
             let content = UNMutableNotificationContent()
             content.title = ch.name
@@ -290,6 +345,7 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, @u
         await MainActor.run {
             guard let model else { return }
             if action == "REJECT" { Task { await model.rejectApproval(id) } }
+            else if action == "APPROVE" { Task { await model.approveApproval(id) } }
             else { model.selection = .page("approvals"); NSApp.activate(ignoringOtherApps: true) }
         }
     }
