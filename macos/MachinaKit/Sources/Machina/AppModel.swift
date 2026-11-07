@@ -30,10 +30,38 @@ final class AppModel {
     var canWrite: Bool { role == "admin" || role == "operator" }
     var showPalette = false
 
+    // Dialog state shared by every screen; the dialogs themselves are attached once in MainWindow.
+    var prompt: PromptRequest?
+    var pendingAction: PendingAction?
+    var notice: String?
+
+    func api() throws -> MachinaClient {
+        guard let client else { throw MachinaError.unauthenticated }
+        return client
+    }
+
+    /// Runs a write. Viewers (role readonly) are stopped here with a clear message instead of a server 403.
+    @discardableResult
+    func perform(_ label: String, _ op: @Sendable (MachinaClient) async throws -> Void) async -> Bool {
+        guard canWrite else { error = "\(label): your role (\(role ?? "unknown")) cannot make changes"; return false }
+        do { try await op(try api()); error = nil; return true }
+        catch { self.error = "\(label): \(error.localizedDescription)"; return false }
+    }
+
+    func ask(_ title: String, message: String = "", submit: String, fields: [PromptField],
+             run: @escaping @MainActor ([String: String]) async -> Void) {
+        prompt = PromptRequest(title: title, message: message, submit: submit, fields: fields, run: run)
+    }
+
+    func confirmAction(_ title: String, message: String, label: String, destructive: Bool = true,
+                       run: @escaping @MainActor () async -> Void) {
+        pendingAction = PendingAction(title: title, message: message, label: label, destructive: destructive, run: run)
+    }
+
     var serverURL: String = UserDefaults.standard.string(forKey: "serverURL") ?? "https://"
     var username: String = UserDefaults.standard.string(forKey: "username") ?? ""
 
-    private var client: MachinaClient?
+    private(set) var client: MachinaClient?
     private var watchTask: Task<Void, Never>?
     private var trustContinuation: CheckedContinuation<Bool, Never>?
 

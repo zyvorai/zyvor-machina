@@ -66,7 +66,7 @@ private func makeClient() -> MachinaClient {
 }
 
 final class Counter: @unchecked Sendable {
-    private let lock = NSLock(); private var items: [String] = []
+    fileprivate let lock = NSLock(); fileprivate var items: [String] = []
     func add(_ s: String) { lock.withLock { items.append(s) } }
     func count(_ s: String) -> Int { lock.withLock { items.filter { $0 == s }.count } }
 }
@@ -149,3 +149,56 @@ extension ClientTests {
         #expect(try await c.sessionInfo().role == "admin")
     }
 }
+
+extension ClientTests {
+    @Test func actionEndpointsAndBodies() async throws {
+        let seen = Counter()
+        MockProtocol.handler = { req in
+            var s = "\(req.httpMethod ?? "") \(req.url!.absoluteString)"
+            if let b = req.httpBody ?? req.httpBodyStream.map({ st in st.open(); defer { st.close() }; var d = Data(); var buf = [UInt8](repeating: 0, count: 1024)
+                while st.hasBytesAvailable { let n = st.read(&buf, maxLength: 1024); if n <= 0 { break }; d.append(buf, count: n) }; return d }) {
+                s += " " + String(decoding: b, as: UTF8.self)
+            }
+            seen.add(s); return (200, "{}")
+        }
+        let c = makeClient()
+        let vm = VmInfo(name: "a b", state: "shutoff", vcpus: 1, memoryMb: 512, libvirtConnection: "session")
+        try await c.createSnapshot(vm, name: "s1", description: "d")
+        try await c.revertSnapshot(vm, "s/1")
+        try await c.deleteSnapshot(vm, "s1")
+        try await c.setAutostart(vm, true)
+        try await c.resizeDisk(vm, target: "vdb", sizeGb: 5)
+        try await c.detachDisk(vm, target: "vdb")
+        try await c.deleteVM(vm)
+        try await c.restoreBackup("b1")
+        let all = seen.all()
+        #expect(all.contains { $0.hasPrefix("POST https://h:5092/api/v1/vms/a%20b/snapshots?connection=session") && $0.contains(#""name":"s1""#) })
+        #expect(all.contains("POST https://h:5092/api/v1/vms/a%20b/snapshots/s%2F1/revert?connection=session"))
+        #expect(all.contains("DELETE https://h:5092/api/v1/vms/a%20b/snapshots/s1?connection=session"))
+        #expect(all.contains("POST https://h:5092/api/v1/vms/a%20b/autostart/true?connection=session"))
+        #expect(all.contains { $0.hasPrefix("POST https://h:5092/api/v1/vms/a%20b/disk/resize/vdb") && $0.contains(#""size_gb":5"#) })
+        #expect(all.contains("POST https://h:5092/api/v1/vms/a%20b/disk/detach/vdb?connection=session"))
+        #expect(all.contains("DELETE https://h:5092/api/v1/vms/a%20b?connection=session"))
+        #expect(all.contains { $0.hasPrefix("POST https://h:5092/api/v1/backups/restore") && $0.contains(#""backup_id":"b1""#) })
+    }
+
+    @Test func resourceActionResolvesRowValues() {
+        let row = ResourceRow(id: "0", values: .object(["vm_name": .string("my vm"), "name": .string("snap/1"), "id": .string("b1")]))
+        let revert = ResourceAction("Revert", "/api/v1/vms/{vm_name}/snapshots/{name}/revert", destructive: true)
+        #expect(revert.endpoint(for: row)?.path == "/api/v1/vms/my%20vm/snapshots/snap%2F1/revert")
+        #expect(ResourceAction("X", "/a/{missing}").endpoint(for: row) == nil)   // never send a half-built path
+        let restore = ResourceAction("Restore", "/api/v1/backups/restore", bodyFields: ["backup_id": "id"])
+        #expect(restore.endpoint(for: row)?.body == .object(["backup_id": .string("b1")]))
+        #expect(ResourceAction("C", "/c/{id}", controller: true).endpoint(for: row)?.resolvedPath == "/api/v1/platform/controller/c/b1")
+    }
+
+    @Test func detailsAndCreateRequestShape() async throws {
+        MockProtocol.handler = { _ in (200, #"{"name":"v","state":"running","vcpus":2,"memory_mb":1024,"disks":[{"device":"disk","target":"vda","source":"/x.qcow2"},{"device":"cdrom","target":"sda"}],"interfaces":[{"mac_address":"aa:bb","source":"default","model":"virtio"}]}"#) }
+        let d = try await makeClient().details(VmInfo(name: "v", state: "running", vcpus: 2, memoryMb: 1024))
+        #expect(d.disks?.count == 2 && d.disks?[1].isCdrom == true && d.interfaces?.first?.macAddress == "aa:bb")
+        let r = CreateVMRequest(name: "n", vcpus: 1, memoryMb: 128, diskGb: 1, network: "default").json
+        #expect(r["disk_gb"]?.double == 1 && r["network"]?.text == "default" && r["iso"] == nil)
+    }
+}
+
+extension Counter { func all() -> [String] { lock.withLock { items } } }

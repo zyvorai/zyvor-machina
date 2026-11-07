@@ -27,6 +27,11 @@ struct ResourceListView: View {
                 Spacer()
                 Text("\(filtered.count) of \(rows.count)").foregroundStyle(.secondary).monospacedDigit()
                 Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }
+                ForEach(spec.actions) { a in
+                    Button(a.title) { run(a) }
+                        .disabled(selected == nil || !model.canWrite)
+                        .help(model.canWrite ? "" : "Your role cannot make changes")
+                }
                 if spec.layout == .table {
                     Toggle(isOn: $inspect) { Image(systemName: "sidebar.right") }.toggleStyle(.button).help("Show details")
                 }
@@ -68,6 +73,17 @@ struct ResourceListView: View {
                 await load()
             }
         }
+    }
+
+    /// One row action: build the request from the selected row, confirm if it is destructive, run, reload.
+    private func run(_ a: ResourceAction) {
+        guard let row = selected, let endpoint = a.endpoint(for: row) else { model.error = "\(a.title): the row is missing a value the request needs."; return }
+        let target = columns.first.map { $0.render(row) } ?? row.id
+        let go: @MainActor () async -> Void = {
+            if await model.perform("\(a.title) \(target)", { _ = try await $0.call(endpoint) }) { model.notice = "\(a.title): done"; await load() }
+        }
+        if a.destructive { model.confirmAction("\(a.title) \(target)?", message: "This changes the server and may not be undoable.", label: a.title, run: go) }
+        else { Task { await go() } }
     }
 
     private func load() async {

@@ -1,5 +1,47 @@
 import Foundation
 
+/// A button on a page: runs one request against the selected row. `{key}` in `path` is replaced by the
+/// row's value (path-encoded); `bodyFields` maps a body field name to a row key.
+public struct ResourceAction: Hashable, Sendable, Identifiable {
+    public var title: String
+    public var method: String
+    public var path: String
+    public var destructive: Bool
+    public var controller: Bool
+    public var bodyFields: [String: String]
+    public var id: String { title }
+    /// POST by default.
+    public init(_ title: String, _ path: String, destructive: Bool = false, controller: Bool = false, bodyFields: [String: String] = [:]) {
+        self.init(title, "POST", path, destructive: destructive, controller: controller, bodyFields: bodyFields)
+    }
+    public init(_ title: String, _ method: String, _ path: String, destructive: Bool = false,
+                controller: Bool = false, bodyFields: [String: String] = [:]) {
+        self.title = title; self.method = method; self.path = path; self.destructive = destructive
+        self.controller = controller; self.bodyFields = bodyFields
+    }
+
+    /// nil when a placeholder has no value in the row (so a bad request is never sent).
+    public func endpoint(for row: ResourceRow) -> Endpoint? {
+        var out = ""; var rest = Substring(path)
+        while let open = rest.firstIndex(of: "{") {
+            out += rest[..<open]
+            guard let close = rest[open...].firstIndex(of: "}") else { return nil }
+            let key = String(rest[rest.index(after: open)..<close])
+            guard let v = row.values[key], v != .null else { return nil }
+            out += MachinaClient.seg(v.text)
+            rest = rest[rest.index(after: close)...]
+        }
+        out += rest
+        var body: JSONValue?
+        if !bodyFields.isEmpty {
+            var o: [String: JSONValue] = [:]
+            for (field, key) in bodyFields { guard let v = row.values[key] else { return nil }; o[field] = v }
+            body = .object(o)
+        }
+        return Endpoint(method, out, body: body, controller: controller)
+    }
+}
+
 public struct ResourceRow: Identifiable, Hashable, Sendable {
     public var id: String
     public var values: JSONValue
@@ -36,11 +78,12 @@ public struct ResourceSpec: Identifiable, Hashable, Sendable {
     public var idKey: String?
     public var columns: [ResourceColumn]
     public var layout: Layout
+    public var actions: [ResourceAction]
 
     public init(_ id: String, _ title: String, group: String, icon: String, endpoint: Endpoint, rowsPath: [String] = [],
-                idKey: String? = nil, columns: [ResourceColumn] = [], layout: Layout = .table) {
+                idKey: String? = nil, columns: [ResourceColumn] = [], layout: Layout = .table, actions: [ResourceAction] = []) {
         self.id = id; self.title = title; self.group = group; self.icon = icon; self.endpoint = endpoint
-        self.rowsPath = rowsPath; self.idKey = idKey; self.columns = columns; self.layout = layout
+        self.rowsPath = rowsPath; self.idKey = idKey; self.columns = columns; self.layout = layout; self.actions = actions
     }
 
     public func rows(from json: JSONValue) -> [ResourceRow] {

@@ -129,8 +129,11 @@ struct MainWindow: View {
         }
         .onAppear { if model.selection == nil { model.selection = .fleet } }
         .sheet(isPresented: $model.showPalette) { CommandPalette().environment(model) }
+        .prompt($model.prompt)
+        .confirm($model.pendingAction)
         .background { Button("") { model.showPalette = true }.keyboardShortcut("k", modifiers: .command).opacity(0) }
         .toolbar {
+            ToolbarItem { Button { Task { await model.presentCreateVM() } } label: { Image(systemName: "plus") }.help("New VM").disabled(!model.canWrite) }
             ToolbarItem { Button { Task { await model.refresh(); await model.refreshPlatform() } } label: { Image(systemName: "arrow.clockwise") } }
             ToolbarItem { Button("Sign Out") { Task { await model.signOut() } } }
         }
@@ -143,15 +146,21 @@ struct MainWindow: View {
             Button("Cancel", role: .cancel) { confirmStop = nil }
         } message: { Text("This is the equivalent of pulling the power cord.") }
         .overlay(alignment: .bottom) {
-            if let e = model.error {
-                Text(e).padding(8).background(.red.opacity(0.9), in: .capsule).foregroundStyle(.white).padding()
-                    .onTapGesture { model.error = nil }
-            }
+            VStack(spacing: 6) {
+                if let n = model.notice {
+                    Text(n).padding(8).background(.green.opacity(0.9), in: .capsule).foregroundStyle(.white)
+                        .onTapGesture { model.notice = nil }
+                }
+                if let e = model.error {
+                    Text(e).padding(8).background(.red.opacity(0.9), in: .capsule).foregroundStyle(.white)
+                        .lineLimit(4).onTapGesture { model.error = nil }
+                }
+            }.padding()
         }
     }
 }
 
-struct VMDetail: View {
+struct VMOverview: View {
     @Environment(AppModel.self) private var model
     let vm: VmInfo
     @Binding var confirmStop: VmInfo?

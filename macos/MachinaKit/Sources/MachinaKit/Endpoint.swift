@@ -27,7 +27,8 @@ public extension MachinaClient {
         if data.isEmpty { return .null }
         let head = String(decoding: data.prefix(15), as: UTF8.self).lowercased()
         if head.hasPrefix("<!doctype") || head.hasPrefix("<html") { throw MachinaError.http(404, "Not an API route: \(e.path)") }
-        return try JSONDecoder().decode(JSONValue.self, from: data)
+        // Some write endpoints answer with plain text; keep it as a string instead of failing.
+        return (try? JSONDecoder().decode(JSONValue.self, from: data)) ?? .string(String(decoding: data, as: UTF8.self))
     }
 
     func sessionInfo() async throws -> SessionInfo {
