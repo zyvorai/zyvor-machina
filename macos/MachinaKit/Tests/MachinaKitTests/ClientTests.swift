@@ -108,3 +108,44 @@ extension ClientTests {
         #expect(seen.count("POST /api/v1/platform/controller/api/v1/tasks/abc/retry") == 1)
     }
 }
+
+extension ClientTests {
+    @Test func jsonValueTextAndRows() throws {
+        let json = try JSONDecoder().decode(JSONValue.self, from: Data(#"{"events":[{"id":"a","n":3,"ok":true,"x":null,"l":[1,2]},{"id":"b","n":2.5}],"k":"v"}"#.utf8))
+        let spec = ResourceSpec("t", "T", group: "g", icon: "i", endpoint: .get("/x"), rowsPath: ["events"], idKey: "id")
+        let rows = spec.rows(from: json)
+        #expect(rows.map(\.id) == ["a", "b"])
+        #expect(rows[0].values["n"]?.text == "3" && rows[1].values["n"]?.text == "2.5")
+        #expect(rows[0].values["ok"]?.text == "yes" && rows[0].values["x"]?.text == "–" && rows[0].values["l"]?.text == "1, 2")
+        // Auto columns: scalar keys only, sorted, capped at 6.
+        #expect(spec.effectiveColumns(for: rows).map(\.key) == ["id", "n", "ok", "x"])
+    }
+
+    @Test func keyValueLayoutAndFormats() throws {
+        let json = try JSONDecoder().decode(JSONValue.self, from: Data(#"{"b":2,"a":"x"}"#.utf8))
+        let spec = ResourceSpec("t", "T", group: "g", icon: "i", endpoint: .get("/x"), layout: .keyValue)
+        let rows = spec.rows(from: json)
+        #expect(rows.map(\.id) == ["a", "b"])
+        #expect(spec.effectiveColumns(for: rows).map(\.title) == ["Key", "Value"])
+        let gb = ResourceColumn("c", "v", .gigabytes)
+        #expect(gb.render(ResourceRow(id: "1", values: .object(["v": .number(914.78)]))) == "914.8 GB")
+    }
+
+    @Test func registryIsConsistent() {
+        let ids = FeatureRegistry.all.map(\.id)
+        #expect(Set(ids).count == ids.count)
+        #expect(FeatureRegistry.groups.flatMap(\.specs).count == ids.count)
+        #expect(FeatureRegistry.spec("ha")?.endpoint.resolvedPath == "/api/v1/platform/controller/api/v1/ha/status")
+    }
+
+    @Test func callRejectsHtmlAndDecodesJson() async throws {
+        MockProtocol.handler = { req in
+            req.url!.path == "/api/v1/events" ? (200, "<!DOCTYPE html><html></html>") : (200, #"{"role":"admin","authenticated":true}"#)
+        }
+        let c = makeClient()
+        await #expect(throws: MachinaError.self) { _ = try await c.call(.get("/api/v1/events")) }
+        let v = try await c.call(.get("/api/v1/auth/session"))
+        #expect(v["role"]?.text == "admin")
+        #expect(try await c.sessionInfo().role == "admin")
+    }
+}

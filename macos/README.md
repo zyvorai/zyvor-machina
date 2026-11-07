@@ -23,4 +23,7 @@ Covers model decoding, 401 re-login, power URLs (spaces and `/` in VM names, ses
 Server `https://HOST:5092`, a PAM user. The first connect asks to trust the host's self-signed certificate; the SHA-256 pin is kept in the Keychain and a changed certificate is refused.
 
 ## Status
-P1 done (client, login, VM list, power, live updates, menubar). P2 partly done: Fleet (this host's metrics + controller hosts), Tasks (cancel/retry, active filter) and Alerts views, refreshed every 10 s while open. Not yet: VNC/serial consoles, App Intents, widgets, notarization (see plan).
+Following `~/.claude/plans` phases toward parity with the web UI.
+- Done: login, VM list/detail/power, live updates, menubar, notifications; Fleet, Tasks, Alerts; **Phase 1 foundations**: generic `Endpoint`/`JSONValue`, `ResourceSpec` + `ResourceListView`, a data-driven sidebar (`FeatureRegistry`), Cmd-K palette, role from `/auth/session`, and 14 read-only pages (host info, libvirt, health, services, audit, jobs, networks, storage pools, network filters, devices, templates, snapshots, backups, HA events).
+- Adding a read-only page = one `ResourceSpec` line in `FeatureRegistry.swift` (empty `columns` derives them from the data).
+- Next: VM lifecycle and storage mutations, metrics charts, VNC/serial consoles, then core platform, security/AI/bare metal, Fleet Cloud, and Mac-native polish (App Intents, widgets, notarization).

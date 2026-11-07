@@ -5,7 +5,7 @@ CFG="${1:-release}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # Direct swiftc build: SwiftPM's build backend stalled on some volumes; this is fast and has no package deps.
 SRC="$ROOT/MachinaKit/Sources"; OBJ="$ROOT/build/obj"; mkdir -p "$OBJ"
-FLAGS=(-swift-version 6 -target arm64-apple-macos14.0)
+FLAGS=(-swift-version 6 -target arm64-apple-macos15.0)
 [ "$CFG" = release ] && FLAGS+=(-O) || FLAGS+=(-Onone -g)
 swiftc -c -wmo "${FLAGS[@]}" -module-name MachinaKit -parse-as-library "$SRC"/MachinaKit/*.swift \
   -emit-module -emit-module-path "$OBJ/MachinaKit.swiftmodule" -o "$OBJ/MachinaKit.o"
@@ -23,7 +23,7 @@ cat > "$APP/Contents/Info.plist" <<P
 <key>CFBundleExecutable</key><string>Machina</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>0.1.0</string>
-<key>LSMinimumSystemVersion</key><string>14.0</string>
+<key>LSMinimumSystemVersion</key><string>15.0</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 P

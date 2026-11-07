@@ -9,7 +9,7 @@ DEV="$(xcode-select -p)"
 FW="$DEV/Platforms/MacOSX.platform/Developer/Library/Frameworks"
 LIB="$DEV/Platforms/MacOSX.platform/Developer/usr/lib"
 PLUGINS="$DEV/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing"
-FLAGS=(-swift-version 6 -target arm64-apple-macos14.0 -Onone -g)
+FLAGS=(-swift-version 6 -target arm64-apple-macos15.0 -Onone -g)
 
 # Swift Testing needs an entry point when linked outside SwiftPM.
 cat > "$OUT/main.swift" <<'S'

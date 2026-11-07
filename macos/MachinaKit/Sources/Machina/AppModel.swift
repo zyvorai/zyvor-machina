@@ -3,7 +3,7 @@ import Observation
 import MachinaKit
 import UserNotifications
 
-enum SidebarItem: Hashable { case fleet, tasks, alerts, vm(String) }
+enum SidebarItem: Hashable { case fleet, tasks, alerts, vm(String), page(String) }
 
 @MainActor @Observable
 final class AppModel {
@@ -24,6 +24,11 @@ final class AppModel {
     var metrics: LocalMetrics?
     var platformError: String?
     var platformLoaded = false
+
+    // Session role (admin / operator / readonly) from GET /auth/session; gates write controls.
+    var role: String?
+    var canWrite: Bool { role == "admin" || role == "operator" }
+    var showPalette = false
 
     var serverURL: String = UserDefaults.standard.string(forKey: "serverURL") ?? "https://"
     var username: String = UserDefaults.standard.string(forKey: "username") ?? ""
@@ -53,6 +58,7 @@ final class AppModel {
             UserDefaults.standard.set(username, forKey: "username")
             Keychain.set(password, for: "pw:\(username)@\(url.host ?? "")")
             client = c
+            role = (try? await c.sessionInfo())?.role
             await refresh()
             phase = .ready
             startWatching(c)
@@ -66,8 +72,14 @@ final class AppModel {
     func signOut() async {
         watchTask?.cancel(); watchTask = nil
         await client?.logout()
-        client = nil; vms = []; hosts = []; tasks = []; alerts = []; metrics = nil
+        client = nil; role = nil; vms = []; hosts = []; tasks = []; alerts = []; metrics = nil
         platformLoaded = false; selection = nil; live = false; phase = .signedOut
+    }
+
+    /// Generic read for registry pages (`ResourceListView`).
+    func call(_ endpoint: Endpoint) async throws -> JSONValue {
+        guard let client else { throw MachinaError.unauthenticated }
+        return try await client.call(endpoint)
     }
 
     func refresh() async {

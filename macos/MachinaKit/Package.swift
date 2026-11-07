@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "MachinaKit",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v15)],
     products: [
         .library(name: "MachinaKit", targets: ["MachinaKit"]),
         .executable(name: "Machina", targets: ["Machina"]),

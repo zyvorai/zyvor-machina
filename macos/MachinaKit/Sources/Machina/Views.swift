@@ -76,6 +76,11 @@ struct MainWindow: View {
                     Label("Tasks", systemImage: "checklist").tag(SidebarItem.tasks)
                     Label("Alerts", systemImage: "bell").badge(model.unackedAlerts).tag(SidebarItem.alerts)
                 }
+                ForEach(FeatureRegistry.groups, id: \.name) { group in
+                    Section(group.name) {
+                        ForEach(group.specs) { spec in Label(spec.title, systemImage: spec.icon).tag(SidebarItem.page(spec.id)) }
+                    }
+                }
                 Section("VMs") {
                     ForEach(filtered) { vm in
                         HStack {
@@ -94,6 +99,7 @@ struct MainWindow: View {
                     Circle().fill(model.live ? .green : .orange).frame(width: 8, height: 8)
                     Text(model.live ? "Live" : "Reconnecting").font(.caption).foregroundStyle(.secondary)
                     Spacer()
+                    if let r = model.role { Text(r).font(.caption).foregroundStyle(.secondary) }
                     Text("\(model.runningCount)/\(model.vms.count) running").font(.caption).foregroundStyle(.secondary)
                 }.padding(10)
             }
@@ -102,6 +108,9 @@ struct MainWindow: View {
             case .fleet: FleetView()
             case .tasks: TasksView()
             case .alerts: AlertsView()
+            case .page(let id):
+                if let spec = FeatureRegistry.spec(id) { ResourceListView(spec: spec).id(id) }
+                else { ContentUnavailableView("Unknown page", systemImage: "questionmark.folder") }
             case .vm: if let vm = selectedVM { VMDetail(vm: vm, confirmStop: $confirmStop) }
                       else { ContentUnavailableView("VM not found", systemImage: "server.rack") }
             case nil: ContentUnavailableView("Select an item", systemImage: "sidebar.left")
@@ -119,6 +128,8 @@ struct MainWindow: View {
             }
         }
         .onAppear { if model.selection == nil { model.selection = .fleet } }
+        .sheet(isPresented: $model.showPalette) { CommandPalette().environment(model) }
+        .background { Button("") { model.showPalette = true }.keyboardShortcut("k", modifiers: .command).opacity(0) }
         .toolbar {
             ToolbarItem { Button { Task { await model.refresh(); await model.refreshPlatform() } } label: { Image(systemName: "arrow.clockwise") } }
             ToolbarItem { Button("Sign Out") { Task { await model.signOut() } } }
