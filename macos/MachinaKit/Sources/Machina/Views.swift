@@ -33,7 +33,7 @@ struct MainWindow: View {
         return nil
     }
     private var wantsPlatform: Bool {
-        switch model.selection { case .fleet, .tasks, .alerts: true; default: false }
+        switch model.selection { case .fleet, .tasks, .alerts, .insight: true; default: false }
     }
 
     var body: some View {
@@ -44,6 +44,9 @@ struct MainWindow: View {
                     Label("Fleet", systemImage: "server.rack").tag(SidebarItem.fleet)
                     Label("Tasks", systemImage: "checklist").tag(SidebarItem.tasks)
                     Label("Alerts", systemImage: "bell").badge(model.unackedAlerts).tag(SidebarItem.alerts)
+                }
+                Section("Visual insight") {
+                    ForEach(InsightPage.allCases, id: \.self) { p in Label(p.title, systemImage: p.icon).tag(SidebarItem.insight(p)) }
                 }
                 ForEach(FeatureRegistry.groups, id: \.name) { group in
                     Section(group.name, isExpanded: Binding(get: { !collapsed.contains(group.name) },
@@ -81,6 +84,7 @@ struct MainWindow: View {
             case .fleet: FleetView()
             case .tasks: TasksView()
             case .alerts: AlertsView()
+            case .insight(let p): InsightRouter(page: p)
             case .page(let id):
                 if let spec = FeatureRegistry.spec(id) { ResourceListView(spec: spec).id(id) }
                 else { ContentUnavailableView("Unknown page", systemImage: "questionmark.folder") }
