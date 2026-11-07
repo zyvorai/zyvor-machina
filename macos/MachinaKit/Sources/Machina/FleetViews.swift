@@ -58,6 +58,7 @@ struct FleetView: View {
                                    fraction: m.capacity?.score.map { $0 / 100 })
                     }
                 }
+                HostHistoryChart()
                 Text("Hosts (\(model.hosts.count))").font(.headline)
                 if model.hosts.isEmpty {
                     if model.platformLoaded { Text("No hosts reported by the controller.").foregroundStyle(.secondary) }

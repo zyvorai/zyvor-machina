@@ -22,6 +22,7 @@ final class AppModel {
     var alerts: [FleetAlert] = []
     var unackedAlerts = 0
     var metrics: LocalMetrics?
+    var history: [MetricsPoint] = []
     var platformError: String?
     var platformLoaded = false
 
@@ -123,7 +124,9 @@ final class AppModel {
         async let t = capture { try await client.tasks() }
         async let m = capture { try await client.localMetrics() }
         async let a = capture { try await client.alerts() }
-        let (hr, tr, mr, ar) = await (h, t, m, a)
+        async let hi = capture { try await client.metricsHistory(limit: 120) }
+        let (hr, tr, mr, ar, hir) = await (h, t, m, a, hi)
+        if case .success(let v) = hir { history = v }
         var errors: [String] = []
         switch hr { case .success(let v): hosts = v; case .failure(let e): errors.append("hosts: \(e.localizedDescription)") }
         switch tr { case .success(let v): tasks = v; case .failure(let e): errors.append("tasks: \(e.localizedDescription)") }

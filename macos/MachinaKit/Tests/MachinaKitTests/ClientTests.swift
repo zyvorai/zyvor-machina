@@ -202,3 +202,35 @@ extension ClientTests {
 }
 
 extension Counter { func all() -> [String] { lock.withLock { items } } }
+
+extension ClientTests {
+    private func pt(_ ms: Double, cpu: Double, rx: Double, mem: Double = 100) -> MetricsPoint {
+        MetricsPoint(timestampMs: ms, hostCpuPercent: 10, hostMemoryPercent: 20, hostDiskPercent: 30, load1: 1, vmsRunning: 1, vmCount: 1,
+                     vmMetrics: [VmMetricsSample(name: "a", state: "running", cpuTimeNs: cpu, vcpus: 2, memoryTotalMb: 512, memoryUsedMb: mem,
+                                                 memoryPct: nil, diskRdBytes: 0, diskWrBytes: 0, netRxBytes: rx, netTxBytes: 0)])
+    }
+
+    @Test func metricsRatesFromCumulativeCounters() {
+        // 10 s apart; 2 vCPUs used 10 s of CPU in total => 50 %. 5000 bytes in 10 s => 500 B/s.
+        let pts = [pt(0, cpu: 0, rx: 0), pt(10_000, cpu: 10e9, rx: 5000), pt(20_000, cpu: 10e9 + 2e9, rx: 6000)]
+        let cpu = MetricsMath.vmCPU(pts, vm: "a")
+        #expect(cpu.count == 2 && abs(cpu[0].value - 50) < 0.001 && abs(cpu[1].value - 10) < 0.001)
+        let rx = MetricsMath.vmRates(pts, vm: "a", [.netRx])
+        #expect(rx.map(\.value) == [500, 100] && rx[0].series == "Network in")
+        #expect(MetricsMath.vmMemory(pts, vm: "a").count == 3)
+        #expect(MetricsMath.hostSeries(pts).count == 9)
+    }
+
+    @Test func metricsSkipCounterResetsAndGaps() {
+        let reset = [pt(0, cpu: 9e9, rx: 9000), pt(10_000, cpu: 1e9, rx: 100), pt(10_000, cpu: 2e9, rx: 200)]
+        #expect(MetricsMath.vmCPU(reset, vm: "a").isEmpty)                  // went backwards, then zero time gap
+        #expect(MetricsMath.vmRates(reset, vm: "a", [.netRx]).isEmpty)
+        #expect(MetricsMath.vmCPU([pt(0, cpu: 0, rx: 0)], vm: "missing").isEmpty)
+    }
+
+    @Test func metricsHistoryDecodes() async throws {
+        MockProtocol.handler = { _ in (200, #"{"points":[{"timestamp_ms":1794057917139,"host_cpu_percent":29.0,"load_1":5.11,"vms_running":4,"vm_count":4,"vm_metrics":[{"name":"w","cpu_time_ns":5.6e12,"vcpus":1,"memory_used_mb":30,"net_rx_bytes":29156161,"extra":1}]}]}"#) }
+        let pts = try await makeClient().metricsHistory(limit: 5)
+        #expect(pts.count == 1 && pts[0].vmMetrics?[0].netRxBytes == 29156161 && pts[0].load1 == 5.11)
+    }
+}
