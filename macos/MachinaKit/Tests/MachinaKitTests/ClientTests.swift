@@ -234,3 +234,121 @@ extension ClientTests {
         #expect(pts.count == 1 && pts[0].vmMetrics?[0].netRxBytes == 29156161 && pts[0].load1 == 5.11)
     }
 }
+
+// MARK: Console (RFB, keys, terminal)
+
+final class ScriptedTransport: ConsoleTransport, @unchecked Sendable {
+    private let lock = NSLock()
+    private var chunks: [Data]
+    private(set) var sent: [Data] = []
+    init(_ chunks: [[UInt8]]) { self.chunks = chunks.map { Data($0) } }
+    func receive() async throws -> Data {
+        let next: Data? = lock.withLock { chunks.isEmpty ? nil : chunks.removeFirst() }
+        guard let next else { throw RFBError.closed }
+        return next
+    }
+    func send(_ data: Data) async throws { lock.withLock { sent.append(data) } }
+    func close() {}
+    var sentBytes: [[UInt8]] { lock.withLock { sent.map { Array($0) } } }
+}
+
+private func be16(_ v: Int) -> [UInt8] { [UInt8(v >> 8), UInt8(v & 0xff)] }
+private func be32(_ v: Int) -> [UInt8] { [UInt8(v >> 24 & 255), UInt8(v >> 16 & 255), UInt8(v >> 8 & 255), UInt8(v & 255)] }
+private func handshake(w: Int, h: Int, version: String = "RFB 003.008\n") -> [[UInt8]] {
+    var first = Array(version.utf8)
+    var rest: [UInt8] = version.contains("003.008") ? [1, 1] + be32(0) : version.contains("003.007") ? [1, 1] : be32(1)
+    rest += be16(w) + be16(h) + [UInt8](repeating: 0, count: 16) + be32(4) + Array("test".utf8)
+    first += rest   // one chunk on purpose: the client must split a stream, not rely on message boundaries
+    return [first]
+}
+
+extension ClientTests {
+    @Test func rfbHandshakeSendsExpectedMessages() async throws {
+        let t = ScriptedTransport(handshake(w: 4, h: 2))
+        let c = RFBClient(transport: t)
+        try await c.connect()
+        let (w, h, name) = (await c.width, await c.height, await c.desktopName)
+        #expect(w == 4 && h == 2 && name == "test")
+        let sent = t.sentBytes
+        #expect(sent[0] == Array("RFB 003.008\n".utf8))
+        #expect(sent[1] == [1])                                   // security None
+        #expect(sent[2] == [1])                                   // ClientInit shared
+        #expect(sent[3].count == 20 && sent[3][0] == 0 && sent[3][4] == 32)    // SetPixelFormat, 32 bpp
+        #expect(sent[4][0] == 2 && sent[4].count == 4 + 16)       // SetEncodings, 4 encodings
+        #expect(sent[5] == [3, 0] + be16(0) + be16(0) + be16(4) + be16(2))     // full update request
+    }
+
+    @Test func rfbOlderVersionsAndPasswordRefusal() async throws {
+        let c37 = RFBClient(transport: ScriptedTransport(handshake(w: 1, h: 1, version: "RFB 003.007\n")))
+        try await c37.connect()
+        let c33 = RFBClient(transport: ScriptedTransport(handshake(w: 1, h: 1, version: "RFB 003.003\n")))
+        try await c33.connect()
+        let pw = RFBClient(transport: ScriptedTransport([Array("RFB 003.008\n".utf8) + [1, 2]]))   // only VNC auth offered
+        await #expect(throws: RFBError.self) { try await pw.connect() }
+        let junk = RFBClient(transport: ScriptedTransport([Array("HTTP/1.1 400 \n".utf8)]))
+        await #expect(throws: RFBError.self) { try await junk.connect() }
+    }
+
+    @Test func rfbDecodesRawCopyRectAndHextile() async throws {
+        var msgs = handshake(w: 4, h: 2)
+        // Raw: pixel (1,0) = B10 G20 R30; pixel (2,0) = B1 G2 R3.
+        var upd: [UInt8] = [0, 0] + be16(3)
+        upd += be16(1) + be16(0) + be16(2) + be16(1) + be32(0) + [10, 20, 30, 0, 1, 2, 3, 0]
+        // CopyRect: copy (1,0) 1x1 to (0,1).
+        upd += be16(0) + be16(1) + be16(1) + be16(1) + be32(1) + be16(1) + be16(0)
+        // Hextile over (2,1) 2x1: bg+fg specified, subrects, not coloured: bg red(0,0,255), fg green, one subrect at x=1,y=0 1x1.
+        upd += be16(2) + be16(1) + be16(2) + be16(1) + be32(5) + [2 | 4 | 8, 0, 0, 255, 0, 0, 255, 0, 0, 1, 0x10, 0x00]
+        msgs.append(upd)
+        let t = ScriptedTransport(msgs)
+        let c = RFBClient(transport: t)
+        try await c.connect()
+        await c.run()      // consumes the update, then the scripted stream ends
+        let px = await c.rawPixels()
+        func at(_ x: Int, _ y: Int) -> [UInt8] { Array(px.bgra[((y * px.width + x) * 4)..<((y * px.width + x) * 4 + 4)]) }
+        #expect(at(1, 0) == [10, 20, 30, 255] && at(2, 0) == [1, 2, 3, 255])
+        #expect(at(0, 1) == [10, 20, 30, 255])                  // copied
+        #expect(at(2, 1) == [0, 0, 255, 255])                   // hextile background (red)
+        #expect(at(3, 1) == [0, 255, 0, 255])                   // hextile foreground subrect (green)
+        #expect(t.sentBytes.last == [3, 1] + be16(0) + be16(0) + be16(4) + be16(2))    // asks for the next incremental update
+    }
+
+    @Test func rfbInputMessages() async throws {
+        let t = ScriptedTransport(handshake(w: 100, h: 50))
+        let c = RFBClient(transport: t)
+        try await c.connect()
+        await c.key(0xff0d, down: true)
+        await c.pointer(x: 500, y: -3, buttonMask: 1)           // clamped into the framebuffer
+        await c.sendClipboard("hi")
+        let s = t.sentBytes.suffix(3)
+        #expect(Array(s[s.startIndex]) == [4, 1, 0, 0] + be32(0xff0d))
+        #expect(Array(s[s.startIndex + 1]) == [5, 1] + be16(99) + be16(0))
+        #expect(Array(s[s.startIndex + 2]) == [6, 0, 0, 0] + be32(2) + [104, 105])
+    }
+
+    @Test func keyMapping() {
+        #expect(KeySyms.keysym(keyCode: 36, characters: "\r") == 0xff0d)
+        #expect(KeySyms.keysym(keyCode: 0, characters: "a") == 0x61)
+        #expect(KeySyms.keysym(keyCode: 0, characters: "é") == 0xe9)
+        #expect(KeySyms.keysym(keyCode: 0, characters: "€") == 0x0100_20ac)
+        #expect(KeySyms.modifier(keyCode: 56) == 0xffe1 && KeySyms.modifier(keyCode: 55) == 0xffeb)
+        #expect(TerminalKeys.bytes(keyCode: 0, characters: "c", control: true) == [3])           // Ctrl-C
+        #expect(TerminalKeys.bytes(keyCode: 126, characters: nil, control: false) == Array("\u{1b}[A".utf8))
+        #expect(TerminalKeys.bytes(keyCode: 36, characters: "\r", control: false) == [13])
+        #expect(TerminalKeys.bytes(keyCode: 0, characters: "é", control: false) == Array("é".utf8))
+    }
+
+    @Test func terminalBufferRendersLikeAConsole() {
+        var t = TerminalBuffer()
+        t.feed("login: root\r\nPassword: ")
+        t.feed("\u{1b}[31mred\u{1b}[0m\u{1b}]0;title\u{07} ok\r\n")
+        #expect(t.text == "login: root\nPassword: red ok\n")
+        t.feed("abc\u{08}\u{08}X")                                   // backspace then overwrite
+        #expect(t.text.hasSuffix("\naXc"))
+        t.feed("\r\u{1b}[K")                                        // CR + erase line
+        #expect(t.text.hasSuffix("\n"))
+        var split = TerminalBuffer(); split.feed("a\u{1b}"); split.feed("[3"); split.feed("1mb")     // sequence split across chunks
+        #expect(split.text == "ab")
+        var cap = TerminalBuffer(maxLines: 3); for i in 0..<10 { cap.feed("l\(i)\n") }
+        #expect(cap.lines.count == 3)
+    }
+}
