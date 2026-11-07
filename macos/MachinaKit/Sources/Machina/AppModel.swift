@@ -4,7 +4,7 @@ import MachinaKit
 import UserNotifications
 import AppKit
 
-enum SidebarItem: Hashable { case fleet, tasks, alerts, vm(String), page(String) }
+enum SidebarItem: Hashable { case fleet, tasks, alerts, vm(String), page(String), insight(InsightPage) }
 
 @MainActor @Observable
 final class AppModel {
@@ -27,6 +27,9 @@ final class AppModel {
     var unackedAlerts = 0
     var metrics: LocalMetrics?
     var history: [MetricsPoint] = []
+    var fleetVMs: [PlatformVM] = []
+    /// VM changes seen on the watch stream this session, newest first (for the "What changed" page).
+    var activity: [ActivityEntry] = []
     var platformError: String?
     var platformLoaded = false
 
@@ -151,7 +154,7 @@ final class AppModel {
     func signOut() async {
         watchTask?.cancel(); watchTask = nil
         await client?.logout()
-        SpotlightIndexer.shared.clear(); client = nil; seenApprovals = nil; pendingApprovals = 0; role = nil; vms = []; hosts = []; tasks = []; alerts = []; metrics = nil
+        SpotlightIndexer.shared.clear(); client = nil; seenApprovals = nil; pendingApprovals = 0; role = nil; vms = []; hosts = []; tasks = []; alerts = []; metrics = nil; fleetVMs = []; activity = []
         platformLoaded = false; selection = nil; live = false; phase = .signedOut
     }
 
@@ -201,8 +204,10 @@ final class AppModel {
         async let t = capture { try await client.tasks() }
         async let m = capture { try await client.localMetrics() }
         async let a = capture { try await client.alerts() }
+        async let fv = capture { try await client.fleetVMs() }
         async let hi = capture { try await client.metricsHistory(limit: 120) }
-        let (hr, tr, mr, ar, hir) = await (h, t, m, a, hi)
+        let (hr, tr, mr, ar, hir, fvr) = await (h, t, m, a, hi, fv)
+        if case .success(let v) = fvr { fleetVMs = v }
         if case .success(let v) = hir { history = v }
         var errors: [String] = []
         switch hr { case .success(let v): hosts = v; case .failure(let e): errors.append("hosts: \(e.localizedDescription)") }
@@ -260,6 +265,7 @@ final class AppModel {
                 case .disconnected: self.live = false
                 case .changes(let changes):
                     self.live = true
+                    self.activity = ActivityLog.append(self.activity, changes, at: Date())
                     self.notify(changes)
                     await self.refresh()
                 }

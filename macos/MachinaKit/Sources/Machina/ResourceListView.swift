@@ -125,6 +125,7 @@ struct CommandPalette: View {
             .init(id: "tasks", title: "Tasks", detail: "Overview", icon: "checklist", item: .tasks),
             .init(id: "alerts", title: "Alerts", detail: "Overview", icon: "bell", item: .alerts),
         ]
+        e += InsightPage.allCases.map { .init(id: "i-" + $0.rawValue, title: $0.title, detail: "Visual insight", icon: $0.icon, item: .insight($0)) }
         e += FeatureRegistry.all.map { .init(id: "p-" + $0.id, title: $0.title, detail: $0.group, icon: $0.icon, item: .page($0.id)) }
         e += model.vms.map { .init(id: "vm-" + $0.name, title: $0.name, detail: "VM · \($0.state)", icon: "desktopcomputer", item: .vm($0.name)) }
         return query.isEmpty ? e : e.filter { $0.title.localizedCaseInsensitiveContains(query) || $0.detail.localizedCaseInsensitiveContains(query) }
