@@ -440,7 +440,7 @@ extension ClientTests {
     @Test func fleetCloudRegistry() {
         let fc = FeatureRegistry.all.filter { $0.group == "Fleet Cloud" }
         #expect(fc.count >= 17)
-        #expect(fc.filter { $0.create != nil }.map(\.id).sorted() == ["fc-flavors", "fc-keypairs", "fc-projects", "fc-volumes"])
+        #expect(fc.filter { $0.create != nil }.map(\.id).sorted() == ["fc-flavors", "fc-instances", "fc-keypairs", "fc-projects", "fc-volumes"])
         #expect(fc.allSatisfy { $0.actions.allSatisfy { $0.method != "GET" } })
     }
 }
