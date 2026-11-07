@@ -253,6 +253,11 @@ struct SerialSurface: NSViewRepresentable {
 // MARK: Tab
 
 struct VMConsoleTab: View {
+    /// Off on purpose: on the test host, closing the serial console WebSocket was followed by the daemon exiting and being
+    /// restarted by systemd (suspected cause: the daemon opens the VM's PTY without O_NOCTTY). Turn this on once the
+    /// daemon is fixed; the serial code path is otherwise complete.
+    static let serialEnabled = false
+
     @Environment(AppModel.self) private var model
     let vm: VmInfo
     enum Kind: String, CaseIterable, Identifiable { case graphics = "Graphics (VNC)", serial = "Serial"; var id: String { rawValue } }
@@ -263,9 +268,13 @@ struct VMConsoleTab: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Picker("", selection: $kind) { ForEach(Kind.allCases) { Text($0.rawValue).tag($0) } }
-                    .pickerStyle(.segmented).labelsHidden().frame(width: 280)
-                    .onChange(of: kind) { _, _ in vnc.disconnect(); serial.disconnect() }
+                if Self.serialEnabled {
+                    Picker("", selection: $kind) { ForEach(Kind.allCases) { Text($0.rawValue).tag($0) } }
+                        .pickerStyle(.segmented).labelsHidden().frame(width: 280)
+                        .onChange(of: kind) { _, _ in vnc.disconnect(); serial.disconnect() }
+                } else {
+                    Label("Graphics (VNC)", systemImage: "display").font(.headline)
+                }
                 Spacer()
                 if kind == .graphics, vnc.state == .connected {
                     Button("Ctrl-Alt-Del") { vnc.ctrlAltDel() }
@@ -286,6 +295,10 @@ struct VMConsoleTab: View {
             Text(kind == .graphics ? "Click the display to capture the keyboard. Command shortcuts stay with the app."
                                    : "Click the console to type. Full-screen programs (vi, top) do not render in this simple terminal.")
                 .font(.caption).foregroundStyle(.secondary)
+            if !Self.serialEnabled {
+                Text("The serial console is turned off: on the tested daemon, closing it made the daemon exit and restart.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
         .padding(24)
         .onDisappear { vnc.disconnect(); serial.disconnect() }
@@ -308,7 +321,7 @@ struct VMConsoleTab: View {
 
     private func connect() {
         guard let api = try? model.api() else { return }
-        if kind == .graphics { vnc.connect(vm, api: api) } else { serial.connect(vm, api: api) }
+        if kind == .graphics || !Self.serialEnabled { vnc.connect(vm, api: api) } else { serial.connect(vm, api: api) }
     }
 }
 
