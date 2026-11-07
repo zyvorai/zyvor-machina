@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+
 # Build, sign, notarize and package Machina.app as a DMG (macOS only).
 #
 #   macos/scripts/release.sh                      # unsigned local DMG (ad-hoc signature, no notarization)

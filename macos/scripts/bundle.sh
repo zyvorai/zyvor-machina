@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+
 # Build Machina.app from the SwiftPM executable (macOS only). Usage: macos/scripts/bundle.sh [debug|release]
 set -euo pipefail
 CFG="${1:-release}"
