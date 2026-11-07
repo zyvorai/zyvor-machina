@@ -24,8 +24,10 @@ public actor MachinaClient {
     }
 
     public static func makeSession(delegate: URLSessionDelegate?) -> URLSession {
-        let cfg = URLSessionConfiguration.default
-        cfg.httpCookieStorage = HTTPCookieStorage()
+        // Ephemeral keeps its own working cookie store (a bare HTTPCookieStorage() is not usable
+        // by URLSession), so the machina_session cookie survives between requests per server.
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.httpShouldSetCookies = true
         cfg.httpCookieAcceptPolicy = .always
         cfg.timeoutIntervalForRequest = 20
         return URLSession(configuration: cfg, delegate: delegate, delegateQueue: nil)
