@@ -9,8 +9,31 @@ public struct ResourceCreate: Hashable, Sendable {
         public var kind: Kind
         public var initial: String
         public var required: Bool
-        public init(_ id: String, _ label: String, _ kind: Kind = .text, initial: String = "", required: Bool = true) {
-            self.id = id; self.label = label; self.kind = kind; self.initial = initial; self.required = required
+        /// When set, the form shows a picker filled from this endpoint instead of free text.
+        public var choices: Choices?
+        public init(_ id: String, _ label: String, _ kind: Kind = .text, initial: String = "", required: Bool = true, choices: Choices? = nil) {
+            self.id = id; self.label = label; self.kind = kind; self.initial = initial; self.required = required; self.choices = choices
+        }
+    }
+    /// Picker options loaded from a list endpoint: the value is `valueKeys` joined with `valueJoin`, the label `labelKeys` joined with " · ".
+    public struct Choices: Hashable, Sendable {
+        public var endpoint: Endpoint
+        public var rowsPath: [String]
+        public var valueKeys: [String]
+        public var valueJoin: String
+        public var labelKeys: [String]
+        public init(_ endpoint: Endpoint, rowsPath: [String] = [], valueKeys: [String], valueJoin: String = "@", labelKeys: [String]) {
+            self.endpoint = endpoint; self.rowsPath = rowsPath; self.valueKeys = valueKeys; self.valueJoin = valueJoin; self.labelKeys = labelKeys
+        }
+        public func options(from json: JSONValue) -> [(label: String, value: String)] {
+            var node: JSONValue? = json
+            for k in rowsPath { node = node?[k] }
+            return (node?.array ?? []).compactMap { row in
+                let parts = valueKeys.compactMap { row.value(at: $0).map { $0.text } }
+                guard parts.count == valueKeys.count, !parts.contains("") else { return nil }
+                let label = labelKeys.compactMap { row.value(at: $0).map { $0.text } }.filter { !$0.isEmpty }.joined(separator: " · ")
+                return (label.isEmpty ? parts.joined(separator: valueJoin) : label, parts.joined(separator: valueJoin))
+            }
         }
     }
     public struct Invalid: Error, LocalizedError, Sendable { public var message: String; public var errorDescription: String? { message } }
@@ -88,20 +111,30 @@ public struct ResourceAction: Hashable, Sendable, Identifiable {
     public var bodyFields: [String: String]
     public var query: [URLQueryItem]
     public var staticBody: JSONValue?
+    /// Values asked for before the request is sent (merged into the body; whole numbers for `.int`).
+    public var inputs: [ResourceCreate.Field]
+    /// Shown in a confirmation dialog before running, even when not destructive.
+    public var confirm: String?
+    /// Runs without a selected row (a page-level action).
+    public var global: Bool
     public var id: String { title }
     /// POST by default.
     public init(_ title: String, _ path: String, destructive: Bool = false, controller: Bool = false,
-                bodyFields: [String: String] = [:], query: [URLQueryItem] = [], staticBody: JSONValue? = nil) {
-        self.init(title, "POST", path, destructive: destructive, controller: controller, bodyFields: bodyFields, query: query, staticBody: staticBody)
+                bodyFields: [String: String] = [:], query: [URLQueryItem] = [], staticBody: JSONValue? = nil,
+                inputs: [ResourceCreate.Field] = [], confirm: String? = nil, global: Bool = false) {
+        self.init(title, "POST", path, destructive: destructive, controller: controller, bodyFields: bodyFields, query: query, staticBody: staticBody,
+                  inputs: inputs, confirm: confirm, global: global)
     }
     public init(_ title: String, _ method: String, _ path: String, destructive: Bool = false, controller: Bool = false,
-                bodyFields: [String: String] = [:], query: [URLQueryItem] = [], staticBody: JSONValue? = nil) {
+                bodyFields: [String: String] = [:], query: [URLQueryItem] = [], staticBody: JSONValue? = nil,
+                inputs: [ResourceCreate.Field] = [], confirm: String? = nil, global: Bool = false) {
+        self.inputs = inputs; self.confirm = confirm; self.global = global
         self.title = title; self.method = method; self.path = path; self.destructive = destructive
         self.controller = controller; self.bodyFields = bodyFields; self.query = query; self.staticBody = staticBody
     }
 
     /// nil when a placeholder has no value in the row (so a bad request is never sent).
-    public func endpoint(for row: ResourceRow) -> Endpoint? {
+    public func endpoint(for row: ResourceRow, inputValues: [String: JSONValue] = [:]) -> Endpoint? {
         var out = ""; var rest = Substring(path)
         while let open = rest.firstIndex(of: "{") {
             out += rest[..<open]
@@ -118,13 +151,38 @@ public struct ResourceAction: Hashable, Sendable, Identifiable {
             for (field, key) in bodyFields { guard let v = row.values.value(at: key) else { return nil }; o[field] = v }
             body = .object(o)
         }
+        if !inputValues.isEmpty {
+            var o = body?.object ?? [:]
+            for (k, v) in inputValues { o[k] = v }
+            body = .object(o)
+        }
         return Endpoint(method, out, query: query, body: body, controller: controller)
+    }
+
+    /// Typed body values from the raw text the user entered for `inputs`.
+    public func inputBody(from values: [String: String]) throws -> [String: JSONValue] {
+        guard !inputs.isEmpty else { return [:] }
+        let form = ResourceCreate(title, path, fields: inputs)
+        return try form.body(from: values).object ?? [:]
+    }
+
+    /// Some endpoints (kubectl wrappers) answer 200 with `ok: false`; the message to show then.
+    public static func failure(in json: JSONValue) -> String? {
+        guard json["ok"] == .bool(false) else { return nil }
+        let err = json["stderr"]?.text ?? ""
+        return err.isEmpty ? (json["error"]?.text ?? "the command failed (exit \(json["exit_code"]?.text ?? "?"))") : err.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    /// A short result line when the response carries one (`summary`, e.g. a DRS dry run).
+    public static func summary(of json: JSONValue) -> String? {
+        let t = json["summary"]?.text ?? ""
+        return t.isEmpty ? nil : t
     }
 }
 
 public struct ResourceRow: Identifiable, Hashable, Sendable {
     public var id: String
     public var values: JSONValue
+    public init(id: String, values: JSONValue) { self.id = id; self.values = values }
 }
 
 public struct ResourceColumn: Hashable, Sendable, Identifiable {
