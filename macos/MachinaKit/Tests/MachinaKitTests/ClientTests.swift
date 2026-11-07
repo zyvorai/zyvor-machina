@@ -387,3 +387,15 @@ extension ClientTests {
         #expect(FeatureRegistry.spec("approvals")?.actions.map(\.title) == ["Approve", "Reject"])
     }
 }
+
+extension ClientTests {
+    @Test func bytesFormatAndPhase6Registry() {
+        let row = ResourceRow(id: "0", values: .object(["n": .number(1_048_576), "s": .string("x")]))
+        #expect(ResourceColumn("c", "n", .bytes).render(row).contains("MB"))
+        #expect(ResourceColumn("c", "s", .bytes).render(row) == "x")          // not a number: shown as is
+        let groups = Dictionary(grouping: FeatureRegistry.all, by: \.group)
+        #expect(groups["Security"]?.count ?? 0 >= 10 && groups["Fleet security"] != nil && groups["Bare metal"] != nil && groups["Insight"] != nil)
+        // Phase 6 is read-only: none of its groups carries an action.
+        #expect(["Security", "Fleet security", "Bare metal", "Insight"].allSatisfy { g in groups[g]!.allSatisfy { $0.actions.isEmpty } })
+    }
+}

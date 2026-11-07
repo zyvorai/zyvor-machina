@@ -55,6 +55,8 @@ struct MainWindow: View {
     @Environment(AppModel.self) private var model
     @State private var search = ""
     @State private var confirmStop: VmInfo?
+    // Long sections start collapsed; the Cmd-K palette reaches every page regardless.
+    @State private var collapsed: Set<String> = ["Containers", "Kubernetes", "Control plane", "Security", "Fleet security", "Bare metal", "Insight", "Storage & network"]
 
     private var filtered: [VmInfo] {
         search.isEmpty ? model.vms : model.vms.filter { $0.name.localizedCaseInsensitiveContains(search) }
@@ -77,7 +79,8 @@ struct MainWindow: View {
                     Label("Alerts", systemImage: "bell").badge(model.unackedAlerts).tag(SidebarItem.alerts)
                 }
                 ForEach(FeatureRegistry.groups, id: \.name) { group in
-                    Section(group.name) {
+                    Section(group.name, isExpanded: Binding(get: { !collapsed.contains(group.name) },
+                                                           set: { if $0 { collapsed.remove(group.name) } else { collapsed.insert(group.name) } })) {
                         ForEach(group.specs) { spec in
                             Label(spec.title, systemImage: spec.icon).badge(spec.id == "approvals" ? model.pendingApprovals : 0).tag(SidebarItem.page(spec.id))
                         }

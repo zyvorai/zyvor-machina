@@ -51,7 +51,7 @@ public struct ResourceRow: Identifiable, Hashable, Sendable {
 }
 
 public struct ResourceColumn: Hashable, Sendable, Identifiable {
-    public enum Format: Hashable, Sendable { case text, gigabytes, percent, date }
+    public enum Format: Hashable, Sendable { case text, gigabytes, percent, date, bytes }
     public var title: String
     public var key: String
     public var format: Format
@@ -64,6 +64,7 @@ public struct ResourceColumn: Hashable, Sendable, Identifiable {
         case .text, .date: return v.text
         case .gigabytes: return v.double.map { String(format: "%.1f GB", $0) } ?? v.text
         case .percent: return v.double.map { String(format: "%.0f%%", $0) } ?? v.text
+        case .bytes: return v.double.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .binary) } ?? v.text
         }
     }
 }
