@@ -8,10 +8,13 @@ enum SidebarItem: Hashable { case fleet, tasks, alerts, vm(String), page(String)
 
 @MainActor @Observable
 final class AppModel {
+    /// One model for the whole process so the Dock menu, App Intents and Spotlight handlers can reach it.
+    static let shared = AppModel()
+
     enum Phase { case signedOut, connecting, ready }
 
     var phase: Phase = .signedOut
-    var vms: [VmInfo] = []
+    var vms: [VmInfo] = [] { didSet { if oldValue != vms { SpotlightIndexer.shared.schedule(vms) } } }
     var error: String?
     var live = false
     var pendingFingerprint: String?
@@ -31,6 +34,39 @@ final class AppModel {
     var role: String?
     var canWrite: Bool { role == "admin" || role == "operator" }
     var showPalette = false
+
+    // Saved servers (without passwords: those live in the Keychain, certificate pins too).
+    var servers: [ServerProfile] = {
+        (UserDefaults.standard.data(forKey: "servers")).flatMap { try? JSONDecoder().decode([ServerProfile].self, from: $0) } ?? []
+    }()
+
+    private func saveServers() { UserDefaults.standard.set(try? JSONEncoder().encode(servers), forKey: "servers") }
+
+    func forget(_ p: ServerProfile) {
+        servers = ServerList.removing(servers, id: p.id); saveServers()
+        if let host = p.url.host { Keychain.remove("pw:\(p.username ?? "")@\(host)") }
+    }
+
+    func hasSavedPassword(_ p: ServerProfile) -> Bool { Keychain.get(passwordAccount(p)) != nil }
+    private func passwordAccount(_ p: ServerProfile) -> String { "pw:\(p.username ?? "")@\(p.url.host ?? "")" }
+
+    /// Switches to a saved server, signing in with its stored password; without one the login form is prefilled.
+    func switchTo(_ p: ServerProfile) async {
+        if phase == .ready { await signOut() }
+        serverURL = p.url.absoluteString; username = p.username ?? ""
+        if let pw = Keychain.get(passwordAccount(p)) { await signIn(password: pw) }
+    }
+
+    func open(_ link: DeepLink) {
+        switch link {
+        case .vm(let n): selection = .vm(n)
+        case .page(let id): selection = FeatureRegistry.spec(id) == nil ? selection : .page(id)
+        case .fleet: selection = .fleet
+        case .tasks: selection = .tasks
+        case .alerts: selection = .alerts
+        }
+        NSApp.activate(ignoringOtherApps: true)
+    }
 
     // Dialog state shared by every screen; the dialogs themselves are attached once in MainWindow.
     var prompt: PromptRequest?
@@ -90,6 +126,7 @@ final class AppModel {
             UserDefaults.standard.set(serverURL, forKey: "serverURL")
             UserDefaults.standard.set(username, forKey: "username")
             Keychain.set(password, for: "pw:\(username)@\(url.host ?? "")")
+            servers = ServerList.remembering(servers, url: url, username: username); saveServers()
             client = c
             role = (try? await c.sessionInfo())?.role
             await refresh()
@@ -114,7 +151,7 @@ final class AppModel {
     func signOut() async {
         watchTask?.cancel(); watchTask = nil
         await client?.logout()
-        client = nil; seenApprovals = nil; pendingApprovals = 0; role = nil; vms = []; hosts = []; tasks = []; alerts = []; metrics = nil
+        SpotlightIndexer.shared.clear(); client = nil; seenApprovals = nil; pendingApprovals = 0; role = nil; vms = []; hosts = []; tasks = []; alerts = []; metrics = nil
         platformLoaded = false; selection = nil; live = false; phase = .signedOut
     }
 

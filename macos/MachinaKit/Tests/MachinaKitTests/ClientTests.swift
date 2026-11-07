@@ -444,3 +444,33 @@ extension ClientTests {
         #expect(fc.allSatisfy { $0.actions.allSatisfy { $0.method != "GET" } })
     }
 }
+
+extension ClientTests {
+    @Test func deepLinksParseAndRoundTrip() {
+        #expect(DeepLink(url: URL(string: "machina://vm/web-frontend-01")!) == .vm("web-frontend-01"))
+        #expect(DeepLink(url: URL(string: "machina://vm/my%20vm")!) == .vm("my vm"))
+        #expect(DeepLink(url: URL(string: "machina://page/k8s-pods")!) == .page("k8s-pods"))
+        #expect(DeepLink(url: URL(string: "MACHINA://Fleet")!) == .fleet)
+        #expect(DeepLink(url: URL(string: "https://vm/x")!) == nil)
+        #expect(DeepLink(url: URL(string: "machina://vm")!) == nil)            // a VM link needs a name
+        #expect(DeepLink(url: URL(string: "machina://nope/x")!) == nil)
+        for l in [DeepLink.vm("a b"), .page("ai-cost"), .fleet, .tasks, .alerts] { #expect(DeepLink(url: l.url) == l) }
+    }
+
+    @Test func savedServersDedupeAndOrder() {
+        let a = URL(string: "https://Host-A:5092")!, b = URL(string: "https://host-b:5092")!
+        var l = ServerList.remembering([], url: a, username: "sus")
+        l = ServerList.remembering(l, url: b, username: "sus")
+        #expect(l.map { $0.url.host } == ["host-b", "Host-A"] || l.map { $0.url.host?.lowercased() } == ["host-b", "host-a"])
+        l = ServerList.remembering(l, url: URL(string: "https://host-a:5092")!, username: "sus", name: "Lab")      // same server, other case: moves to the front
+        #expect(l.count == 2 && l[0].name == "Lab")
+        l = ServerList.remembering(l, url: a, username: "root")                                                  // other user = separate entry
+        #expect(l.count == 3)
+        #expect(ServerList.removing(l, id: l[0].id).count == 2)
+        let json = try? JSONEncoder().encode(l)
+        #expect((try? JSONDecoder().decode([ServerProfile].self, from: json ?? Data()))?.count == 3)
+        // Profiles saved before `username` existed still decode.
+        let old = #"[{"id":"7D1F3C52-0B0E-4C5B-8E43-1E6F2B1D9A10","name":"x","url":"https://h:5092"}]"#
+        #expect((try? JSONDecoder().decode([ServerProfile].self, from: Data(old.utf8)))?.first?.username == nil)
+    }
+}

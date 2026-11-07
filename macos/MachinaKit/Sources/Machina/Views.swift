@@ -16,6 +16,15 @@ struct LoginView: View {
                 SecureField("Password", text: $password).onSubmit(go)
             }
             .textFieldStyle(.roundedBorder).frame(width: 320)
+            if !model.servers.isEmpty {
+                Menu("Saved servers") {
+                    ForEach(model.servers) { p in
+                        Button("\(p.name)\(p.username.map { " (\($0))" } ?? "")") { Task { await model.switchTo(p) } }
+                    }
+                    Divider()
+                    ForEach(model.servers) { p in Button("Forget \(p.name)", role: .destructive) { model.forget(p) } }
+                }.frame(width: 320)
+            }
             if let e = model.error { Text(e).foregroundStyle(.red).font(.callout).frame(width: 320) }
             Button(action: go) {
                 if model.phase == .connecting { ProgressView().controlSize(.small) } else { Text("Sign In") }
@@ -55,6 +64,7 @@ struct MainWindow: View {
     @Environment(AppModel.self) private var model
     @State private var search = ""
     @State private var confirmStop: VmInfo?
+    @Environment(\.openWindow) private var openWindow
     // Long sections start collapsed; the Cmd-K palette reaches every page regardless.
     @State private var collapsed: Set<String> = ["Containers", "Kubernetes", "Control plane", "Security", "Fleet security", "Bare metal", "Insight", "Storage & network", "Fleet Cloud"]
 
@@ -94,6 +104,7 @@ struct MainWindow: View {
                             Image(systemName: "circle.fill").font(.caption2)
                                 .foregroundStyle(vm.isRunning ? .green : .gray)
                         }.tag(SidebarItem.vm(vm.name))
+                        .contextMenu { Button("Open in New Window") { openWindow(id: "vm-window", value: vm.name) } }
                     }
                 }
             }
@@ -146,7 +157,15 @@ struct MainWindow: View {
         .toolbar {
             ToolbarItem { Button { Task { await model.presentCreateVM() } } label: { Image(systemName: "plus") }.help("New VM").disabled(!model.canWrite) }
             ToolbarItem { Button { Task { await model.refresh(); await model.refreshPlatform() } } label: { Image(systemName: "arrow.clockwise") } }
-            ToolbarItem { Button("Sign Out") { Task { await model.signOut() } } }
+            ToolbarItem {
+                Menu {
+                    ForEach(model.servers) { p in
+                        Button("\(p.name)\(p.username.map { " (\($0))" } ?? "")\(model.hasSavedPassword(p) ? "" : " — password needed")") { Task { await model.switchTo(p) } }
+                    }
+                    Divider()
+                    Button("Sign Out") { Task { await model.signOut() } }
+                } label: { Label("Server", systemImage: "externaldrive.connected.to.line.below") }
+            }
         }
         .confirmationDialog("Force stop \(confirmStop?.name ?? "")?", isPresented: .constant(confirmStop != nil),
                             titleVisibility: .visible) {
