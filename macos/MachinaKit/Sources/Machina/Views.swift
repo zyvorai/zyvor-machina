@@ -1,49 +1,6 @@
 import SwiftUI
 import MachinaKit
 
-struct LoginView: View {
-    @Environment(AppModel.self) private var model
-    @State private var password = ""
-
-    var body: some View {
-        @Bindable var model = model
-        VStack(spacing: 18) {
-            Text("machina").font(.system(size: 44, weight: .semibold, design: .rounded))
-            Text("Connect to a Machina daemon").foregroundStyle(.secondary)
-            VStack(spacing: 10) {
-                TextField("https://host:5092", text: $model.serverURL).textContentType(.URL)
-                TextField("Username", text: $model.username)
-                SecureField("Password", text: $password).onSubmit(go)
-            }
-            .textFieldStyle(.roundedBorder).frame(width: 320)
-            if !model.servers.isEmpty {
-                Menu("Saved servers") {
-                    ForEach(model.servers) { p in
-                        Button("\(p.name)\(p.username.map { " (\($0))" } ?? "")") { Task { await model.switchTo(p) } }
-                    }
-                    Divider()
-                    ForEach(model.servers) { p in Button("Forget \(p.name)", role: .destructive) { model.forget(p) } }
-                }.frame(width: 320)
-            }
-            if let e = model.error { Text(e).foregroundStyle(.red).font(.callout).frame(width: 320) }
-            Button(action: go) {
-                if model.phase == .connecting { ProgressView().controlSize(.small) } else { Text("Sign In") }
-            }
-            .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
-            .disabled(model.phase == .connecting || password.isEmpty)
-        }
-        .padding(40).frame(minWidth: 460, minHeight: 420)
-        .alert("Trust this certificate?", isPresented: .constant(model.pendingFingerprint != nil)) {
-            Button("Trust") { model.resolveTrust(true) }
-            Button("Cancel", role: .cancel) { model.resolveTrust(false) }
-        } message: {
-            Text("This server uses a self-signed certificate. Verify the SHA-256 fingerprint:\n\n\(model.pendingFingerprint ?? "")")
-        }
-    }
-
-    private func go() { Task { await model.signIn(password: password) } }
-}
-
 struct StateBadge: View {
     let state: String
     var color: Color {
