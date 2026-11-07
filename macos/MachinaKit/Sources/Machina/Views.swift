@@ -56,7 +56,7 @@ struct MainWindow: View {
     @State private var search = ""
     @State private var confirmStop: VmInfo?
     // Long sections start collapsed; the Cmd-K palette reaches every page regardless.
-    @State private var collapsed: Set<String> = ["Containers", "Kubernetes", "Control plane", "Security", "Fleet security", "Bare metal", "Insight", "Storage & network"]
+    @State private var collapsed: Set<String> = ["Containers", "Kubernetes", "Control plane", "Security", "Fleet security", "Bare metal", "Insight", "Storage & network", "Fleet Cloud"]
 
     private var filtered: [VmInfo] {
         search.isEmpty ? model.vms : model.vms.filter { $0.name.localizedCaseInsensitiveContains(search) }

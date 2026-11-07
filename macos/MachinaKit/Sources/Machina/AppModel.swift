@@ -140,7 +140,12 @@ final class AppModel {
         }
     }
 
-    /// Generic read for registry pages (`ResourceListView`).
+    /// Generic read for registry pages (`ResourceListView`): plain call, derived transform or fan-out.
+    func load(_ spec: ResourceSpec) async throws -> JSONValue {
+        guard let client else { throw MachinaError.unauthenticated }
+        return try await client.load(spec)
+    }
+
     func call(_ endpoint: Endpoint) async throws -> JSONValue {
         guard let client else { throw MachinaError.unauthenticated }
         return try await client.call(endpoint)

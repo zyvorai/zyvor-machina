@@ -27,6 +27,9 @@ struct ResourceListView: View {
                 Spacer()
                 Text("\(filtered.count) of \(rows.count)").foregroundStyle(.secondary).monospacedDigit()
                 Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }
+                if let create = spec.create {
+                    Button("New…") { openCreate(create) }.disabled(!model.canWrite).help(model.canWrite ? "" : "Your role cannot make changes")
+                }
                 ForEach(spec.actions) { a in
                     Button(a.title) { run(a) }
                         .disabled(selected == nil || !model.canWrite)
@@ -75,6 +78,17 @@ struct ResourceListView: View {
         }
     }
 
+    private func openCreate(_ c: ResourceCreate) {
+        let fields = c.fields.map { f in PromptField(id: f.id, label: f.label, initial: f.initial, options: f.kind == .bool ? ["yes", "no"] : nil) }
+        model.ask(c.title, submit: "Create", fields: fields) { values in
+            let body: JSONValue
+            do { body = try c.body(from: values) } catch { model.error = error.localizedDescription; return }
+            var draft = c.endpoint; draft.body = body
+            let e = draft
+            if await model.perform(c.title, { _ = try await $0.call(e) }) { model.notice = "\(c.title): done"; await load() }
+        }
+    }
+
     /// One row action: build the request from the selected row, confirm if it is destructive, run, reload.
     private func run(_ a: ResourceAction) {
         guard let row = selected, let endpoint = a.endpoint(for: row) else { model.error = "\(a.title): the row is missing a value the request needs."; return }
@@ -88,7 +102,7 @@ struct ResourceListView: View {
 
     private func load() async {
         do {
-            rows = spec.rows(from: try await model.call(spec.endpoint))
+            rows = spec.rows(from: try await model.load(spec))
             loadError = nil
         } catch {
             loadError = error.localizedDescription

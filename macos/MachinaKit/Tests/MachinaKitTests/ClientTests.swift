@@ -399,3 +399,48 @@ extension ClientTests {
         #expect(["Security", "Fleet security", "Bare metal", "Insight"].allSatisfy { g in groups[g]!.allSatisfy { $0.actions.isEmpty } })
     }
 }
+
+extension ClientTests {
+    @Test func createFormBuildsTypedBodyAndValidates() throws {
+        let c = FeatureRegistry.spec("fc-flavors")!.create!
+        let body = try c.body(from: ["name": " small ", "vcpus": "2", "memory_mib": "2048", "disk_gib": "20", "description": ""])
+        #expect(body["name"]?.text == "small" && body["vcpus"]?.double == 2 && body["description"] == nil)   // trimmed, typed, empty optional left out
+        #expect(throws: ResourceCreate.Invalid.self) { try c.body(from: ["name": "", "vcpus": "2", "memory_mib": "1", "disk_gib": "1"]) }
+        #expect(throws: ResourceCreate.Invalid.self) { try c.body(from: ["name": "x", "vcpus": "two", "memory_mib": "1", "disk_gib": "1"]) }
+        #expect(throws: ResourceCreate.Invalid.self) { try c.body(from: ["name": "x", "vcpus": "-1", "memory_mib": "1", "disk_gib": "1"]) }
+        #expect(c.endpoint.resolvedPath == "/api/v1/platform/controller/api/v1/flavors" && c.endpoint.method == "POST")
+    }
+
+    @Test func serverGroupsAreDerivedFromTags() async throws {
+        MockProtocol.handler = { _ in (200, #"[{"name":"a","tags":["anti-affinity:db","x"]},{"name":"b","tags":["anti-affinity:db"]},{"name":"c","tags":["anti-affinity:web"]},{"name":"d","tags":[]}]"#) }
+        let spec = FeatureRegistry.spec("fc-servergroups")!
+        let rows = spec.rows(from: try await makeClient().load(spec))
+        #expect(rows.map(\.id) == ["0", "1"])
+        #expect(spec.columns.map { $0.render(rows[0]) } == ["db", "2", "a, b"] && spec.columns.map { $0.render(rows[1]) } == ["web", "1", "c"])
+    }
+
+    @Test func fanOutMergesChildrenAndToleratesOneFailure() async throws {
+        MockProtocol.handler = { req in
+            switch req.url!.path {
+            case "/api/v1/platform/controller/api/v1/vms": return (200, #"[{"id":"1","name":"a"},{"id":"2","name":"b"},{"id":"3","name":"c"}]"#)
+            case "/api/v1/platform/controller/api/v1/vms/1/port-forwards": return (200, #"[{"port":80},{"port":443}]"#)
+            case "/api/v1/platform/controller/api/v1/vms/2/port-forwards": return (404, "no")
+            default: return (200, #"{"items":[{"port":22}]}"#)
+            }
+        }
+        let spec = FeatureRegistry.spec("fc-portforwards")!
+        let rows = spec.rows(from: try await makeClient().load(spec))
+        #expect(rows.count == 3)
+        #expect(rows.map { $0.values["_parent"]?.text ?? "" } == ["a", "a", "c"])      // b failed and is skipped, order follows the parents
+        #expect(spec.effectiveColumns(for: rows).first?.title == "Parent")
+        MockProtocol.handler = { req in req.url!.path.hasSuffix("/vms") ? (200, #"[{"id":"1","name":"a"}]"#) : (500, "boom") }
+        await #expect(throws: MachinaError.self) { _ = try await makeClient().load(spec) }                // every child failed: report it
+    }
+
+    @Test func fleetCloudRegistry() {
+        let fc = FeatureRegistry.all.filter { $0.group == "Fleet Cloud" }
+        #expect(fc.count >= 17)
+        #expect(fc.filter { $0.create != nil }.map(\.id).sorted() == ["fc-flavors", "fc-keypairs", "fc-projects", "fc-volumes"])
+        #expect(fc.allSatisfy { $0.actions.allSatisfy { $0.method != "GET" } })
+    }
+}
