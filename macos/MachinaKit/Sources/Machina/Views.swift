@@ -78,7 +78,9 @@ struct MainWindow: View {
                 }
                 ForEach(FeatureRegistry.groups, id: \.name) { group in
                     Section(group.name) {
-                        ForEach(group.specs) { spec in Label(spec.title, systemImage: spec.icon).tag(SidebarItem.page(spec.id)) }
+                        ForEach(group.specs) { spec in
+                            Label(spec.title, systemImage: spec.icon).badge(spec.id == "approvals" ? model.pendingApprovals : 0).tag(SidebarItem.page(spec.id))
+                        }
                     }
                 }
                 Section("VMs") {
@@ -128,6 +130,12 @@ struct MainWindow: View {
             }
         }
         .onAppear { if model.selection == nil { model.selection = .fleet } }
+        .task {
+            while !Task.isCancelled {
+                await model.refreshApprovals()
+                try? await Task.sleep(nanoseconds: 30_000_000_000)
+            }
+        }
         .sheet(isPresented: $model.showPalette) { CommandPalette().environment(model) }
         .prompt($model.prompt)
         .confirm($model.pendingAction)

@@ -9,15 +9,18 @@ public struct ResourceAction: Hashable, Sendable, Identifiable {
     public var destructive: Bool
     public var controller: Bool
     public var bodyFields: [String: String]
+    public var query: [URLQueryItem]
+    public var staticBody: JSONValue?
     public var id: String { title }
     /// POST by default.
-    public init(_ title: String, _ path: String, destructive: Bool = false, controller: Bool = false, bodyFields: [String: String] = [:]) {
-        self.init(title, "POST", path, destructive: destructive, controller: controller, bodyFields: bodyFields)
+    public init(_ title: String, _ path: String, destructive: Bool = false, controller: Bool = false,
+                bodyFields: [String: String] = [:], query: [URLQueryItem] = [], staticBody: JSONValue? = nil) {
+        self.init(title, "POST", path, destructive: destructive, controller: controller, bodyFields: bodyFields, query: query, staticBody: staticBody)
     }
-    public init(_ title: String, _ method: String, _ path: String, destructive: Bool = false,
-                controller: Bool = false, bodyFields: [String: String] = [:]) {
+    public init(_ title: String, _ method: String, _ path: String, destructive: Bool = false, controller: Bool = false,
+                bodyFields: [String: String] = [:], query: [URLQueryItem] = [], staticBody: JSONValue? = nil) {
         self.title = title; self.method = method; self.path = path; self.destructive = destructive
-        self.controller = controller; self.bodyFields = bodyFields
+        self.controller = controller; self.bodyFields = bodyFields; self.query = query; self.staticBody = staticBody
     }
 
     /// nil when a placeholder has no value in the row (so a bad request is never sent).
@@ -27,18 +30,18 @@ public struct ResourceAction: Hashable, Sendable, Identifiable {
             out += rest[..<open]
             guard let close = rest[open...].firstIndex(of: "}") else { return nil }
             let key = String(rest[rest.index(after: open)..<close])
-            guard let v = row.values[key], v != .null else { return nil }
+            guard let v = row.values.value(at: key), v != .null else { return nil }
             out += MachinaClient.seg(v.text)
             rest = rest[rest.index(after: close)...]
         }
         out += rest
-        var body: JSONValue?
+        var body: JSONValue? = staticBody
         if !bodyFields.isEmpty {
-            var o: [String: JSONValue] = [:]
-            for (field, key) in bodyFields { guard let v = row.values[key] else { return nil }; o[field] = v }
+            var o: [String: JSONValue] = staticBody?.object ?? [:]
+            for (field, key) in bodyFields { guard let v = row.values.value(at: key) else { return nil }; o[field] = v }
             body = .object(o)
         }
-        return Endpoint(method, out, body: body, controller: controller)
+        return Endpoint(method, out, query: query, body: body, controller: controller)
     }
 }
 
@@ -56,7 +59,7 @@ public struct ResourceColumn: Hashable, Sendable, Identifiable {
     public init(_ title: String, _ key: String, _ format: Format = .text) { self.title = title; self.key = key; self.format = format }
 
     public func render(_ row: ResourceRow) -> String {
-        guard let v = row.values[key] else { return "–" }
+        guard let v = row.values.value(at: key) else { return "–" }
         switch format {
         case .text, .date: return v.text
         case .gigabytes: return v.double.map { String(format: "%.1f GB", $0) } ?? v.text
@@ -90,11 +93,17 @@ public struct ResourceSpec: Identifiable, Hashable, Sendable {
         var node: JSONValue? = json
         for k in rowsPath { node = node?[k] }
         if layout == .keyValue, let o = (node ?? json).object {
-            return o.keys.sorted().map { k in ResourceRow(id: k, values: .object(["key": .string(k), "value": o[k]!])) }
+            var flat: [(String, JSONValue)] = []
+            func walk(_ prefix: String, _ v: JSONValue, _ depth: Int) {
+                if depth < 2, let obj = v.object, !obj.isEmpty { for k in obj.keys.sorted() { walk(prefix + "." + k, obj[k]!, depth + 1) } }
+                else { flat.append((prefix, v)) }
+            }
+            for k in o.keys.sorted() { walk(k, o[k]!, 0) }
+            return flat.map { k, v in ResourceRow(id: k, values: .object(["key": .string(k), "value": v])) }
         }
         let items = node?.array ?? (node?.object != nil ? [node!] : [])
         return items.enumerated().map { i, v in
-            ResourceRow(id: idKey.flatMap { v[$0]?.text } ?? String(i), values: v)
+            ResourceRow(id: idKey.flatMap { v.value(at: $0)?.text } ?? String(i), values: v)
         }
     }
 

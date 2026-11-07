@@ -42,6 +42,51 @@ public enum FeatureRegistry {
                                .init("Delete", "DELETE", "/api/v1/backups/{id}", destructive: true)]),
         ResourceSpec("ha", "HA events", group: "Platform", icon: "arrow.triangle.2.circlepath", endpoint: .controllerGet("/api/v1/ha/status"), rowsPath: ["events"], idKey: "id",
                      columns: [.init("Time", "created_at", .date), .init("Action", "action"), .init("Message", "message"), .init("Host", "host_id")]),
+
+        // Containers (Vessel: Podman/Docker on the host)
+        ResourceSpec("vessel", "Container engine", group: "Containers", icon: "shippingbox", endpoint: .get("/api/v1/vessel/status"), layout: .keyValue),
+        ResourceSpec("containers", "Containers", group: "Containers", icon: "shippingbox.fill", endpoint: .get("/api/v1/vessel/containers"), rowsPath: ["items"], idKey: "id",
+                     columns: [.init("Name", "name"), .init("Image", "image"), .init("State", "state"), .init("Status", "status"), .init("Created", "created", .date)],
+                     actions: [.init("Start", "/api/v1/vessel/containers/{id}/start"),
+                               .init("Stop", "/api/v1/vessel/containers/{id}/stop", destructive: true),
+                               .init("Restart", "/api/v1/vessel/containers/{id}/restart", destructive: true),
+                               .init("Remove", "DELETE", "/api/v1/vessel/containers/{id}", destructive: true, query: [.init(name: "force", value: "false")])]),
+        ResourceSpec("pods", "Pods (Podman)", group: "Containers", icon: "square.stack.3d.up", endpoint: .get("/api/v1/vessel/pods"), rowsPath: ["items"], idKey: "id"),
+
+        // Kubernetes (read-only; the cluster the daemon's kubeconfig reaches)
+        ResourceSpec("k8s-overview", "Cluster overview", group: "Kubernetes", icon: "helm", endpoint: .get("/api/v1/k8s/overview"), layout: .keyValue),
+        ResourceSpec("k8s-nodes", "Nodes", group: "Kubernetes", icon: "server.rack", endpoint: .get("/api/v1/k8s/nodes"), idKey: "name",
+                     columns: [.init("Name", "name"), .init("Roles", "roles"), .init("Ready", "ready"), .init("Kubelet", "kubelet_version"),
+                               .init("OS", "os_image"), .init("Kernel", "kernel_version"), .init("Runtime", "container_runtime")]),
+        ResourceSpec("k8s-namespaces", "Namespaces", group: "Kubernetes", icon: "folder", endpoint: .get("/api/v1/k8s/namespaces"), rowsPath: ["items"], idKey: "metadata.name",
+                     columns: [.init("Name", "metadata.name"), .init("Phase", "status.phase"), .init("Created", "metadata.creationTimestamp", .date)]),
+        ResourceSpec("k8s-pods", "Pods (Kubernetes)", group: "Kubernetes", icon: "cube", endpoint: .get("/api/v1/k8s/pods"), rowsPath: ["items"], idKey: "metadata.uid",
+                     columns: [.init("Name", "metadata.name"), .init("Namespace", "metadata.namespace"), .init("Phase", "status.phase"),
+                               .init("Node", "spec.nodeName"), .init("Pod IP", "status.podIP"), .init("Created", "metadata.creationTimestamp", .date)]),
+        ResourceSpec("k8s-deployments", "Deployments", group: "Kubernetes", icon: "square.stack.3d.forward.dottedline", endpoint: .get("/api/v1/k8s/deployments"), rowsPath: ["items"], idKey: "metadata.uid",
+                     columns: [.init("Name", "metadata.name"), .init("Namespace", "metadata.namespace"), .init("Ready", "status.readyReplicas"),
+                               .init("Desired", "spec.replicas"), .init("Created", "metadata.creationTimestamp", .date)]),
+        ResourceSpec("k8s-services", "Services", group: "Kubernetes", icon: "point.3.connected.trianglepath.dotted", endpoint: .get("/api/v1/k8s/services"), rowsPath: ["items"], idKey: "metadata.uid",
+                     columns: [.init("Name", "metadata.name"), .init("Namespace", "metadata.namespace"), .init("Type", "spec.type"),
+                               .init("Cluster IP", "spec.clusterIP"), .init("Created", "metadata.creationTimestamp", .date)]),
+        ResourceSpec("k8s-events", "Events", group: "Kubernetes", icon: "text.bubble", endpoint: .get("/api/v1/k8s/events"), rowsPath: ["items"], idKey: "metadata.uid",
+                     columns: [.init("Last seen", "lastTimestamp", .date), .init("Type", "type"), .init("Reason", "reason"), .init("Object", "involvedObject.name"),
+                               .init("Count", "count"), .init("Message", "message")]),
+
+        // Controller: placement, access and security
+        ResourceSpec("drs", "DRS consolidation", group: "Control plane", icon: "scale.3d", endpoint: .controllerGet("/api/v1/drs/consolidation"), layout: .keyValue),
+        ResourceSpec("users", "Users", group: "Control plane", icon: "person.2", endpoint: .controllerGet("/api/v1/users"), idKey: "id",
+                     columns: [.init("User", "username"), .init("Role", "role"), .init("Created", "created_at", .date)]),
+        ResourceSpec("apikeys", "API keys", group: "Control plane", icon: "key", endpoint: .controllerGet("/api/v1/api-keys"), idKey: "id"),
+        ResourceSpec("secgroups", "Security groups", group: "Control plane", icon: "lock.shield", endpoint: .controllerGet("/api/v1/security-groups"), idKey: "id"),
+        ResourceSpec("fw-targets", "Firewall targets", group: "Control plane", icon: "flame", endpoint: .controllerGet("/api/v1/zeus-firewall/overview"), rowsPath: ["targets"], idKey: "id",
+                     columns: [.init("Name", "name"), .init("Kind", "kind"), .init("Backend", "backend"), .init("Profile", "profile"), .init("Enabled", "enabled"),
+                               .init("Risk", "risk"), .init("Score", "score"), .init("Open ports", "open_ports"), .init("Blocked today", "blocked_today")]),
+        ResourceSpec("approvals", "Firewall approvals", group: "Control plane", icon: "checkmark.seal", endpoint: .controllerGet("/api/v1/zeus-firewall/approvals"), idKey: "id",
+                     columns: [.init("Requested", "created_at", .date), .init("Target", "target_kind"), .init("Profile", "profile"), .init("Status", "status"),
+                               .init("By", "requested_by"), .init("Reviewed by", "reviewed_by"), .init("Note", "review_note")],
+                     actions: [.init("Approve", "/api/v1/zeus-firewall/approvals/{id}/approve", destructive: true, controller: true, staticBody: .object([:])),
+                               .init("Reject", "/api/v1/zeus-firewall/approvals/{id}/reject", destructive: true, controller: true, staticBody: .object([:]))]),
     ]
 
     public static func spec(_ id: String) -> ResourceSpec? { all.first { $0.id == id } }

@@ -352,3 +352,38 @@ extension ClientTests {
         #expect(cap.lines.count == 3)
     }
 }
+
+extension ClientTests {
+    @Test func dottedPathsAndFlattening() throws {
+        let json = try JSONDecoder().decode(JSONValue.self, from: Data(#"{"items":[{"metadata":{"name":"p","uid":"u1"},"status":{"phase":"Running"}}],"a":{"b":{"c":1,"d":{"e":2}},"f":"x"},"l":[1]}"#.utf8))
+        let spec = ResourceSpec("t", "T", group: "g", icon: "i", endpoint: .get("/x"), rowsPath: ["items"], idKey: "metadata.uid",
+                                columns: [.init("Name", "metadata.name"), .init("Phase", "status.phase"), .init("Missing", "status.nope")])
+        let rows = spec.rows(from: json)
+        #expect(rows[0].id == "u1")
+        #expect(spec.columns.map { $0.render(rows[0]) } == ["p", "Running", "–"])
+        let kv = ResourceSpec("k", "K", group: "g", icon: "i", endpoint: .get("/x"), layout: .keyValue).rows(from: json)
+        // Objects are expanded two levels; deeper values stay as one cell.
+        #expect(kv.map(\.id) == ["a.b.c", "a.b.d", "a.f", "items", "l"])
+    }
+
+    @Test func actionQueryAndStaticBody() {
+        let row = ResourceRow(id: "0", values: .object(["id": .string("abc"), "name": .string("n")]))
+        let rm = ResourceAction("Remove", "DELETE", "/api/v1/vessel/containers/{id}", destructive: true, query: [.init(name: "force", value: "false")])
+        let e = rm.endpoint(for: row)
+        #expect(e?.method == "DELETE" && e?.path == "/api/v1/vessel/containers/abc" && e?.query == [.init(name: "force", value: "false")])
+        let ap = ResourceAction("Approve", "/api/v1/zeus-firewall/approvals/{id}/approve", controller: true, staticBody: .object([:]))
+        #expect(ap.endpoint(for: row)?.body == .object([:]) && ap.endpoint(for: row)?.resolvedPath.hasPrefix("/api/v1/platform/controller/") == true)
+    }
+
+    @Test func newPendingApprovalsOnlyAfterFirstPoll() {
+        let now = [(id: "a", status: "pending"), (id: "b", status: "approved"), (id: "c", status: "Pending")]
+        #expect(Approvals.newPending(seen: nil, current: now).isEmpty)                       // first poll: stay quiet
+        #expect(Approvals.newPending(seen: ["a"], current: now) == ["c"])                   // b is not pending, a already seen
+    }
+
+    @Test func registryHasPhase5Pages() {
+        let ids = Set(FeatureRegistry.all.map(\.id))
+        #expect(["containers", "k8s-pods", "k8s-events", "approvals", "users", "fw-targets", "drs"].allSatisfy(ids.contains))
+        #expect(FeatureRegistry.spec("approvals")?.actions.map(\.title) == ["Approve", "Reject"])
+    }
+}

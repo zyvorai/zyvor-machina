@@ -27,6 +27,12 @@ public enum JSONValue: Codable, Hashable, Sendable {
     }
 
     public subscript(key: String) -> JSONValue? { if case .object(let o) = self { return o[key] }; return nil }
+    /// Dotted lookup, e.g. `metadata.name` or `status.phase`; a missing step gives nil.
+    public func value(at path: String) -> JSONValue? {
+        var node: JSONValue? = self
+        for k in path.split(separator: ".") { node = node?[String(k)] }
+        return node
+    }
     public var array: [JSONValue]? { if case .array(let a) = self { return a }; return nil }
     public var object: [String: JSONValue]? { if case .object(let o) = self { return o }; return nil }
     public var isScalar: Bool { switch self { case .array, .object: false; default: true } }
@@ -41,7 +47,7 @@ public enum JSONValue: Codable, Hashable, Sendable {
         case .bool(let b): return b ? "yes" : "no"
         case .number(let n): return n == n.rounded() && abs(n) < 1e15 ? String(Int64(n)) : String(format: "%g", n)
         case .string(let s): return s
-        case .array(let a): return a.allSatisfy(\.isScalar) && a.count <= 4 ? a.map(\.text).joined(separator: ", ") : "\(a.count) items"
+        case .array(let a): return a.isEmpty ? "–" : a.allSatisfy(\.isScalar) && a.count <= 4 ? a.map(\.text).joined(separator: ", ") : "\(a.count) items"
         case .object(let o): return "{\(o.count) keys}"
         }
     }

@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import MachinaKit
 import UserNotifications
+import AppKit
 
 enum SidebarItem: Hashable { case fleet, tasks, alerts, vm(String), page(String) }
 
@@ -35,6 +36,9 @@ final class AppModel {
     var prompt: PromptRequest?
     var pendingAction: PendingAction?
     var notice: String?
+    var pendingApprovals = 0
+    private var seenApprovals: Set<String>?
+    private let notifications = NotificationDelegate()
 
     func api() throws -> MachinaClient {
         guard let client else { throw MachinaError.unauthenticated }
@@ -91,7 +95,16 @@ final class AppModel {
             await refresh()
             phase = .ready
             startWatching(c)
-            _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+            notifications.model = self
+            let center = UNUserNotificationCenter.current()
+            center.delegate = notifications
+            // Review opens the app on the approvals page. Reject (the safe direction) needs the Mac to be unlocked;
+            // approving stays in the app, behind a confirmation, because a banner does not show the plan.
+            center.setNotificationCategories([UNNotificationCategory(identifier: "APPROVAL", actions: [
+                UNNotificationAction(identifier: "REVIEW", title: "Review", options: [.foreground]),
+                UNNotificationAction(identifier: "REJECT", title: "Reject", options: [.authenticationRequired, .destructive]),
+            ], intentIdentifiers: [], options: [])])
+            _ = try? await center.requestAuthorization(options: [.alert, .sound])
         } catch {
             self.error = error.localizedDescription
             phase = .signedOut
@@ -101,8 +114,30 @@ final class AppModel {
     func signOut() async {
         watchTask?.cancel(); watchTask = nil
         await client?.logout()
-        client = nil; role = nil; vms = []; hosts = []; tasks = []; alerts = []; metrics = nil
+        client = nil; seenApprovals = nil; pendingApprovals = 0; role = nil; vms = []; hosts = []; tasks = []; alerts = []; metrics = nil
         platformLoaded = false; selection = nil; live = false; phase = .signedOut
+    }
+
+    /// Polled every 30 s while signed in: updates the sidebar badge and notifies for requests that appeared since the last poll.
+    func refreshApprovals() async {
+        guard phase == .ready, let client, let pending = try? await client.pendingApprovals() else { return }
+        pendingApprovals = pending.count
+        let fresh = Approvals.newPending(seen: seenApprovals, current: pending.map { ($0.id, "pending") })
+        seenApprovals = Set(pending.map(\.id))
+        for id in fresh {
+            let content = UNMutableNotificationContent()
+            content.title = "Firewall change needs approval"
+            content.body = pending.first { $0.id == id }?.summary ?? ""
+            content.categoryIdentifier = "APPROVAL"
+            content.userInfo = ["approvalId": id]
+            try? await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "approval-\(id)", content: content, trigger: nil))
+        }
+    }
+
+    func rejectApproval(_ id: String) async {
+        if await perform("Reject approval", { _ = try await $0.call(Endpoint("POST", "/api/v1/zeus-firewall/approvals/\(MachinaClient.seg(id))/reject", body: .object([:]), controller: true)) }) {
+            notice = "Rejected approval request"; await refreshApprovals()
+        }
     }
 
     /// Generic read for registry pages (`ResourceListView`).
@@ -197,6 +232,23 @@ final class AppModel {
             content.body = "\(ch.oldState ?? "?") → \(ch.newState ?? "?")"
             UNUserNotificationCenter.current().add(
                 UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
+        }
+    }
+}
+
+/// Handles taps and actions on approval notifications. Delegate callbacks arrive off the main actor.
+final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
+    @MainActor weak var model: AppModel?
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent n: UNNotification) async -> UNNotificationPresentationOptions { [.banner, .sound] }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        guard let id = response.notification.request.content.userInfo["approvalId"] as? String else { return }
+        let action = response.actionIdentifier
+        await MainActor.run {
+            guard let model else { return }
+            if action == "REJECT" { Task { await model.rejectApproval(id) } }
+            else { model.selection = .page("approvals"); NSApp.activate(ignoringOtherApps: true) }
         }
     }
 }
