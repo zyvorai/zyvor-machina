@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import MachinaKit
 
 /// Renders any `ResourceSpec`: loads its endpoint, refreshes every 15 s, filters, and shows the
@@ -35,6 +36,17 @@ struct ResourceListView: View {
                         .disabled(selected == nil || !model.canWrite)
                         .help(model.canWrite ? "" : "Your role cannot make changes")
                 }
+                Menu {
+                    Button("Export CSV…") { exportPage(csv: true) }
+                    Button("Export JSON…") { exportPage(csv: false) }
+                    Divider()
+                    Button("Copy as curl") { model.copyCurl(spec.endpoint, "curl for \(spec.title)") }
+                    if let r = selected {
+                        ForEach(spec.actions.filter { $0.endpoint(for: r) != nil }) { act in
+                            Button("Copy curl: \(act.title) selected row") { if let e = act.endpoint(for: r) { model.copyCurl(e, "curl for \(act.title)") } }
+                        }
+                    }
+                } label: { Image(systemName: "square.and.arrow.up") }.menuStyle(.borderlessButton).fixedSize().help("Export or copy as curl")
                 if spec.layout == .table {
                     Toggle(isOn: $inspect) { Image(systemName: "sidebar.right") }.toggleStyle(.button).help("Show details")
                 }
@@ -68,6 +80,9 @@ struct ResourceListView: View {
                 ContentUnavailableView("Select a row", systemImage: "cursorarrow.click").inspectorColumnWidth(min: 240, ideal: 300)
             }
         }
+        .onChange(of: rows) { model.page = PageContext(spec: spec, columns: columns, rows: filtered) }
+        .onChange(of: search) { model.page = PageContext(spec: spec, columns: columns, rows: filtered) }
+        .onDisappear { if model.page?.spec.id == spec.id { model.page = nil } }
         .task(id: spec.id) {
             await load()
             while !Task.isCancelled {
@@ -76,6 +91,16 @@ struct ResourceListView: View {
                 await load()
             }
         }
+    }
+
+    /// Saves the rows currently shown (after the filter) with a save panel; JSON keeps every field, CSV the visible columns.
+    private func exportPage(csv: Bool) {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = ResourceExport.fileName(spec.title, ext: csv ? "csv" : "json")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let text = csv ? ResourceExport.csv(columns: columns, rows: filtered) : ResourceExport.json(rows: filtered)
+        do { try text.write(to: url, atomically: true, encoding: .utf8); model.notice = "Exported \(filtered.count) rows to \(url.lastPathComponent)" }
+        catch { model.error = "Export failed: \(error.localizedDescription)" }
     }
 
     private func openCreate(_ c: ResourceCreate) {
@@ -109,40 +134,4 @@ struct ResourceListView: View {
         }
         loaded = true
     }
-}
-
-/// Cmd-K: jump to any page, fleet view or VM.
-struct CommandPalette: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
-    @State private var query = ""
-
-    private struct Entry: Identifiable { var id: String; var title: String; var detail: String; var icon: String; var item: SidebarItem }
-
-    private var entries: [Entry] {
-        var e: [Entry] = [
-            .init(id: "fleet", title: "Fleet", detail: "Overview", icon: "server.rack", item: .fleet),
-            .init(id: "tasks", title: "Tasks", detail: "Overview", icon: "checklist", item: .tasks),
-            .init(id: "alerts", title: "Alerts", detail: "Overview", icon: "bell", item: .alerts),
-        ]
-        e += FeatureRegistry.all.map { .init(id: "p-" + $0.id, title: $0.title, detail: $0.group, icon: $0.icon, item: .page($0.id)) }
-        e += model.vms.map { .init(id: "vm-" + $0.name, title: $0.name, detail: "VM · \($0.state)", icon: "desktopcomputer", item: .vm($0.name)) }
-        return query.isEmpty ? e : e.filter { $0.title.localizedCaseInsensitiveContains(query) || $0.detail.localizedCaseInsensitiveContains(query) }
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            TextField("Go to…", text: $query).textFieldStyle(.plain).font(.title3).padding(14)
-                .onSubmit { if let f = entries.first { go(f.item) } }
-            Divider()
-            List(entries) { e in
-                Button { go(e.item) } label: {
-                    HStack { Label(e.title, systemImage: e.icon); Spacer(); Text(e.detail).foregroundStyle(.secondary).font(.caption) }
-                }.buttonStyle(.plain)
-            }
-        }
-        .frame(width: 520, height: 380)
-    }
-
-    private func go(_ item: SidebarItem) { model.selection = item; dismiss() }
 }

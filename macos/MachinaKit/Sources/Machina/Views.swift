@@ -19,14 +19,13 @@ struct StateBadge: View {
 
 struct MainWindow: View {
     @Environment(AppModel.self) private var model
-    @State private var search = ""
     @State private var confirmStop: VmInfo?
-    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openWindow) var openWindow
     // Long sections start collapsed; the Cmd-K palette reaches every page regardless.
     @State private var collapsed: Set<String> = ["Containers", "Kubernetes", "Control plane", "Security", "Fleet security", "Bare metal", "Insight", "Storage & network", "Fleet Cloud"]
 
     private var filtered: [VmInfo] {
-        search.isEmpty ? model.vms : model.vms.filter { $0.name.localizedCaseInsensitiveContains(search) }
+        VMFilter(model.vmQuery).apply(to: model.vms)
     }
     private var selectedVM: VmInfo? {
         if case .vm(let n) = model.selection { return model.vms.first { $0.name == n } }
@@ -53,19 +52,13 @@ struct MainWindow: View {
                         }
                     }
                 }
-                Section("VMs") {
-                    ForEach(filtered) { vm in
-                        HStack {
-                            Text(vm.name)
-                            Spacer()
-                            Image(systemName: "circle.fill").font(.caption2)
-                                .foregroundStyle(vm.isRunning ? .green : .gray)
-                        }.tag(SidebarItem.vm(vm.name))
-                        .contextMenu { Button("Open in New Window") { openWindow(id: "vm-window", value: vm.name) } }
-                    }
+                let split = Pins.split(filtered, pins: model.pins)
+                if !split.pinned.isEmpty {
+                    Section("Pinned") { ForEach(split.pinned) { vmRow($0, tagPrefix: "pin") } }
                 }
+                Section("VMs") { ForEach(split.others) { vmRow($0, tagPrefix: "vm") } }
             }
-            .searchable(text: $search, placement: .sidebar, prompt: "Search VMs")
+            .searchable(text: $model.vmQuery, placement: .sidebar, prompt: "Search VMs (is:running vcpus>=4)")
             .navigationSplitViewColumnWidth(min: 200, ideal: 240)
             .safeAreaInset(edge: .bottom) {
                 HStack {
@@ -108,12 +101,26 @@ struct MainWindow: View {
             }
         }
         .sheet(isPresented: $model.showPalette) { CommandPalette().environment(model) }
+        .sheet(isPresented: $model.showBulk) { BulkActionsSheet().environment(model) }
+        .sheet(isPresented: $model.showShortcuts) { ShortcutsSheet() }
         .prompt($model.prompt)
         .confirm($model.pendingAction)
-        .background { Button("") { model.showPalette = true }.keyboardShortcut("k", modifiers: .command).opacity(0) }
         .toolbar {
             ToolbarItem { Button { Task { await model.presentCreateVM() } } label: { Image(systemName: "plus") }.help("New VM").disabled(!model.canWrite) }
             ToolbarItem { Button { Task { await model.refresh(); await model.refreshPlatform() } } label: { Image(systemName: "arrow.clockwise") } }
+            ToolbarItem { Button { model.showBulk = true } label: { Image(systemName: "checklist.checked") }.help("Bulk actions on VMs (⇧⌘B)") }
+            ToolbarItem {
+                Menu {
+                    if model.savedFilters.isEmpty { Text("No saved filters") }
+                    ForEach(model.savedFilters) { f in Button("\(f.name)  ·  \(f.query)") { model.vmQuery = f.query } }
+                    Divider()
+                    Button("Save Current Filter…") { model.saveCurrentFilter() }
+                    Button("Clear Filter") { model.vmQuery = "" }.disabled(model.vmQuery.isEmpty)
+                    if !model.savedFilters.isEmpty {
+                        Menu("Delete Saved Filter") { ForEach(model.savedFilters) { f in Button(f.name, role: .destructive) { model.savedFilters.removeAll { $0.name == f.name } } } }
+                    }
+                } label: { Image(systemName: "line.3.horizontal.decrease.circle") }.help("Saved VM filters")
+            }
             ToolbarItem {
                 Menu {
                     ForEach(model.servers) { p in
@@ -143,6 +150,25 @@ struct MainWindow: View {
                         .lineLimit(4).onTapGesture { model.error = nil }
                 }
             }.padding()
+        }
+    }
+}
+
+extension MainWindow {
+    /// One sidebar VM row; the tag prefix keeps a pinned VM's two possible rows distinct (it only appears once).
+    @ViewBuilder func vmRow(_ vm: VmInfo, tagPrefix: String) -> some View {
+        HStack {
+            if model.pins.contains(vm.name) { Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.orange) }
+            Text(vm.name)
+            Spacer()
+            Image(systemName: "circle.fill").font(.caption2).foregroundStyle(vm.isRunning ? .green : .gray)
+        }.tag(SidebarItem.vm(vm.name))
+        .contextMenu {
+            Button(model.pins.contains(vm.name) ? "Unpin" : "Pin to Top") { model.togglePin(vm.name) }
+            Button("Open in New Window") { openWindow(id: "vm-window", value: vm.name) }
+            Divider()
+            Button("Copy Name") { model.copyToPasteboard(vm.name, vm.name) }
+            Button("Copy Details as curl") { model.copyCurl(Endpoint("GET", "/api/v1/vms/\(MachinaClient.seg(vm.name))", query: vm.scopeQuery)) }
         }
     }
 }
@@ -186,7 +212,7 @@ struct VMOverview: View {
 
 struct MenuBarContent: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openWindow) var openWindow
 
     var body: some View {
         if model.phase != .ready {
