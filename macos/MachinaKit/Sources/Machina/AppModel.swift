@@ -4,6 +4,13 @@ import MachinaKit
 import UserNotifications
 import AppKit
 
+/// What the on-screen resource page exposes to menu commands.
+struct PageContext {
+    var spec: ResourceSpec
+    var columns: [ResourceColumn]
+    var rows: [ResourceRow]
+}
+
 enum SidebarItem: Hashable { case fleet, tasks, alerts, vm(String), page(String), insight(InsightPage) }
 
 @MainActor @Observable
@@ -44,6 +51,62 @@ final class AppModel {
     var role: String?
     var canWrite: Bool { role == "admin" || role == "operator" }
     var showPalette = false
+    var showShortcuts = false
+    var showBulk = false
+
+    // Productivity state, kept in UserDefaults per Mac (names only; nothing secret).
+    var pins: [String] = UserDefaults.standard.stringArray(forKey: "pinnedVMs") ?? [] { didSet { UserDefaults.standard.set(pins, forKey: "pinnedVMs") } }
+    var recents: [String] = UserDefaults.standard.stringArray(forKey: "paletteRecents") ?? [] { didSet { UserDefaults.standard.set(recents, forKey: "paletteRecents") } }
+    var savedFilters: [SavedFilter] = (UserDefaults.standard.data(forKey: "savedFilters")).flatMap { try? JSONDecoder().decode([SavedFilter].self, from: $0) } ?? [] {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(savedFilters), forKey: "savedFilters") }
+    }
+    /// The sidebar's VM filter text (name words plus `is:running`, `vcpus>=4`, …).
+    var vmQuery = ""
+    /// The resource page on screen, so menu shortcuts can export it or copy its request as curl.
+    var page: PageContext?
+
+    func togglePin(_ name: String) { pins = Pins.toggling(name, in: pins) }
+    func remember(_ id: String) { recents = Recents.pushing(id, onto: recents) }
+    func saveCurrentFilter() {
+        guard !VMFilter(vmQuery).isEmpty else { error = "Type a filter in the sidebar first (for example is:running vcpus>=4)."; return }
+        ask("Save VM filter", message: vmQuery, submit: "Save", fields: [PromptField(id: "name", label: "Name")]) { [self] v in
+            savedFilters = SavedFilter.saving(SavedFilter(name: v["name"] ?? "", query: vmQuery), into: savedFilters)
+            notice = "Filter saved"
+        }
+    }
+
+    func copyToPasteboard(_ text: String, _ what: String) {
+        NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
+        notice = "Copied \(what)"
+    }
+    func copyCurl(_ e: Endpoint, _ what: String = "curl command") {
+        guard client != nil, let url = URL(string: serverURL.trimmingCharacters(in: .whitespaces)) else { return }
+        copyToPasteboard(Curl.script(e, server: url), what)
+    }
+
+    /// Runs one bulk action over the VMs it applies to, one at a time so a failure names the VM.
+    /// Goes through the same role gate and confirmation as single actions.
+    func bulk(_ action: BulkAction, on vms: [VmInfo]) {
+        guard canWrite else { error = "\(action.title): your role (\(role ?? "unknown")) cannot make changes"; return }
+        let plan = action.plan(vms)
+        guard !plan.apply.isEmpty else { error = "\(action.title): none of the selected VMs can do that right now."; return }
+        let names = plan.apply.map(\.name).joined(separator: ", ")
+        let skipped = plan.skip.isEmpty ? "" : " Skipped (wrong state): \(plan.skip.map(\.name).joined(separator: ", "))."
+        confirmAction("\(action.title) \(plan.apply.count) VM\(plan.apply.count == 1 ? "" : "s")?", message: names + "." + skipped,
+                      label: action.title, destructive: action.destructive) { [self] in
+            var failed: [String] = []
+            let snap = BulkAction.snapshotName(at: Date())
+            for vm in plan.apply {
+                let ok = await perform("\(action.title) \(vm.name)") { c in
+                    if let p = action.power { try await c.power(p, vm: vm) } else { try await c.createSnapshot(vm, name: snap, description: "Bulk snapshot from Machina for Mac") }
+                }
+                if !ok { failed.append(vm.name) }
+            }
+            if failed.isEmpty { notice = "\(action.title): \(plan.apply.count) done"; error = nil }
+            else { error = "\(action.title) failed for \(failed.joined(separator: ", "))" }
+            await refresh()
+        }
+    }
 
     // Saved servers (without passwords: those live in the Keychain, certificate pins too).
     var servers: [ServerProfile] = {

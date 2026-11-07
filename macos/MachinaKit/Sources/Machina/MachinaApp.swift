@@ -46,6 +46,7 @@ struct MachinaApp: App {
                 if let name = SpotlightIndexer.vmName(from: activity) { model.open(.vm(name)) }
             }
         }
+        .commands { MachinaCommands(model: model) }
         // One VM per window: opened from the sidebar's context menu.
         WindowGroup("VM", id: "vm-window", for: String.self) { $name in
             VMWindow(name: name ?? "").environment(model)
