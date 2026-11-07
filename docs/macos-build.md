@@ -68,3 +68,7 @@ Or use the remote UX scripts documented in [ux-e2e-coverage.md](ux-e2e-coverage.
 | `deploy-remote.sh` / `package-binary-remote.sh` (SSH to Linux) | Install libvirt on macOS “for local dev” |
 
 **Compile remote. Ship from Linux.**
+
+## macOS app
+
+The native SwiftUI client lives in `macos/` (see `macos/README.md`). It builds on macOS only: `macos/scripts/bundle.sh debug`.

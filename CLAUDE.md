@@ -52,6 +52,13 @@ make && sudo make deploy     # manual equivalent
 ./scripts/deploy-remote.sh user@host --remote-build   # build on remote Linux host
 ```
 
+### macOS app (macOS only)
+```bash
+macos/scripts/bundle.sh debug   # build macos/build/Machina.app (swiftc, no SwiftPM)
+cd macos/MachinaKit && swift test
+```
+Native SwiftUI client over the daemon REST/WS API (`macos/README.md`).
+
 ### Dev mode (no install, Linux only)
 ```bash
 ./target/debug/machina-daemon    # daemon on :5092
