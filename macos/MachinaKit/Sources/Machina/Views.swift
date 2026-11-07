@@ -59,12 +59,23 @@ struct MainWindow: View {
     private var filtered: [VmInfo] {
         search.isEmpty ? model.vms : model.vms.filter { $0.name.localizedCaseInsensitiveContains(search) }
     }
-    private var selected: VmInfo? { model.vms.first { $0.name == model.selection } }
+    private var selectedVM: VmInfo? {
+        if case .vm(let n) = model.selection { return model.vms.first { $0.name == n } }
+        return nil
+    }
+    private var wantsPlatform: Bool {
+        switch model.selection { case .fleet, .tasks, .alerts: true; default: false }
+    }
 
     var body: some View {
         @Bindable var model = model
         NavigationSplitView {
             List(selection: $model.selection) {
+                Section("Overview") {
+                    Label("Fleet", systemImage: "server.rack").tag(SidebarItem.fleet)
+                    Label("Tasks", systemImage: "checklist").tag(SidebarItem.tasks)
+                    Label("Alerts", systemImage: "bell").badge(model.unackedAlerts).tag(SidebarItem.alerts)
+                }
                 Section("VMs") {
                     ForEach(filtered) { vm in
                         HStack {
@@ -72,11 +83,11 @@ struct MainWindow: View {
                             Spacer()
                             Image(systemName: "circle.fill").font(.caption2)
                                 .foregroundStyle(vm.isRunning ? .green : .gray)
-                        }.tag(vm.name)
+                        }.tag(SidebarItem.vm(vm.name))
                     }
                 }
             }
-            .searchable(text: $search, placement: .sidebar)
+            .searchable(text: $search, placement: .sidebar, prompt: "Search VMs")
             .navigationSplitViewColumnWidth(min: 200, ideal: 240)
             .safeAreaInset(edge: .bottom) {
                 HStack {
@@ -87,14 +98,29 @@ struct MainWindow: View {
                 }.padding(10)
             }
         } detail: {
-            if let vm = selected {
-                VMDetail(vm: vm, confirmStop: $confirmStop)
-            } else {
-                ContentUnavailableView("Select a VM", systemImage: "server.rack")
+            switch model.selection {
+            case .fleet: FleetView()
+            case .tasks: TasksView()
+            case .alerts: AlertsView()
+            case .vm: if let vm = selectedVM { VMDetail(vm: vm, confirmStop: $confirmStop) }
+                      else { ContentUnavailableView("VM not found", systemImage: "server.rack") }
+            case nil: ContentUnavailableView("Select an item", systemImage: "sidebar.left")
             }
         }
+        // Poll the platform endpoints every 10 s while a fleet/tasks/alerts page is open,
+        // and once at start so the Alerts badge is filled in.
+        .task(id: wantsPlatform) {
+            await model.refreshPlatform()
+            guard wantsPlatform else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
+                if Task.isCancelled { break }
+                await model.refreshPlatform()
+            }
+        }
+        .onAppear { if model.selection == nil { model.selection = .fleet } }
         .toolbar {
-            ToolbarItem { Button { Task { await model.refresh() } } label: { Image(systemName: "arrow.clockwise") } }
+            ToolbarItem { Button { Task { await model.refresh(); await model.refreshPlatform() } } label: { Image(systemName: "arrow.clockwise") } }
             ToolbarItem { Button("Sign Out") { Task { await model.signOut() } } }
         }
         .confirmationDialog("Force stop \(confirmStop?.name ?? "")?", isPresented: .constant(confirmStop != nil),

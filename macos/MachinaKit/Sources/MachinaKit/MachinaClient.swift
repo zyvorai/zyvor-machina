@@ -41,7 +41,7 @@ public actor MachinaClient {
         return u
     }
 
-    private func send(_ method: String, _ path: String, query: [URLQueryItem] = [],
+    func send(_ method: String, _ path: String, query: [URLQueryItem] = [],
                       body: Data? = nil, retry: Bool = true) async throws -> Data {
         var req = URLRequest(url: try url(path, query))
         req.httpMethod = method

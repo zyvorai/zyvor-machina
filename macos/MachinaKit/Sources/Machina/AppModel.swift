@@ -3,6 +3,8 @@ import Observation
 import MachinaKit
 import UserNotifications
 
+enum SidebarItem: Hashable { case fleet, tasks, alerts, vm(String) }
+
 @MainActor @Observable
 final class AppModel {
     enum Phase { case signedOut, connecting, ready }
@@ -12,7 +14,16 @@ final class AppModel {
     var error: String?
     var live = false
     var pendingFingerprint: String?
-    var selection: String?
+    var selection: SidebarItem?
+
+    // Fleet / tasks / alerts (controller + fleet endpoints)
+    var hosts: [PlatformHost] = []
+    var tasks: [PlatformTask] = []
+    var alerts: [FleetAlert] = []
+    var unackedAlerts = 0
+    var metrics: LocalMetrics?
+    var platformError: String?
+    var platformLoaded = false
 
     var serverURL: String = UserDefaults.standard.string(forKey: "serverURL") ?? "https://"
     var username: String = UserDefaults.standard.string(forKey: "username") ?? ""
@@ -55,12 +66,45 @@ final class AppModel {
     func signOut() async {
         watchTask?.cancel(); watchTask = nil
         await client?.logout()
-        client = nil; vms = []; live = false; phase = .signedOut
+        client = nil; vms = []; hosts = []; tasks = []; alerts = []; metrics = nil
+        platformLoaded = false; selection = nil; live = false; phase = .signedOut
     }
 
     func refresh() async {
         guard let client else { return }
         do { vms = try await client.listVMs() } catch { self.error = error.localizedDescription }
+    }
+
+    /// Loads hosts, tasks, metrics and alerts independently so one failing endpoint
+    /// (e.g. a controller that is down) does not blank the others.
+    func refreshPlatform() async {
+        guard let client else { return }
+        async let h = capture { try await client.hosts() }
+        async let t = capture { try await client.tasks() }
+        async let m = capture { try await client.localMetrics() }
+        async let a = capture { try await client.alerts() }
+        let (hr, tr, mr, ar) = await (h, t, m, a)
+        var errors: [String] = []
+        switch hr { case .success(let v): hosts = v; case .failure(let e): errors.append("hosts: \(e.localizedDescription)") }
+        switch tr { case .success(let v): tasks = v; case .failure(let e): errors.append("tasks: \(e.localizedDescription)") }
+        switch mr { case .success(let v): metrics = v; case .failure(let e): errors.append("metrics: \(e.localizedDescription)") }
+        switch ar { case .success(let v): alerts = v.alerts; unackedAlerts = v.totalUnacknowledged
+                    case .failure(let e): errors.append("alerts: \(e.localizedDescription)") }
+        platformError = errors.isEmpty ? nil : errors.joined(separator: " · ")
+        platformLoaded = true
+    }
+
+    func taskAction(cancel: Bool, _ task: PlatformTask) async {
+        guard let client else { return }
+        do {
+            if cancel { try await client.cancelTask(task.id) } else { try await client.retryTask(task.id) }
+            error = nil
+        } catch { self.error = "\(cancel ? "Cancel" : "Retry") \(task.operation): \(error.localizedDescription)" }
+        await refreshPlatform()
+    }
+
+    private func capture<T: Sendable>(_ body: @Sendable () async throws -> T) async -> Result<T, Error> {
+        do { return .success(try await body()) } catch { return .failure(error) }
     }
 
     func power(_ action: PowerAction, _ vm: VmInfo) async {

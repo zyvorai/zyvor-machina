@@ -70,3 +70,41 @@ final class Counter: @unchecked Sendable {
     func add(_ s: String) { lock.withLock { items.append(s) } }
     func count(_ s: String) -> Int { lock.withLock { items.filter { $0 == s }.count } }
 }
+
+// Same suite as ClientTests: the mock handler is shared static state, so tests must not run in parallel.
+extension ClientTests {
+    @Test func decodesHostsTasksAlertsMetrics() async throws {
+        MockProtocol.handler = { req in
+            switch req.url!.path {
+            case "/api/v1/platform/controller/api/v1/hosts":
+                return (200, #"[{"id":"h1","hostname":"n1","address":"10.0.0.1","state":"online","vm_count":6,"cpu_percent":29.3,"memory_used_mib":19588,"memory_total_mib":31423,"maintenance_mode":false,"agent_grpc_addr":"x","extra":1}]"#)
+            case "/api/v1/platform/controller/api/v1/tasks":
+                return (200, #"[{"id":"t1","operation":"host.inventory","status":"failed","progress":0,"message":"transport error","created_at":"2026-11-07T13:00:11Z"}]"#)
+            case "/api/v1/fleet/alerts":
+                return (200, #"{"enabled":false,"total_unacknowledged":2,"peers":[{"peer":"local","alerts":[{"id":"a1","rule_name":"High CPU","message":"m","severity":"critical","timestamp":"2026-10-23 19:58:35","acknowledged":false}]}]}"#)
+            default:
+                return (200, #"{"enabled":false,"local":{"host_cpu_percent":28.5,"host_memory_percent":62.2,"host_disk_percent":74.3,"load_1":3.59,"vm_count":4,"vms_running":4,"capacity":{"score":45.0,"label":"high"}},"peers":[]}"#)
+            }
+        }
+        let c = makeClient()
+        let h = try await c.hosts()
+        #expect(h[0].isOnline && h[0].vmCount == 6)
+        #expect(Int(h[0].memoryPercent ?? 0) == 62)
+        let t = try await c.tasks()
+        #expect(t[0].isFailed && !t[0].isActive)
+        let a = try await c.alerts()
+        #expect(a.totalUnacknowledged == 2 && a.alerts[0].peer == "local" && a.alerts[0].ruleName == "High CPU")
+        let m = try await c.localMetrics()
+        #expect(m.vmsRunning == 4 && m.capacity?.label == "high")
+    }
+
+    @Test func taskActionPaths() async throws {
+        let seen = Counter()
+        MockProtocol.handler = { req in seen.add("\(req.httpMethod ?? "") \(req.url!.path)"); return (200, "{}") }
+        let c = makeClient()
+        try await c.cancelTask("abc")
+        try await c.retryTask("abc")
+        #expect(seen.count("POST /api/v1/platform/controller/api/v1/tasks/abc/cancel") == 1)
+        #expect(seen.count("POST /api/v1/platform/controller/api/v1/tasks/abc/retry") == 1)
+    }
+}

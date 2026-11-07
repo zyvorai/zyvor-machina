@@ -23,4 +23,4 @@ Covers model decoding, 401 re-login, power URLs (spaces and `/` in VM names, ses
 Server `https://HOST:5092`, a PAM user. The first connect asks to trust the host's self-signed certificate; the SHA-256 pin is kept in the Keychain and a changed certificate is refused.
 
 ## Status
-P1 done (client, login, VM list, power, live updates, menubar). Not yet: fleet/tasks views, VNC/serial consoles, App Intents, widgets, notarization (see plan).
+P1 done (client, login, VM list, power, live updates, menubar). P2 partly done: Fleet (this host's metrics + controller hosts), Tasks (cancel/retry, active filter) and Alerts views, refreshed every 10 s while open. Not yet: VNC/serial consoles, App Intents, widgets, notarization (see plan).
