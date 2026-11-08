@@ -17,6 +17,12 @@ struct PromptField: Identifiable {
     var options: [String]?      // nil = free text, otherwise a picker
 }
 
+struct TextResult: Identifiable {
+    let id = UUID()
+    var title: String
+    var text: String
+}
+
 struct PromptRequest: Identifiable {
     let id = UUID()
     var title: String
@@ -38,6 +44,16 @@ extension View {
 
     func prompt(_ request: Binding<PromptRequest?>) -> some View {
         sheet(item: request) { PromptSheet(request: $0) }
+    }
+
+    func textResult(_ result: Binding<TextResult?>) -> some View {
+        sheet(item: result) { r in
+            VStack(alignment: .leading, spacing: 12) {
+                Text(r.title).font(.title2.weight(.semibold))
+                ScrollView { Text(r.text).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
+                HStack { Spacer(); Button("Done") { result.wrappedValue = nil }.keyboardShortcut(.defaultAction) }
+            }.padding(22).frame(width: 560, height: 420)
+        }
     }
 }
 

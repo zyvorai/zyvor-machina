@@ -33,6 +33,9 @@ final class AppModel {
     // Session role (admin / operator / readonly) from GET /auth/session; gates write controls.
     var role: String?
     var canWrite: Bool { role == "admin" || role == "operator" }
+    var isAdmin: Bool { role == "admin" }
+    /// Long text answer to show in a sheet (AI operator replies).
+    var textResult: TextResult?
     var showPalette = false
 
     // Saved servers (without passwords: those live in the Keychain, certificate pins too).

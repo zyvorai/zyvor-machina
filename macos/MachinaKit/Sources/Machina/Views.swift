@@ -110,6 +110,7 @@ struct MainWindow: View {
         .sheet(isPresented: $model.showPalette) { CommandPalette().environment(model) }
         .prompt($model.prompt)
         .confirm($model.pendingAction)
+        .textResult($model.textResult)
         .background { Button("") { model.showPalette = true }.keyboardShortcut("k", modifiers: .command).opacity(0) }
         .toolbar {
             ToolbarItem { Button { Task { await model.presentCreateVM() } } label: { Image(systemName: "plus") }.help("New VM").disabled(!model.canWrite) }

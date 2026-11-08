@@ -27,13 +27,14 @@ struct ResourceListView: View {
                 Spacer()
                 Text("\(filtered.count) of \(rows.count)").foregroundStyle(.secondary).monospacedDigit()
                 Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }
-                if let create = spec.create {
-                    Button("New…") { openCreate(create) }.disabled(!model.canWrite).help(model.canWrite ? "" : "Your role cannot make changes")
+                ForEach(spec.allCreates, id: \.title) { c in
+                    Button(spec.create == c && c.title == "New…" ? "New…" : c.title) { openCreate(c) }
+                        .disabled(!allowed(admin: c.adminOnly)).help(roleHelp(admin: c.adminOnly))
                 }
                 ForEach(spec.actions) { a in
                     Button(a.title) { run(a) }
-                        .disabled(selected == nil || !model.canWrite)
-                        .help(model.canWrite ? "" : "Your role cannot make changes")
+                        .disabled((selected == nil && !a.rowless) || !allowed(admin: a.adminOnly))
+                        .help(roleHelp(admin: a.adminOnly))
                 }
                 if spec.layout == .table {
                     Toggle(isOn: $inspect) { Image(systemName: "sidebar.right") }.toggleStyle(.button).help("Show details")
@@ -70,34 +71,59 @@ struct ResourceListView: View {
         }
         .task(id: spec.id) {
             await load()
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 15_000_000_000)
+            while !Task.isCancelled, spec.refreshSecs > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(spec.refreshSecs) * 1_000_000_000)
                 if Task.isCancelled { break }
                 await load()
             }
         }
     }
 
+    private func allowed(admin: Bool) -> Bool { admin ? model.isAdmin : model.canWrite }
+    private func roleHelp(admin: Bool) -> String {
+        allowed(admin: admin) ? "" : (admin ? "Needs the admin role" : "Your role cannot make changes")
+    }
+
     private func openCreate(_ c: ResourceCreate) {
-        let fields = c.fields.map { f in PromptField(id: f.id, label: f.label, initial: f.initial, options: f.kind == .bool ? ["yes", "no"] : nil) }
-        model.ask(c.title, submit: "Create", fields: fields) { values in
+        var fields = c.fields.map { f in
+            PromptField(id: f.id, label: f.label, initial: f.initial, options: f.kind == .bool ? ["yes", "no"] : (f.options.isEmpty ? nil : f.options))
+        }
+        if let phrase = c.typedPhrase { fields.append(PromptField(id: ResourceCreate.phraseKey, label: "Type \(phrase) to confirm")) }
+        model.ask(c.title, message: c.warning ?? "", submit: "Continue", fields: fields) { values in
             let body: JSONValue
             do { body = try c.body(from: values) } catch { model.error = error.localizedDescription; return }
             var draft = c.endpoint; draft.body = body
             let e = draft
-            if await model.perform(c.title, { _ = try await $0.call(e) }) { model.notice = "\(c.title): done"; await load() }
+            let send: @MainActor () async -> Void = {
+                let ok = await model.perform(c.title, { client in
+                    let answer = try await client.call(e)
+                    if let key = c.resultKey, let text = answer[key]?.text {
+                        await MainActor.run { model.textResult = TextResult(title: c.title, text: text) }
+                    }
+                })
+                if ok { model.notice = "\(c.title): done"; await load() }
+            }
+            model.confirmAction("\(c.title)?", message: c.warning ?? "This changes the server.", label: "Send", destructive: true, run: send)
         }
     }
 
     /// One row action: build the request from the selected row, confirm if it is destructive, run, reload.
     private func run(_ a: ResourceAction) {
-        guard let row = selected, let endpoint = a.endpoint(for: row) else { model.error = "\(a.title): the row is missing a value the request needs."; return }
-        let target = columns.first.map { $0.render(row) } ?? row.id
+        let row = a.rowless ? ResourceRow(id: "", values: .object([:])) : selected
+        guard let row, let endpoint = a.endpoint(for: row) else { model.error = "\(a.title): the row is missing a value the request needs."; return }
+        let target = a.rowless ? spec.title : (columns.first.map { $0.render(row) } ?? row.id)
         let go: @MainActor () async -> Void = {
             if await model.perform("\(a.title) \(target)", { _ = try await $0.call(endpoint) }) { model.notice = "\(a.title): done"; await load() }
         }
-        if a.destructive { model.confirmAction("\(a.title) \(target)?", message: "This changes the server and may not be undoable.", label: a.title, run: go) }
-        else { Task { await go() } }
+        let confirm: @MainActor () -> Void = {
+            model.confirmAction("\(a.title) \(target)?", message: a.confirm ?? "This changes the server and may not be undoable.", label: a.title, destructive: a.destructive, run: go)
+        }
+        if let phrase = a.phrase(for: row) {
+            model.ask("\(a.title) \(target)", message: (a.confirm ?? "") + "\n\nType \(phrase) to continue.", submit: "Continue", fields: [PromptField(id: "typed", label: "Type \(phrase)")]) { values in
+                guard (values["typed"] ?? "").trimmingCharacters(in: .whitespaces) == phrase else { model.error = "\(a.title): the typed name did not match, nothing was sent."; return }
+                confirm()
+            }
+        } else { confirm() }
     }
 
     private func load() async {
