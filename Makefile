@@ -361,12 +361,12 @@ regression-pages: ## Live CDP page sweep (needs Chrome :9222; LOOPS=N; see scrip
 
 BPF_LINKER_VERSION ?= v0.11.1
 
-bpf-deps: ## Install the eBPF toolchain (nightly rust-src + prebuilt musl bpf-linker; builds it from source if the download fails)
+bpf-deps: ## Install the eBPF toolchain (nightly rust-src + prebuilt musl bpf-linker, downloaded with retries; builds it from source if the download still fails)
 	rustup toolchain install nightly --component rust-src
 	@if ! command -v bpf-linker >/dev/null 2>&1; then \
 	  arch=$$(uname -m); [ "$$arch" = arm64 ] && arch=aarch64; \
 	  tmp=$$(mktemp -d); \
-	  if curl -fsSL "https://github.com/aya-rs/bpf-linker/releases/download/$(BPF_LINKER_VERSION)/bpf-linker-$$arch-unknown-linux-musl.tar.zst" -o "$$tmp/bpf-linker.tar.zst" \
+	  if curl -fsSL --retry 5 --retry-all-errors --retry-delay 10 --connect-timeout 20 "https://github.com/aya-rs/bpf-linker/releases/download/$(BPF_LINKER_VERSION)/bpf-linker-$$arch-unknown-linux-musl.tar.zst" -o "$$tmp/bpf-linker.tar.zst" \
 	     && tar --zstd -xf "$$tmp/bpf-linker.tar.zst" -C "$$tmp" \
 	     && bin=$$(find "$$tmp" -type f -name bpf-linker | head -1) && [ -n "$$bin" ]; then \
 	    install -Dm755 "$$bin" "$${CARGO_HOME:-$$HOME/.cargo}/bin/bpf-linker"; echo "bpf-linker $(BPF_LINKER_VERSION) installed (prebuilt)"; \
