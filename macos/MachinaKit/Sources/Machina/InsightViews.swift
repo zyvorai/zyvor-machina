@@ -43,6 +43,7 @@ struct InsightRouter: View {
         case .grid: VMGridView()
         case .heatmap: CapacityHeatmapView()
         case .timeline: ActivityTimelineView()
+        case .aiBlackBox, .aiPerformance, .aiMigration, .aiFleet, .aiNoisy: AIInsightRouter(page: page)
         }
     }
 }
