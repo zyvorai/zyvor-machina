@@ -33,4 +33,4 @@ Every change is confirmed first and follows your role: operators can't use admin
 
 ## Known limits
 
-The VM serial console is disabled until a daemon fix lands, and bare metal serial-over-LAN may not connect until the daemon proxies it. Load balancers have a single listener and stacks have no converge preview in the native controller API. Shortcuts and Siri integration needs a build made with Xcode. See the [app README](https://github.com/zyvorai/zyvor-machina/blob/main/macos/README.md) for the full list.
+The VM serial console stays disabled until the daemon's serial fix is confirmed on a real host. Bare metal serial-over-LAN goes through a daemon route that needs a recent daemon build, and no real session has been run yet. Load balancers have a single listener and stacks have no converge preview in the native controller API. Shortcuts and Siri integration needs a build made with Xcode. See the [app README](https://github.com/zyvorai/zyvor-machina/blob/main/macos/README.md) for the full list.
