@@ -6,7 +6,10 @@ final class MockProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var handler: (@Sendable (URLRequest) -> (Int, String))?
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    /// When set, requests fail with this URL error instead of being answered.
+    nonisolated(unsafe) static var failWith: URLError.Code?
     override func startLoading() {
+        if let f = Self.failWith { client?.urlProtocol(self, didFailWithError: URLError(f)); return }
         let (code, body) = Self.handler?(request) ?? (500, "")
         let resp = HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: nil, headerFields: nil)!
         client?.urlProtocol(self, didReceive: resp, cacheStoragePolicy: .notAllowed)
@@ -395,8 +398,10 @@ extension ClientTests {
         #expect(ResourceColumn("c", "s", .bytes).render(row) == "x")          // not a number: shown as is
         let groups = Dictionary(grouping: FeatureRegistry.all, by: \.group)
         #expect(groups["Security"]?.count ?? 0 >= 10 && groups["Fleet security"] != nil && groups["Bare metal"] != nil && groups["Insight"] != nil)
-        // Phase 6 is read-only: none of its groups carries an action.
-        #expect(["Security", "Fleet security", "Bare metal", "Insight"].allSatisfy { g in groups[g]!.allSatisfy { $0.actions.isEmpty } })
+        // Fleet security and Insight stay read-only. Security and Bare metal gained admin-only writes in Phase 9
+        // (see Phase9Tests), so every action there must be admin-only except bare-metal Release (operator).
+        #expect(["Fleet security", "Insight"].allSatisfy { g in groups[g]!.allSatisfy { $0.actions.isEmpty } })
+        #expect(["Security", "Bare metal"].allSatisfy { g in groups[g]!.allSatisfy { $0.actions.allSatisfy { $0.adminOnly || $0.title == "Release" } } })
     }
 }
 
@@ -440,7 +445,7 @@ extension ClientTests {
     @Test func fleetCloudRegistry() {
         let fc = FeatureRegistry.all.filter { $0.group == "Fleet Cloud" }
         #expect(fc.count >= 17)
-        #expect(fc.filter { $0.create != nil }.map(\.id).sorted() == ["fc-flavors", "fc-instances", "fc-keypairs", "fc-projects", "fc-volumes"])
+        #expect(fc.filter { $0.create != nil }.map(\.id).sorted() == ["fc-flavors", "fc-instances", "fc-keypairs", "fc-lbs", "fc-projects", "fc-stacks", "fc-volumes"])
         #expect(fc.allSatisfy { $0.actions.allSatisfy { $0.method != "GET" } })
     }
 }

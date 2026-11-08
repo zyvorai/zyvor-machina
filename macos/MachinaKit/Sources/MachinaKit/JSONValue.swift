@@ -26,6 +26,11 @@ public enum JSONValue: Codable, Hashable, Sendable {
         }
     }
 
+    /// Indented, key-sorted JSON for reading (plans, previews).
+    public var pretty: String {
+        (try? JSONEncoder.pretty.encode(self)).map { String(decoding: $0, as: UTF8.self) } ?? text
+    }
+
     public subscript(key: String) -> JSONValue? { if case .object(let o) = self { return o[key] }; return nil }
     /// Dotted lookup, e.g. `metadata.name` or `status.phase`; a missing step gives nil.
     public func value(at path: String) -> JSONValue? {

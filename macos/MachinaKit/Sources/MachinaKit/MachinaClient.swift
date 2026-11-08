@@ -1,12 +1,14 @@
 import Foundation
 
 public enum MachinaError: Error, LocalizedError, Sendable {
-    case http(Int, String), badURL, unauthenticated
+    case http(Int, String), badURL, unauthenticated, timedOut(String, Int)
     public var errorDescription: String? {
         switch self {
         case .http(let c, let m): return "HTTP \(c): \(m)"
         case .badURL: return "Invalid server URL"
         case .unauthenticated: return "Sign in required"
+        case .timedOut(let path, let secs):
+            return "No answer from \(path) after \(secs) s. The controller may be busy building this report; try again in a minute. Nothing was changed."
         }
     }
 }
@@ -33,7 +35,7 @@ public actor MachinaClient {
         return URLSession(configuration: cfg, delegate: delegate, delegateQueue: nil)
     }
 
-    private func url(_ path: String, _ query: [URLQueryItem] = []) throws -> URL {
+    func url(_ path: String, _ query: [URLQueryItem] = []) throws -> URL {
         guard var c = URLComponents(url: server.url, resolvingAgainstBaseURL: false) else { throw MachinaError.badURL }
         c.percentEncodedPath = path   // callers pass an already-encoded path
         c.queryItems = query.isEmpty ? nil : query
@@ -42,21 +44,29 @@ public actor MachinaClient {
     }
 
     func send(_ method: String, _ path: String, query: [URLQueryItem] = [],
-                      body: Data? = nil, retry: Bool = true) async throws -> Data {
+                      body: Data? = nil, retry: Bool = true, timeout: TimeInterval? = nil) async throws -> Data {
         var req = URLRequest(url: try url(path, query))
         req.httpMethod = method
+        if let timeout { req.timeoutInterval = timeout }
         if let body { req.httpBody = body; req.setValue("application/json", forHTTPHeaderField: "Content-Type") }
         let (data, resp) = try await session.data(for: req)
         let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
         if code == 401, retry, let c = credentials, path != "/api/v1/auth/login" {
             try await login(user: c.user, password: c.password)
-            return try await send(method, path, query: query, body: body, retry: false)
+            return try await send(method, path, query: query, body: body, retry: false, timeout: timeout)
         }
         guard (200..<300).contains(code) else {
             throw code == 401 ? MachinaError.unauthenticated
                 : MachinaError.http(code, String(data: data.prefix(300), encoding: .utf8) ?? "")
         }
         return data
+    }
+
+    /// Signs in again with the stored credentials (after a 401); false when there are none.
+    func reloginIfPossible() async throws -> Bool {
+        guard let c = credentials else { return false }
+        try await login(user: c.user, password: c.password)
+        return true
     }
 
     @discardableResult

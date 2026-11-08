@@ -2,7 +2,9 @@ import Foundation
 
 /// A "New…" form: typed fields turned into a JSON body. Int fields must be whole numbers; empty optional fields are left out.
 public struct ResourceCreate: Hashable, Sendable {
-    public enum Kind: Hashable, Sendable { case text, int, bool }
+    /// `list` / `intList`: comma or space separated values sent as a JSON array. `json`: a JSON object typed in a
+    /// multi-line box, sent as a parsed value. `choice`: one of the listed values (`Field.options` does the same for `.text`).
+    public enum Kind: Hashable, Sendable { case text, int, bool, list, intList, json, choice([String]) }
     public struct Field: Hashable, Sendable, Identifiable {
         public var id: String          // JSON key
         public var label: String
@@ -11,8 +13,14 @@ public struct ResourceCreate: Hashable, Sendable {
         public var required: Bool
         /// When set, the form shows a picker filled from this endpoint instead of free text.
         public var choices: Choices?
-        public init(_ id: String, _ label: String, _ kind: Kind = .text, initial: String = "", required: Bool = true, choices: Choices? = nil) {
-            self.id = id; self.label = label; self.kind = kind; self.initial = initial; self.required = required; self.choices = choices
+        /// Inclusive bounds for `.int` fields (checked before anything is sent).
+        public var range: ClosedRange<Int>?
+        /// Allowed values for a `.text` field (shown as a picker).
+        public var options: [String]
+        public init(_ id: String, _ label: String, _ kind: Kind = .text, initial: String = "", required: Bool = true,
+                    choices: Choices? = nil, range: ClosedRange<Int>? = nil, options: [String] = []) {
+            self.id = id; self.label = label; self.kind = kind; self.initial = initial; self.required = required
+            self.choices = choices; self.range = range; self.options = options
         }
     }
     /// Picker options loaded from a list endpoint: the value is `valueKeys` joined with `valueJoin`, the label `labelKeys` joined with " · ".
@@ -42,26 +50,80 @@ public struct ResourceCreate: Hashable, Sendable {
     public var path: String
     public var controller: Bool
     public var fields: [Field]
+    public var method: String = "POST"
+    /// Body fields the user cannot change (for example `dry_run: true`), merged after the typed ones.
+    public var fixed: [String: JSONValue] = [:]
+    /// Shown in the form and in the confirmation that follows it.
+    public var warning: String?
+    /// The user must type this exact phrase in the form (an extra confirmation for dangerous writes).
+    public var typedPhrase: String?
+    /// Needs the admin role (the server enforces it too).
+    public var adminOnly = false
+    /// Refuse a request that could cut off the operator: `allow_tcp` without 22 and no `exempt` entry.
+    public var guardLockout = false
+    public var timeout: TimeInterval?
+    /// After success, show this key of the JSON answer (for example a chat `reply`).
+    public var resultKey: String?
     public init(_ title: String, _ path: String, controller: Bool = true, fields: [Field]) {
         self.title = title; self.path = path; self.controller = controller; self.fields = fields
     }
+    /// Builder-style tweaks so specs stay one expression.
+    public func with(_ edit: (inout ResourceCreate) -> Void) -> ResourceCreate { var c = self; edit(&c); return c }
+
+    /// Key of the extra typed-confirmation field in the values dictionary.
+    public static let phraseKey = "_confirm"
 
     public func body(from values: [String: String]) throws -> JSONValue {
+        if let phrase = typedPhrase, (values[Self.phraseKey] ?? "").trimmingCharacters(in: .whitespacesAndNewlines) != phrase {
+            throw Invalid(message: "Type \(phrase) exactly to confirm.")
+        }
+        var o = try Self.body(fields: fields, from: values).object ?? [:]
+        for (k, v) in fixed { o[k] = v }
+        if guardLockout {
+            let ports = o["allow_tcp"]?.array?.compactMap { $0.double.map(Int.init) } ?? []
+            let exempt = o["exempt"]?.array ?? []
+            if o["dry_run"] != .bool(true), !ports.contains(22), exempt.isEmpty {
+                throw Invalid(message: "Allow TCP 22 or add an exempt CIDR (your own address), or this could lock you out.")
+            }
+        }
+        return .object(o)
+    }
+
+    /// Typed body for a set of form fields (shared by "New…" forms and action inputs).
+    public static func body(fields: [Field], from values: [String: String]) throws -> JSONValue {
         var o: [String: JSONValue] = [:]
         for f in fields {
             let raw = (values[f.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             if raw.isEmpty { if f.required { throw Invalid(message: "\(f.label) is required.") }; continue }
             switch f.kind {
-            case .text: o[f.id] = .string(raw)
+            case .text:
+                if !f.options.isEmpty, !f.options.contains(raw) { throw Invalid(message: "\(f.label) must be one of \(f.options.joined(separator: ", ")).") }
+                o[f.id] = .string(raw)
             case .int:
                 guard let n = Int(raw), n >= 0 else { throw Invalid(message: "\(f.label) must be a whole number.") }
+                if let r = f.range, !r.contains(n) { throw Invalid(message: "\(f.label) must be between \(r.lowerBound) and \(r.upperBound).") }
                 o[f.id] = .number(Double(n))
             case .bool: o[f.id] = .bool(raw == "yes" || raw == "true")
+            case .list: o[f.id] = .array(Self.split(raw).map(JSONValue.string))
+            case .intList:
+                let parts = Self.split(raw)
+                let nums = parts.compactMap { Int($0) }.filter { (1...65535).contains($0) }
+                guard nums.count == parts.count else { throw Invalid(message: "\(f.label) must be port numbers (1 to 65535) separated by commas.") }
+                o[f.id] = .array(nums.map { .number(Double($0)) })
+            case .choice(let options):
+                guard options.contains(raw) else { throw Invalid(message: "\(f.label) must be one of \(options.joined(separator: ", ")).") }
+                o[f.id] = .string(raw)
+            case .json:
+                guard let v = try? JSONDecoder().decode(JSONValue.self, from: Data(raw.utf8)), v.object != nil else {
+                    throw Invalid(message: "\(f.label) must be a JSON object.")
+                }
+                o[f.id] = v
             }
         }
         return .object(o)
     }
-    public var endpoint: Endpoint { Endpoint("POST", path, controller: controller) }
+    static func split(_ raw: String) -> [String] { raw.split(whereSeparator: { $0 == "," || $0 == " " }).map(String.init) }
+    public var endpoint: Endpoint { Endpoint(method, path, controller: controller, timeout: timeout) }
 }
 
 /// Lists a parent resource, then fetches each parent's children (`{id}` in `childPath`) and merges them; every
@@ -73,9 +135,23 @@ public struct FanOut: Hashable, Sendable {
     public var labelKey: String
     public var childPath: String
     public var controller: Bool
-    public init(parent: Endpoint, parentRowsPath: [String] = [], idKey: String = "id", labelKey: String = "name", childPath: String, controller: Bool = true) {
+    /// Query for each child call; `{id}` in a value is replaced by the parent's id.
+    public var childQuery: [URLQueryItem]
+    /// Where the child rows are inside each child answer (empty: the answer is the array or `{items}`).
+    public var childRowsPath: [String]
+    /// Only parents whose `filterKey` equals `filterValue`.
+    public var filterKey: String?
+    public var filterValue: String?
+    public var limit: Int
+    public var childTimeout: TimeInterval?
+    /// Optional middle level: parent -> `intermediatePath` rows -> `childPath` rows (e.g. project -> VPCs -> subnets).
+    public var intermediatePath: String?
+    public init(parent: Endpoint, parentRowsPath: [String] = [], idKey: String = "id", labelKey: String = "name", childPath: String, controller: Bool = true,
+                childQuery: [URLQueryItem] = [], childRowsPath: [String] = [], filterKey: String? = nil, filterValue: String? = nil,
+                limit: Int = 50, childTimeout: TimeInterval? = nil, intermediatePath: String? = nil) {
         self.parent = parent; self.parentRowsPath = parentRowsPath; self.idKey = idKey; self.labelKey = labelKey
-        self.childPath = childPath; self.controller = controller
+        self.childPath = childPath; self.controller = controller; self.childQuery = childQuery; self.childRowsPath = childRowsPath
+        self.filterKey = filterKey; self.filterValue = filterValue; self.limit = limit; self.childTimeout = childTimeout; self.intermediatePath = intermediatePath
     }
 }
 
@@ -113,24 +189,59 @@ public struct ResourceAction: Hashable, Sendable, Identifiable {
     public var staticBody: JSONValue?
     /// Values asked for before the request is sent (merged into the body; whole numbers for `.int`).
     public var inputs: [ResourceCreate.Field]
-    /// Shown in a confirmation dialog before running, even when not destructive.
+    /// Text for the confirmation dialog; falls back to a generic warning. Shown even when not destructive.
     public var confirm: String?
     /// Runs without a selected row (a page-level action).
     public var global: Bool
+    /// The row key whose value the user must type to confirm (for example the experiment name).
+    public var typeToConfirm: String?
+    /// Needs the admin role (BMC power, enforcement). The server enforces it too.
+    public var adminOnly = false
+    public var timeout: TimeInterval?
+    /// Pre-fills an input field (`id`) from a row value (`key`); objects are shown as pretty JSON.
+    public var prefill: [String: String]
+    /// Show the response in a sheet (used for read-only previews such as a stack plan).
+    public var showsResult: Bool
     public var id: String { title }
+    public func with(_ edit: (inout ResourceAction) -> Void) -> ResourceAction { var a = self; edit(&a); return a }
+
+    /// The phrase to type for this row, nil when the action needs none (or the row has no value).
+    public func phrase(for row: ResourceRow) -> String? {
+        guard let k = typeToConfirm else { return nil }
+        return row.values.value(at: k)?.text
+    }
     /// POST by default.
     public init(_ title: String, _ path: String, destructive: Bool = false, controller: Bool = false,
                 bodyFields: [String: String] = [:], query: [URLQueryItem] = [], staticBody: JSONValue? = nil,
-                inputs: [ResourceCreate.Field] = [], confirm: String? = nil, global: Bool = false) {
+                inputs: [ResourceCreate.Field] = [], confirm: String? = nil, global: Bool = false,
+                prefill: [String: String] = [:], showsResult: Bool = false) {
         self.init(title, "POST", path, destructive: destructive, controller: controller, bodyFields: bodyFields, query: query, staticBody: staticBody,
-                  inputs: inputs, confirm: confirm, global: global)
+                  inputs: inputs, confirm: confirm, global: global, prefill: prefill, showsResult: showsResult)
     }
     public init(_ title: String, _ method: String, _ path: String, destructive: Bool = false, controller: Bool = false,
                 bodyFields: [String: String] = [:], query: [URLQueryItem] = [], staticBody: JSONValue? = nil,
-                inputs: [ResourceCreate.Field] = [], confirm: String? = nil, global: Bool = false) {
-        self.inputs = inputs; self.confirm = confirm; self.global = global
+                inputs: [ResourceCreate.Field] = [], confirm: String? = nil, global: Bool = false,
+                prefill: [String: String] = [:], showsResult: Bool = false) {
+        self.inputs = inputs; self.confirm = confirm; self.global = global; self.prefill = prefill; self.showsResult = showsResult
         self.title = title; self.method = method; self.path = path; self.destructive = destructive
         self.controller = controller; self.bodyFields = bodyFields; self.query = query; self.staticBody = staticBody
+    }
+
+    /// The request with the user's typed input merged into the body. Throws `ResourceCreate.Invalid` on a bad value.
+    public func endpoint(for row: ResourceRow, input values: [String: String]) throws -> Endpoint? {
+        endpoint(for: row, inputValues: try inputBody(from: values))
+    }
+
+    /// Initial text for each input field: the row value when `prefill` names one, else the field's own default.
+    public func initialValues(for row: ResourceRow) -> [String: String] {
+        var out: [String: String] = [:]
+        for f in inputs {
+            guard let key = prefill[f.id], let v = row.values.value(at: key), v != .null else { out[f.id] = f.initial; continue }
+            if v.isScalar { out[f.id] = v.text }
+            else if let data = try? JSONEncoder.pretty.encode(v) { out[f.id] = String(decoding: data, as: UTF8.self) }
+            else { out[f.id] = f.initial }
+        }
+        return out
     }
 
     /// nil when a placeholder has no value in the row (so a bad request is never sent).
@@ -156,14 +267,13 @@ public struct ResourceAction: Hashable, Sendable, Identifiable {
             for (k, v) in inputValues { o[k] = v }
             body = .object(o)
         }
-        return Endpoint(method, out, query: query, body: body, controller: controller)
+        return Endpoint(method, out, query: query, body: body, controller: controller, timeout: timeout)
     }
 
     /// Typed body values from the raw text the user entered for `inputs`.
     public func inputBody(from values: [String: String]) throws -> [String: JSONValue] {
         guard !inputs.isEmpty else { return [:] }
-        let form = ResourceCreate(title, path, fields: inputs)
-        return try form.body(from: values).object ?? [:]
+        return try ResourceCreate.body(fields: inputs, from: values).object ?? [:]
     }
 
     /// Some endpoints (kubectl wrappers) answer 200 with `ok: false`; the message to show then.
@@ -208,6 +318,8 @@ public struct ResourceColumn: Hashable, Sendable, Identifiable {
 /// "derive from the first rows", so long-tail pages need only an endpoint.
 public struct ResourceSpec: Identifiable, Hashable, Sendable {
     public enum Layout: Hashable, Sendable { case table, keyValue }
+    /// Extra UI a page carries beyond the table: the ISO transfer panel or the Fleet Cloud launch wizard.
+    public enum Accessory: Hashable, Sendable { case isoTransfer, instanceWizard }
     public var id: String
     public var title: String
     public var group: String
@@ -219,15 +331,24 @@ public struct ResourceSpec: Identifiable, Hashable, Sendable {
     public var layout: Layout
     public var actions: [ResourceAction]
     public var create: ResourceCreate?
+    /// More "New…" style forms shown next to `create` (for example Dry run and Arm).
+    public var moreCreates: [ResourceCreate]
     public var fanOut: FanOut?
     public var transform: RowTransform?
+    /// Seconds between automatic reloads; 0 = only when the user presses reload (heavy reports).
+    public var refreshSecs: Int
+    public var accessory: Accessory?
+
+    public var allCreates: [ResourceCreate] { (create.map { [$0] } ?? []) + moreCreates }
 
     public init(_ id: String, _ title: String, group: String, icon: String, endpoint: Endpoint, rowsPath: [String] = [],
                 idKey: String? = nil, columns: [ResourceColumn] = [], layout: Layout = .table, actions: [ResourceAction] = [],
-                create: ResourceCreate? = nil, fanOut: FanOut? = nil, transform: RowTransform? = nil) {
+                create: ResourceCreate? = nil, moreCreates: [ResourceCreate] = [], fanOut: FanOut? = nil, transform: RowTransform? = nil,
+                refreshSecs: Int = 15, accessory: Accessory? = nil) {
         self.id = id; self.title = title; self.group = group; self.icon = icon; self.endpoint = endpoint
         self.rowsPath = rowsPath; self.idKey = idKey; self.columns = columns; self.layout = layout; self.actions = actions
-        self.create = create; self.fanOut = fanOut; self.transform = transform
+        self.create = create; self.moreCreates = moreCreates; self.fanOut = fanOut; self.transform = transform; self.refreshSecs = refreshSecs
+        self.accessory = accessory
     }
 
     public func rows(from json: JSONValue) -> [ResourceRow] {
@@ -257,25 +378,26 @@ public struct ResourceSpec: Identifiable, Hashable, Sendable {
 }
 
 
+extension JSONEncoder {
+    static var pretty: JSONEncoder { let e = JSONEncoder(); e.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]; return e }
+}
+
 public extension MachinaClient {
-    /// Loads a page's data: a plain call, a derived transform, or a fan-out over parents.
-    func load(_ spec: ResourceSpec) async throws -> JSONValue {
-        guard let f = spec.fanOut else {
-            let json = try await call(spec.endpoint)
-            return spec.transform?.apply(json) ?? json
-        }
-        var node: JSONValue = try await call(f.parent)
-        for k in f.parentRowsPath { node = node[k] ?? .null }
-        let parents = Array((node.array ?? []).prefix(50))
-        guard !parents.isEmpty else { return .array([]) }
+    /// Fetches `template` (with `{id}`) for each parent in parallel and tags every child row with `_parent`.
+    /// One failing parent is skipped; the call throws only when every parent failed.
+    private func fan(_ parents: [JSONValue], _ f: FanOut, path template: String) async throws -> [JSONValue] {
+        let parents = Array(parents.prefix(f.limit))
+        guard !parents.isEmpty else { return [] }
         let results: [Result<[JSONValue], Error>] = await withTaskGroup(of: (Int, Result<[JSONValue], Error>).self) { group in
             for (i, p) in parents.enumerated() {
                 guard let id = p[f.idKey]?.text else { continue }
                 let label = p[f.labelKey]?.text ?? id
-                let path = f.childPath.replacingOccurrences(of: "{id}", with: MachinaClient.seg(id))
+                let path = template.replacingOccurrences(of: "{id}", with: MachinaClient.seg(id))
                 group.addTask { [self] in
                     do {
-                        let v = try await call(Endpoint("GET", path, controller: f.controller))
+                        let query = f.childQuery.map { URLQueryItem(name: $0.name, value: $0.value?.replacingOccurrences(of: "{id}", with: id)) }
+                        var v = try await call(Endpoint("GET", path, query: query, controller: f.controller, timeout: f.childTimeout))
+                        for k in f.childRowsPath { v = v[k] ?? .null }
                         let rows = v.array ?? v["items"]?.array ?? []
                         return (i, .success(rows.map { r in
                             var o = r.object ?? ["value": r]; o["_parent"] = .string(label); return .object(o)
@@ -290,6 +412,20 @@ public extension MachinaClient {
         var rows: [JSONValue] = []; var firstError: Error?; var ok = 0
         for r in results { switch r { case .success(let v): rows += v; ok += 1; case .failure(let e): firstError = firstError ?? e } }
         if ok == 0, let e = firstError { throw e }
-        return .array(rows)
+        return rows
+    }
+
+    /// Loads a page's data: a plain call, a derived transform, or a fan-out over parents.
+    func load(_ spec: ResourceSpec) async throws -> JSONValue {
+        guard let f = spec.fanOut else {
+            let json = try await call(spec.endpoint)
+            return spec.transform?.apply(json) ?? json
+        }
+        var node: JSONValue = try await call(f.parent)
+        for k in f.parentRowsPath { node = node[k] ?? .null }
+        var parents = node.array ?? []
+        if let k = f.filterKey, let want = f.filterValue { parents = parents.filter { $0[k]?.text == want } }
+        if let mid = f.intermediatePath { parents = try await fan(parents, f, path: mid) }
+        return .array(try await fan(parents, f, path: f.childPath))
     }
 }

@@ -31,8 +31,11 @@ struct MetricTile: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).font(.caption).foregroundStyle(.secondary)
             Text(value).font(.title2.weight(.semibold)).monospacedDigit()
-            if let f = fraction { ProgressView(value: min(max(f, 0), 1)).tint(f > 0.9 ? .red : f > 0.75 ? .orange : .accentColor) }
+            if let f = fraction { ProgressView(value: min(max(f, 0), 1)).tint(f > 0.9 ? .red : f > 0.75 ? .orange : .accentColor).accessibilityHidden(true) }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(title))
+        .accessibilityValue(Text(fraction.map { "\(value), \(Int((min(max($0, 0), 1) * 100).rounded())) percent" } ?? value))
         .padding(12).frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 10))
     }
@@ -67,7 +70,7 @@ struct FleetView: View {
                     Table(model.hosts) {
                         TableColumn("Host") { h in
                             HStack(spacing: 6) {
-                                Circle().fill(stateColor(h.state)).frame(width: 8, height: 8)
+                                Circle().fill(stateColor(h.state)).frame(width: 8, height: 8).accessibilityLabel(Text(h.state.capitalized))
                                 Text(h.hostname)
                                 if h.maintenanceMode == true { Text("maintenance").font(.caption2).padding(.horizontal, 5)
                                     .background(.orange.opacity(0.25), in: .capsule) }
@@ -117,6 +120,7 @@ struct TasksView: View {
                     TableColumn("Status") { Text($0.status.capitalized).foregroundStyle(stateColor($0.status)) }
                     TableColumn("Progress") { t in
                         ProgressView(value: min(max((t.progress ?? 0) / 100, 0), 1)).frame(width: 90)
+                            .accessibilityLabel(Text("Progress")).accessibilityValue(Text("\(Int(min(max(t.progress ?? 0, 0), 100))) percent"))
                     }
                     TableColumn("Message") { Text($0.message ?? "").lineLimit(2).help($0.message ?? "") }
                     TableColumn("Created", value: \.createdAt)

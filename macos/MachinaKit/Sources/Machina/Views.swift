@@ -14,12 +14,16 @@ struct StateBadge: View {
     var body: some View {
         Label(state.capitalized, systemImage: "circle.fill")
             .labelStyle(.titleAndIcon).foregroundStyle(color).font(.callout)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("State"))
+            .accessibilityValue(Text(state.capitalized))
     }
 }
 
 struct MainWindow: View {
     @Environment(AppModel.self) private var model
     @State private var confirmStop: VmInfo?
+    @State private var dropTargeted = false
     @Environment(\.openWindow) var openWindow
     // Long sections start collapsed; the Cmd-K palette reaches every page regardless.
     @State private var collapsed: Set<String> = ["Containers", "Kubernetes", "Control plane", "Security", "Fleet security", "Bare metal", "Insight", "Storage & network", "Fleet Cloud"]
@@ -65,7 +69,7 @@ struct MainWindow: View {
             .navigationSplitViewColumnWidth(min: 200, ideal: 240)
             .safeAreaInset(edge: .bottom) {
                 HStack {
-                    Circle().fill(model.live ? .green : .orange).frame(width: 8, height: 8)
+                    Circle().fill(model.live ? .green : .orange).frame(width: 8, height: 8).accessibilityHidden(true)
                     Text(model.live ? "Live" : "Reconnecting").font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     if let r = model.role { Text(r).font(.caption).foregroundStyle(.secondary) }
@@ -103,10 +107,19 @@ struct MainWindow: View {
         .sheet(isPresented: $model.showShortcuts) { ShortcutsSheet() }
         .prompt($model.prompt)
         .confirm($model.pendingAction)
+        .textResult($model.textResult)
+        .dropDestination(for: URL.self) { urls, _ in model.handleDrop(urls) } isTargeted: { dropTargeted = $0 }
+        .overlay {
+            if dropTargeted {
+                RoundedRectangle(cornerRadius: 14).strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [10, 6])).padding(6)
+                    .overlay { Label("Drop .iso files to upload", systemImage: "opticaldisc").font(.title2.weight(.semibold)).padding(16).background(.regularMaterial, in: .rect(cornerRadius: 12)) }
+                    .allowsHitTesting(false)
+            }
+        }
         .toolbar {
-            ToolbarItem { Button { Task { await model.presentCreateVM() } } label: { Image(systemName: "plus") }.help("New VM").disabled(!model.canWrite) }
-            ToolbarItem { Button { Task { await model.refresh(); await model.refreshPlatform() } } label: { Image(systemName: "arrow.clockwise") } }
-            ToolbarItem { Button { model.showBulk = true } label: { Image(systemName: "checklist.checked") }.help("Bulk actions on VMs (⇧⌘B)") }
+            ToolbarItem { Button { Task { await model.presentCreateVM() } } label: { Image(systemName: "plus") }.help("New VM").accessibilityLabel("New VM").disabled(!model.canWrite) }
+            ToolbarItem { Button { Task { await model.refresh(); await model.refreshPlatform() } } label: { Image(systemName: "arrow.clockwise") }.help("Refresh").accessibilityLabel("Refresh") }
+            ToolbarItem { Button { model.showBulk = true } label: { Image(systemName: "checklist.checked") }.accessibilityLabel("Bulk actions").help("Bulk actions on VMs (⇧⌘B)") }
             ToolbarItem {
                 Menu {
                     if model.savedFilters.isEmpty { Text("No saved filters") }
@@ -231,6 +244,7 @@ struct MenuBarContent: View {
             Button("Fleet") { show(.fleet) }
         }
         Divider()
+        Button("Check for Updates…") { Task { await Updates.checkNow() } }
         Button("Open Machina") { openWindow(id: "main"); NSApp.activate(ignoringOtherApps: true) }
         SettingsLink { Text("Settings…") }
         Button("Quit") { NSApp.terminate(nil) }
