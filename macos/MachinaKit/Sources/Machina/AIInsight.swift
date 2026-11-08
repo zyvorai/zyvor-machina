@@ -136,7 +136,7 @@ private struct BlackBoxPage: View {
 
 // MARK: Performance autopilot
 
-private struct TypedConfirmSheet: View {
+private struct InsightTypedConfirmSheet: View {
     let title: String, detail: [String], phrase: String, button: String
     let onRun: () async -> Void
     let onClose: () -> Void
@@ -186,7 +186,7 @@ private struct PerformancePage: View {
             if report != nil { proposalView }
         }
         .sheet(item: $confirm) { p in
-            TypedConfirmSheet(title: "Run \(p.label)?",
+            InsightTypedConfirmSheet(title: "Run \(p.label)?",
                               detail: ["Action: \(p.actionType)", "Affects one VM only: \(vmName) (\(p.vmID ?? ""))", "Risk: \(p.risk)", p.review,
                                        "This is a real change and goes through the controller as a task."],
                               phrase: AIExecute.autopilotPhrase(actionType: p.actionType, vmName: vmName), button: "Run action") {
@@ -429,7 +429,7 @@ private struct FleetInsightPage: View {
         }
         .task { await load() }
         .sheet(item: $confirm) { m in
-            TypedConfirmSheet(title: "Move \(m.vmName)?",
+            InsightTypedConfirmSheet(title: "Move \(m.vmName)?",
                               detail: ["VM: \(m.vmName) (\(m.vmID))", "From host \(m.from) to host \(m.to)", m.reason,
                                        "This starts a real migration task for this one VM. The controller picks the move, so the app re-checks that it is still this VM first."],
                               phrase: AIExecute.rebalancePhrase(vmName: m.vmName), button: "Start migration") {
