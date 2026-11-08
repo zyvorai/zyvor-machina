@@ -189,11 +189,14 @@ final class SerialConsoleModel {
     private var task: Task<Void, Never>?
     private var pending = false
 
-    func connect(_ vm: VmInfo, api: MachinaClient) {
+    func connect(_ vm: VmInfo, api: MachinaClient) { connect { try await api.openConsole(vm, kind: .serial) } }
+
+    /// Any text WebSocket (a VM serial port, a bare-metal SOL session).
+    func connect(_ open: @escaping @Sendable () async throws -> WebSocketTransport) {
         disconnect(); buffer = TerminalBuffer(); text = ""; state = .connecting
         task = Task { [weak self] in
             do {
-                let t = try await api.openConsole(vm, kind: .serial)
+                let t = try await open()
                 self?.transport = t
                 self?.state = .connected
                 while !Task.isCancelled {

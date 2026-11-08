@@ -17,6 +17,8 @@ struct ResourceListView: View {
     @State private var selection: ResourceRow.ID?
     @State private var inspect = false
     @State private var wizard = false
+    @State private var solRow: ResourceRow?
+    @State private var chaosSheet: ChaosSheet?
 
 
     private var columns: [ResourceColumn] { spec.effectiveColumns(for: rows) }
@@ -41,8 +43,16 @@ struct ResourceListView: View {
                     Button("Upload…") { model.pickISOsToUpload() }.disabled(!model.canWrite).help(model.canWrite ? "Or drop .iso files anywhere on the window" : "Your role cannot make changes")
                     Button("Download from URL…") { model.promptISODownload() }.disabled(!model.canWrite)
                 }
+                if spec.accessory == .bareMetalSol {
+                    Button("Serial console…") { solRow = selected }
+                        .disabled(selected == nil || !model.isAdmin).help(model.isAdmin ? "Serial-over-LAN (IPMI servers)" : "Needs the admin role")
+                }
                 if spec.accessory == .instanceWizard {
                     Button("Launch…") { wizard = true }.disabled(!model.canWrite).help(model.canWrite ? "" : "Your role cannot make changes")
+                }
+                if spec.accessory == .chaosEditor {
+                    Button("New experiment…") { chaosSheet = ChaosSheet(row: nil) }.disabled(!model.isAdmin).help(model.isAdmin ? "" : "Needs the admin role")
+                    Button("Edit…") { chaosSheet = ChaosSheet(row: selected) }.disabled(selected == nil || !model.isAdmin).help(model.isAdmin ? "" : "Needs the admin role")
                 }
                 ForEach(spec.allCreates, id: \.title) { c in
                     Button(spec.create == c && c.title == "New…" ? "New…" : c.title) { openCreate(c) }
@@ -85,6 +95,7 @@ struct ResourceListView: View {
             }
         }
         .padding(24)
+        .sheet(item: $chaosSheet) { s in ChaosEditor(row: s.row) { saved in chaosSheet = nil; if saved { Task { await load() } } } }
         .searchable(text: $search, prompt: "Filter \(spec.title.lowercased())")
         .inspector(isPresented: $inspect) {
             if let r = selected, let o = r.values.object {
@@ -98,6 +109,7 @@ struct ResourceListView: View {
                 ContentUnavailableView("Select a row", systemImage: "cursorarrow.click").inspectorColumnWidth(min: 240, ideal: 300)
             }
         }
+        .sheet(item: $solRow) { SolConsoleSheet(row: $0).environment(model) }
         .onChange(of: rows) { model.page = PageContext(spec: spec, columns: columns, rows: filtered) }
         .onChange(of: search) { model.page = PageContext(spec: spec, columns: columns, rows: filtered) }
         .onDisappear { if model.page?.spec.id == spec.id { model.page = nil } }
@@ -136,7 +148,7 @@ struct ResourceListView: View {
             case .choice(let o): options = o
             default: options = f.options.isEmpty ? nil : f.options
             }
-            return PromptField(id: f.id, label: f.label, initial: initial[f.id] ?? f.initial, options: options, multiline: f.kind == .json)
+            return PromptField(id: f.id, label: f.label, initial: initial[f.id] ?? f.initial, options: options, multiline: f.kind == .json || f.kind == .lines, secure: f.secret)
         }
     }
 
@@ -197,10 +209,10 @@ struct ResourceListView: View {
         // Every write is confirmed (and a typed name when the action asks for one) before it is sent.
         let confirmThenRun: @MainActor ([String: JSONValue]) -> Void = { extra in
             let confirm: @MainActor () -> Void = {
-                model.confirmAction("\(a.title) \(target)?", message: a.confirm ?? "This changes the server and may not be undoable.", label: a.title.replacingOccurrences(of: "…", with: ""), destructive: a.destructive) { await execute(extra) }
+                model.confirmAction("\(a.title) \(target)?", message: a.confirmText(for: row) ?? "This changes the server and may not be undoable.", label: a.title.replacingOccurrences(of: "…", with: ""), destructive: a.destructive) { await execute(extra) }
             }
             if let phrase = a.phrase(for: row) {
-                model.ask("\(a.title) \(target)", message: (a.confirm ?? "") + "\n\nType \(phrase) to continue.", submit: "Continue", fields: [PromptField(id: "typed", label: "Type \(phrase)")]) { values in
+                model.ask("\(a.title) \(target)", message: (a.confirmText(for: row) ?? "") + "\n\nType \(phrase) to continue.", submit: "Continue", fields: [PromptField(id: "typed", label: "Type \(phrase)")]) { values in
                     guard (values["typed"] ?? "").trimmingCharacters(in: .whitespaces) == phrase else { model.error = "\(a.title): the typed name did not match, nothing was sent."; return }
                     confirm()
                 }

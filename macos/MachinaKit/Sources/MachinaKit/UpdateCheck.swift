@@ -26,6 +26,9 @@ public struct ReleaseInfo: Equatable, Sendable {
     public var version: String
     public var pageURL: URL
     public var dmgURL: URL?
+    /// The release body (markdown); `SelfUpdate.expectedSHA256` reads the DMG's checksum from it.
+    public var notes: String? = nil
+    public var dmgName: String? = nil
 }
 
 public enum UpdateStatus: Equatable, Sendable {
@@ -59,9 +62,10 @@ public enum UpdateChecker {
               let tag = o["tag_name"] as? String, AppVersion(tag) != nil,
               let page = (o["html_url"] as? String).flatMap(URL.init(string:)) else { return nil }
         let assets = o["assets"] as? [[String: Any]] ?? []
-        let dmg = assets.first { ($0["name"] as? String)?.lowercased().hasSuffix(".dmg") == true }
-            .flatMap { ($0["browser_download_url"] as? String).flatMap(URL.init(string:)) }
-        return ReleaseInfo(version: tag.hasPrefix("v") ? String(tag.dropFirst()) : tag, pageURL: page, dmgURL: dmg)
+        let dmgAsset = assets.first { ($0["name"] as? String)?.lowercased().hasSuffix(".dmg") == true }
+        let dmg = dmgAsset.flatMap { ($0["browser_download_url"] as? String).flatMap(URL.init(string:)) }
+        return ReleaseInfo(version: tag.hasPrefix("v") ? String(tag.dropFirst()) : tag, pageURL: page, dmgURL: dmg,
+                           notes: o["body"] as? String, dmgName: dmgAsset?["name"] as? String)
     }
 
     public static func evaluate(current: String, release: ReleaseInfo) -> UpdateStatus {

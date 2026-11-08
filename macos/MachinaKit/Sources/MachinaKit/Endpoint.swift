@@ -25,6 +25,7 @@ public extension MachinaClient {
     /// Generic call returning dynamic JSON. A body that starts like HTML means the path is not an API
     /// route (the web app's index page is served for unknown paths), so it is reported as a 404.
     func call(_ e: Endpoint) async throws -> JSONValue {
+        try SecretRedaction.requireTLS(body: e.body, server: server.url)
         let body = try e.body.map { try JSONEncoder().encode($0) }
         let data: Data
         do { data = try await send(e.method, e.resolvedPath, query: e.query, body: body, timeout: e.timeout) }

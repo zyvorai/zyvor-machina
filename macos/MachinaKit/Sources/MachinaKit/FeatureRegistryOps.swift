@@ -42,14 +42,15 @@ extension FeatureRegistry {
                                .init("Last status", "last_status"), .init("Last run", "last_run_at", .date), .init("Created by", "created_by")],
                      actions: [
                         ResourceAction("Run", "/api/v1/chaos/experiments/{id}/run", destructive: true, controller: true, bodyFields: ["confirm": "name"])
-                            .with { $0.typeToConfirm = "name"; $0.confirm = "Injects REAL faults (latency, loss, partitions, disk throttling or a VM kill) into the targets named by this experiment. It aborts by itself if its probes fall below the experiment's threshold." },
-                        ResourceAction("Delete", "DELETE", "/api/v1/chaos/experiments/{id}", destructive: true, controller: true),
-                     ]),
+                            .with { $0.adminOnly = true; $0.typeToConfirm = "name"; $0.confirm = "Injects REAL faults (latency, loss, partitions, disk throttling or a VM kill) into the targets named by this experiment. It aborts by itself if its probes fall below the experiment's threshold." },
+                        ResourceAction("Delete", "DELETE", "/api/v1/chaos/experiments/{id}", destructive: true, controller: true)
+                            .with { $0.adminOnly = true; $0.typeToConfirm = "name"; $0.confirm = "Deletes the experiment definition. Its past runs stay listed." },
+                     ], accessory: .chaosEditor),
         ResourceSpec("chaos-runs", "Chaos runs", group: "Resilience", icon: "play.circle", endpoint: .controllerGet("/api/v1/chaos/runs"), idKey: "id",
                      columns: [.init("Started", "started_at", .date), .init("Status", "status"), .init("By", "started_by"), .init("Verdict", "report.verdict"),
                                .init("Duration s", "report.duration_s"), .init("Findings", "report.findings"), .init("Abort reason", "abort_reason")],
                      actions: [ResourceAction("Abort", "/api/v1/chaos/runs/{id}/abort", destructive: true, controller: true, staticBody: obj([:]))
-                        .with { $0.confirm = "Stops the run and removes its faults." }],
+                        .with { $0.adminOnly = true; $0.confirm = "Stops the run and removes its faults." }],
                      refreshSecs: 10),
         ResourceSpec("chaos-faults", "Active faults", group: "Resilience", icon: "exclamationmark.triangle",
                      endpoint: .controllerGet("/api/v1/chaos/faults"), rowsPath: ["items"], idKey: "id",
@@ -135,11 +136,11 @@ extension FeatureRegistry {
                 .with { $0.adminOnly = true; $0.confirm = "Starts commissioning: the machine must PXE-boot the inventory image and report back with a one-time token." },
             ResourceAction("Release", "/api/v1/baremetal/servers/{id}/release", destructive: true, controller: true)
                 .with { $0.confirm = "Returns an allocated or deployed server to the ready pool." },
-        ],
+        ] + BareMetalOps.writeActions,
         create: ResourceCreate("Register server…", "/api/v1/baremetal/servers",
                                fields: [.init("hostname", "Hostname"), .init("bmc_address", "BMC address (host or URL)"),
                                         .init("mac_address", "PXE NIC MAC", required: false), .init("zone", "Zone", required: false)])
-            .with { $0.adminOnly = true; $0.warning = "Adds the record only. Set the BMC login in the web UI; the app never handles BMC passwords." })
+            .with { $0.adminOnly = true; $0.warning = "Adds the record only. Use Set BMC login on the new row to store its BMC user and password." }, accessory: .bareMetalSol)
 
     static let bareMetalProfiles = ResourceSpec(
         "bm-profiles", "Profiles", group: "Bare metal", icon: "slider.horizontal.3", endpoint: .controllerGet("/api/v1/baremetal/profiles"), idKey: "name",
