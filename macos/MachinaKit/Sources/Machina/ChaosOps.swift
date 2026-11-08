@@ -1,5 +1,7 @@
 import SwiftUI
 import MachinaKit
+import AppKit
+import UniformTypeIdentifiers
 
 /// Create / edit sheet for a chaos experiment. Admin only. Nothing is targeted until the user ticks VMs, and the
 /// save confirmation lists the blast radius (targets, steps, longest run).
@@ -16,14 +18,18 @@ struct ChaosEditor: View {
     @State private var b = "0"
     @State private var c = "30"
     @State private var cidrs = ""
+    @State private var peerIDs: [String] = []
+    @State private var notice: String?
     @State private var probeText = ""
     @State private var problem: String?
     @State private var busy = false
     @State private var pending: Endpoint?
 
-    init(row: ResourceRow?, onDone: @escaping (Bool) -> Void) {
-        editingID = row?.id
-        _draft = State(initialValue: row.map { ChaosDraft(row: $0.values) } ?? ChaosDraft())
+    /// `duplicate` opens a copy of the row as a NEW experiment with no targets.
+    init(row: ResourceRow?, duplicate: Bool = false, onDone: @escaping (Bool) -> Void) {
+        editingID = duplicate ? nil : row?.id
+        let base = row.map { ChaosDraft(row: $0.values) } ?? ChaosDraft()
+        _draft = State(initialValue: duplicate ? ChaosPorting.duplicate(base) : base)
         self.onDone = onDone
     }
 
@@ -95,7 +101,10 @@ struct ChaosEditor: View {
                 }.padding(.trailing, 8)
             }
             if let p = problem { Text(p).foregroundStyle(.red).font(.callout) }
+            if let n = notice { Text(n).foregroundStyle(.secondary).font(.callout) }
             HStack {
+                Button("Import JSON…") { importJSON() }.help("Loads an experiment as a draft. It targets nothing and is not run.")
+                Button("Export JSON…") { exportJSON() }.disabled(draft.steps.isEmpty)
                 Text("Longest run: \(draft.totalSecs)s").foregroundStyle(.secondary)
                 Spacer()
                 Button("Cancel") { onDone(false) }.keyboardShortcut(.cancelAction)
@@ -121,7 +130,10 @@ struct ChaosEditor: View {
             switch kind {
             case "latency": field("ms", $a); field("jitter", $b); field("secs", $c)
             case "loss": field("%", $a); field("secs", $c)
-            case "partition": TextField("CIDRs, comma separated", text: $cidrs).textFieldStyle(.roundedBorder); field("secs", $c)
+            case "partition":
+                TextField("CIDRs, comma separated", text: $cidrs).textFieldStyle(.roundedBorder)
+                peerMenu
+                field("secs", $c)
             case "disk": field("read IOPS", $a); field("write IOPS", $b); field("secs", $c)
             case "kill": field("recover s", $c)
             default: field("host id", $a, width: 150)
@@ -129,6 +141,36 @@ struct ChaosEditor: View {
             Button("Add") { addStep() }
         }
     }
+    private var peerMenu: some View {
+        Menu(peerIDs.isEmpty ? "Peer VMs" : "\(peerIDs.count) peer VMs") {
+            ForEach(vms, id: \.id) { vm in
+                Toggle(vm.name, isOn: Binding(get: { peerIDs.contains(vm.id) }, set: { on in
+                    if on { peerIDs.append(vm.id) } else { peerIDs.removeAll { $0 == vm.id } }
+                }))
+            }
+        }.frame(width: 110).help("VMs the targets are cut off from, besides the CIDRs")
+    }
+
+    private func importJSON() {
+        problem = nil; notice = nil
+        let panel = NSOpenPanel(); panel.allowedContentTypes = [.json]; panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let data = try Data(contentsOf: url)
+            draft = try ChaosPorting.importDraft(data)
+            notice = "Imported \(draft.steps.count) step(s). Targets were cleared: pick them again. Nothing was run."
+        } catch { problem = error.localizedDescription }
+    }
+
+    private func exportJSON() {
+        problem = nil; notice = nil
+        let panel = NSSavePanel(); panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = ResourceExport.fileName(draft.name.isEmpty ? "chaos-experiment" : draft.name, ext: "json")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do { try ChaosPorting.export(draft).write(to: url, options: .atomic); notice = "Exported to \(url.lastPathComponent) (without targets)." }
+        catch { problem = error.localizedDescription }
+    }
+
     private func field(_ label: String, _ v: Binding<String>, width: CGFloat = 56) -> some View {
         TextField(label, text: v).textFieldStyle(.roundedBorder).frame(width: width).help(label)
     }
@@ -139,7 +181,8 @@ struct ChaosEditor: View {
         case "latency": draft.steps.append(.latency(delayMs: i(a), jitterMs: i(b), secs: i(c)))
         case "loss": draft.steps.append(.loss(pct: Double(a.trimmingCharacters(in: .whitespaces)) ?? 0, secs: i(c)))
         case "partition":
-            draft.steps.append(.partition(cidrs: cidrs.split(whereSeparator: { ", ".contains($0) }).map(String.init), peers: [], secs: i(c)))
+            draft.steps.append(.partition(cidrs: cidrs.split(whereSeparator: { ", ".contains($0) }).map(String.init), peers: peerIDs, secs: i(c)))
+            peerIDs = []; cidrs = ""
         case "disk": draft.steps.append(.disk(readIops: i(a), writeIops: i(b), secs: i(c)))
         case "kill": draft.steps.append(.kill(recoverSecs: i(c)))
         default: draft.steps.append(.hostFailure(hostID: a.trimmingCharacters(in: .whitespaces)))
@@ -173,4 +216,4 @@ struct ChaosEditor: View {
     }
 }
 
-struct ChaosSheet: Identifiable { let id = UUID(); let row: ResourceRow? }
+struct ChaosSheet: Identifiable { let id = UUID(); let row: ResourceRow?; var duplicate = false }
