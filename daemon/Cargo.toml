@@ -10,6 +10,7 @@ machina-spec = { path = "../spec" }
 machina-bpf = { path = "../bpf/machina-bpf" }
 virt-image-build = { path = "../virt-image-build" }
 uuid = { workspace = true }
+libc = "0.2"
 virt = { workspace = true }
 axum = { workspace = true }
 tokio = { workspace = true }

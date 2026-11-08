@@ -120,9 +120,35 @@ async fn platform_spice_ws_proxy(
     ws.on_upgrade(move |socket| relay_platform_ws(socket, path, q.token))
 }
 
+/// `GET /ws/v1/baremetal/{id}/sol?token=` -> the controller's serial-over-LAN WebSocket, so
+/// clients use one origin (and one pinned certificate). The controller validates the
+/// single-use token; only a UUID id and a URL-safe token are forwarded.
+async fn baremetal_sol_ws_proxy(
+    ws: WebSocketUpgrade,
+    Path(id): Path<String>,
+    Query(q): Query<PlatformWsQuery>,
+) -> axum::response::Response {
+    let token_ok = !q.token.is_empty()
+        && q.token.len() <= 512
+        && q
+            .token
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.');
+    let Ok(id) = uuid::Uuid::parse_str(&id) else {
+        return (axum::http::StatusCode::BAD_REQUEST, "invalid server id").into_response();
+    };
+    if !token_ok {
+        return (axum::http::StatusCode::BAD_REQUEST, "invalid token").into_response();
+    }
+    let path = format!("{}/ws/v1/baremetal/{id}/sol", controller_ws_base());
+    ws.on_upgrade(move |socket| relay_platform_ws(socket, path, q.token))
+        .into_response()
+}
+
 pub fn platform_ws_routes() -> Router<LibvirtManager> {
     Router::new()
         .route("/platform/vnc/{vm_id}", get(platform_vnc_ws_proxy))
         .route("/platform/serial/{vm_id}", get(platform_serial_ws_proxy))
         .route("/platform/spice/{vm_id}", get(platform_spice_ws_proxy))
+        .route("/baremetal/{id}/sol", get(baremetal_sol_ws_proxy))
 }

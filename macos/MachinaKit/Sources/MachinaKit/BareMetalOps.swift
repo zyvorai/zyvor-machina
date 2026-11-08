@@ -197,9 +197,9 @@ public enum BareMetalOps {
 
     public struct SolSession: Sendable, Equatable { public var url: URL; public var serverId: String }
 
-    /// Where the controller serves the SOL WebSocket. The daemon does not proxy it, so this is the controller's own
-    /// port (5093) on the daemon's host, wss when the daemon is https.
-    public static func solURL(wsPath: String, serverId: String, server: URL, controllerPort: Int = 5093) throws -> URL {
+    /// The SOL WebSocket on the daemon's own origin (the daemon proxies it to the controller, so the pinned
+    /// certificate applies), wss when the daemon is https. `port` overrides the daemon's port for older setups.
+    public static func solURL(wsPath: String, serverId: String, server: URL, port: Int? = nil) throws -> URL {
         guard let q = wsPath.firstIndex(of: "?") else { throw BareMetalError.badSolPath }
         let path = String(wsPath[..<q]), query = String(wsPath[wsPath.index(after: q)...])
         guard path == "/ws/v1/baremetal/\(serverId)/sol", query.hasPrefix("token="), !query.dropFirst(6).isEmpty,
@@ -207,7 +207,7 @@ public enum BareMetalOps {
         var c = URLComponents()
         c.scheme = server.scheme == "http" ? "ws" : "wss"
         c.host = server.host
-        c.port = controllerPort
+        c.port = port ?? server.port
         c.percentEncodedPath = path
         c.percentEncodedQuery = query
         guard let u = c.url else { throw BareMetalError.badSolPath }
@@ -224,13 +224,13 @@ public enum BareMetalOps {
 
 public extension MachinaClient {
     /// Asks for a single-use SOL token (admin, audited) and returns the WebSocket URL. The token is in the URL: do not log it.
-    func solURL(serverId: String, controllerPort: Int = 5093) async throws -> URL {
+    func solURL(serverId: String, port: Int? = nil) async throws -> URL {
         let json = try await call(Endpoint("POST", "/api/v1/baremetal/servers/\(MachinaClient.seg(serverId))/sol-token", body: .object([:]), controller: true))
         guard let path = json["ws_path"]?.text else { throw BareMetalError.badSolPath }
-        return try BareMetalOps.solURL(wsPath: path, serverId: serverId, server: server.url, controllerPort: controllerPort)
+        return try BareMetalOps.solURL(wsPath: path, serverId: serverId, server: server.url, port: port)
     }
 
-    func openSol(serverId: String, controllerPort: Int = 5093) async throws -> WebSocketTransport {
-        WebSocketTransport(session: urlSession, url: try await solURL(serverId: serverId, controllerPort: controllerPort), protocols: [], text: true)
+    func openSol(serverId: String, port: Int? = nil) async throws -> WebSocketTransport {
+        WebSocketTransport(session: urlSession, url: try await solURL(serverId: serverId, port: port), protocols: [], text: true)
     }
 }
