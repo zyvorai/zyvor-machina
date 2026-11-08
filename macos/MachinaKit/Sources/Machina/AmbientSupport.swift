@@ -95,8 +95,10 @@ struct SettingsView: View {
                 }
                 Text("Revoking forgets the pin; the next connection asks you to trust the host's certificate again.").font(.caption).foregroundStyle(.secondary)
             }.tabItem { Label("Trusted certificates", systemImage: "checkmark.shield") }
+
+            QuickAccessSettingsForm().tabItem { Label("Quick access", systemImage: "bolt") }
         }
-        .formStyle(.grouped).frame(width: 480, height: 360).onAppear(perform: reload)
+        .formStyle(.grouped).frame(width: 520, height: 440).onAppear(perform: reload)
     }
 
     private func reload() { certs = Keychain.accounts().compactMap(TrustedCert.parse).sorted { $0.host < $1.host } }
