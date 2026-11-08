@@ -49,7 +49,7 @@ public enum BareMetalError: Error, LocalizedError, Sendable, Equatable {
 
 /// Per-field input checks that run before anything is sent (shared by every bare-metal form).
 public enum FieldCheck: Hashable, Sendable {
-    case bmcAddress, bmcUsername, bmcPassword, mediaURL, osName, timezone
+    case bmcAddress, bmcUsername, bmcPassword, mediaURL, osName, timezone, imageName, httpsURL, hexDigest
 
     /// nil when the value is acceptable, else what is wrong.
     public func problem(_ s: String) -> String? {
@@ -60,6 +60,9 @@ public enum FieldCheck: Hashable, Sendable {
         case .mediaURL: return BareMetalOps.mediaURLProblem(s)
         case .osName: return BareMetalOps.osProblem(s)
         case .timezone: return BareMetalOps.timezoneProblem(s)
+        case .imageName: return BareMetalOps.imageNameProblem(s)
+        case .httpsURL: return BareMetalOps.httpsURLProblem(s)
+        case .hexDigest: return BareMetalOps.hexDigestProblem(s)
         }
     }
 }
@@ -153,7 +156,7 @@ public enum BareMetalOps {
         }
 
     static let deploy = ResourceAction("Deploy image…", serverPath + "/deploy", destructive: true, controller: true, inputs: [
-        .init("os", "Installer or image name", initial: "ubuntu-24.04", check: .osName),
+        .init("os", "Installer or image name", initial: "ubuntu-24.04", choices: osChoices, check: .osName),
         .init("ssh_authorized_keys", "SSH public keys (one per line, optional)", .lines, required: false),
         .init("timezone", "Time zone", initial: "UTC", required: false, check: .timezone),
         .init("ttl_hours", "Install token lifetime in hours (0 = default)", .int, initial: "0", required: false, range: 0...168),
@@ -191,7 +194,7 @@ public enum BareMetalOps {
         }
 
     /// Added to the Servers page. Serial-over-LAN is a button (`ResourceSpec.Accessory.bareMetalSol`), not an action.
-    public static let writeActions: [ResourceAction] = [setBmc, rotateBmc, deploy, mediaInsert, mediaEject]
+    public static let writeActions: [ResourceAction] = [setBmc, rotateBmc, deploy, bootOverride, mediaInsert, mediaEject]
 
     // MARK: Serial-over-LAN
 

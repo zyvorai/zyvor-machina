@@ -47,6 +47,7 @@ $ICON
   <key>CFBundleURLName</key><string>dev.zyvor.machina</string>
   <key>CFBundleURLSchemes</key><array><string>machina</string></array>
 </dict></array>
+<key>NSUserActivityTypes</key><array><string>dev.zyvor.machina.vm</string></array>
 <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
 <key>LSMinimumSystemVersion</key><string>15.0</string>
 <key>NSHighResolutionCapable</key><true/>

@@ -2,7 +2,7 @@ import Foundation
 
 /// Read-only pages (Phase 1). Shapes come from live responses and `web/src/api/*.ts`.
 public enum FeatureRegistry {
-    public static let all: [ResourceSpec] = base + opsSpecs + cloudOpsSpecs + ebpfFormSpecs
+    public static let all: [ResourceSpec] = base + opsSpecs + cloudOpsSpecs + ebpfFormSpecs + FleetEbpf.specs
 
     static let base: [ResourceSpec] = [
         ResourceSpec("node", "Host info", group: "Host", icon: "desktopcomputer", endpoint: .get("/api/v1/node"), layout: .keyValue),
@@ -151,8 +151,8 @@ public enum FeatureRegistry {
 
         // Bare metal (read-only)
         bareMetalServers,
-        ResourceSpec("bm-images", "Image catalog", group: "Bare metal", icon: "opticaldisc", endpoint: .controllerGet("/api/v1/baremetal/images"), rowsPath: ["catalog"], idKey: "name",
-                     columns: [.init("Name", "name"), .init("OS", "os"), .init("Arch", "arch"), .init("Format", "format"), .init("Checksum", "checksum_algo")]),
+        BareMetalOps.imported,
+        BareMetalOps.catalog,
         bareMetalProfiles,
 
         // Insight (controller AI engine reports; read-only)

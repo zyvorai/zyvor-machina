@@ -3,6 +3,8 @@ import AppKit
 import MachinaKit
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) { QuickAccess.shared.reconfigure() }
+
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         do {
             let menu = NSMenu()
@@ -41,13 +43,17 @@ struct MachinaApp: App {
             }
             .environment(model)
             .frame(minWidth: 760, minHeight: 480)
-            .onOpenURL { if let l = DeepLink(url: $0) { model.open(l) } }
+            .onOpenURL { model.openShared(url: $0) }
+            .onContinueUserActivity(ShareLink.activityType) { activity in
+                if let r = ShareLink.link(fromActivity: activity.userInfo) { model.open(r.link) }
+            }
             .onContinueUserActivity(SpotlightIndexer.activityType) { activity in
                 if let name = SpotlightIndexer.vmName(from: activity) { model.open(.vm(name)) }
             }
         }
         .commands { MachinaCommands(model: model) }
         .commands { UpdateCommands() }
+        .commands { QuickAccessCommands(model: model) }
         // One VM per window: opened from the sidebar's context menu.
         WindowGroup("VM", id: "vm-window", for: String.self) { $name in
             VMWindow(name: name ?? "").environment(model)

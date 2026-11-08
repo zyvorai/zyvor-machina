@@ -19,6 +19,7 @@ struct ResourceListView: View {
     @State private var wizard = false
     @State private var solRow: ResourceRow?
     @State private var chaosSheet: ChaosSheet?
+    @State private var chaosRun: ChaosRunSheet?
 
 
     private var columns: [ResourceColumn] { spec.effectiveColumns(for: rows) }
@@ -53,6 +54,10 @@ struct ResourceListView: View {
                 if spec.accessory == .chaosEditor {
                     Button("New experiment…") { chaosSheet = ChaosSheet(row: nil) }.disabled(!model.isAdmin).help(model.isAdmin ? "" : "Needs the admin role")
                     Button("Edit…") { chaosSheet = ChaosSheet(row: selected) }.disabled(selected == nil || !model.isAdmin).help(model.isAdmin ? "" : "Needs the admin role")
+                    Button("Duplicate…") { chaosSheet = ChaosSheet(row: selected, duplicate: true) }.disabled(selected == nil || !model.isAdmin).help(model.isAdmin ? "Copy as a new experiment with no targets" : "Needs the admin role")
+                }
+                if spec.accessory == .chaosRuns {
+                    Button("Run details…") { if let r = selected { chaosRun = ChaosRunSheet(id: r.id, row: r) } }.disabled(selected == nil)
                 }
                 ForEach(spec.allCreates, id: \.title) { c in
                     Button(spec.create == c && c.title == "New…" ? "New…" : c.title) { openCreate(c) }
@@ -95,7 +100,8 @@ struct ResourceListView: View {
             }
         }
         .padding(24)
-        .sheet(item: $chaosSheet) { s in ChaosEditor(row: s.row) { saved in chaosSheet = nil; if saved { Task { await load() } } } }
+        .sheet(item: $chaosSheet) { s in ChaosEditor(row: s.row, duplicate: s.duplicate) { saved in chaosSheet = nil; if saved { Task { await load() } } } }
+        .sheet(item: $chaosRun) { s in ChaosRunDetailView(runID: s.id) { chaosRun = nil }.environment(model) }
         .searchable(text: $search, prompt: "Filter \(spec.title.lowercased())")
         .inspector(isPresented: $inspect) {
             if let r = selected, let o = r.values.object {
@@ -175,7 +181,9 @@ struct ResourceListView: View {
                 for (id, map) in labels { values[id] = map[values[id] ?? ""] ?? "" }
                 let body: JSONValue
                 do { body = try c.body(from: values) } catch { model.error = error.localizedDescription; return }
-                var draft = c.endpoint; draft.body = body
+                var draft: Endpoint
+                do { draft = try c.endpoint(values: values) } catch { model.error = error.localizedDescription; return }
+                draft.body = body
                 let e = draft
                 let send: @MainActor () async -> Void = {
                     let ok = await model.perform(c.title, { client in
@@ -186,7 +194,7 @@ struct ResourceListView: View {
                     })
                     if ok { model.notice = "\(c.title): done"; await load() }
                 }
-                model.confirmAction("\(c.title)?", message: c.warning ?? "This changes the server.", label: "Send", destructive: true, run: send)
+                model.confirmAction("\(c.title)?", message: c.confirmation(values: values, body: body), label: "Send", destructive: true, run: send)
             }
         }
     }
@@ -204,6 +212,10 @@ struct ResourceListView: View {
             let outcome = box.value
             if let why = ResourceAction.failure(in: outcome) { model.error = "\(a.title) \(target): \(why)"; return }
             model.notice = ResourceAction.summary(of: outcome).map { "\(a.title): \($0)" } ?? "\(a.title): done"
+            if let next = a.followUpEndpoint(for: row, inputValues: extra) {      // e.g. the power step a boot override needs
+                let ok2 = await model.perform("\(a.title) follow-up \(target)", { _ = try await $0.call(next) })
+                if ok2 { model.notice = "\(a.title): done, then \(next.body?["action"]?.text ?? "follow-up") sent" }
+            }
             await load()
         }
         // Every write is confirmed (and a typed name when the action asks for one) before it is sent.
@@ -232,7 +244,26 @@ struct ResourceListView: View {
             confirmThenRun(extra)
         }
         if a.inputs.isEmpty { go([:]); return }
-        model.ask("\(a.title) \(target)", submit: "Continue", fields: Self.promptFields(a.inputs, initial: a.initialValues(for: row))) { go($0) }
+        Task {
+            // Inputs with `choices` are pickers filled from the server; a failed lookup leaves only the fixed `extra` values.
+            let initial = a.initialValues(for: row)
+            var labels: [String: [String: String]] = [:]
+            var fields: [PromptField] = []
+            for f in a.inputs {
+                if let ch = f.choices {
+                    let json = (try? await model.api().call(ch.endpoint)) ?? .null
+                    let opts = ch.options(from: json)
+                    labels[f.id] = Dictionary(opts.map { ($0.label, $0.value) }, uniquingKeysWith: { x, _ in x })
+                    let start = opts.first { $0.value == initial[f.id] }?.label ?? opts.first?.label ?? ""
+                    fields.append(PromptField(id: f.id, label: f.label, initial: start, options: opts.map(\.label)))
+                } else { fields.append(contentsOf: Self.promptFields([f], initial: initial)) }
+            }
+            model.ask("\(a.title) \(target)", submit: "Continue", fields: fields) { values in
+                var values = values
+                for (id, map) in labels { values[id] = map[values[id] ?? ""] ?? values[id] ?? "" }
+                go(values)
+            }
+        }
     }
 
     private func load() async {

@@ -51,7 +51,7 @@ extension FeatureRegistry {
                                .init("Duration s", "report.duration_s"), .init("Findings", "report.findings"), .init("Abort reason", "abort_reason")],
                      actions: [ResourceAction("Abort", "/api/v1/chaos/runs/{id}/abort", destructive: true, controller: true, staticBody: obj([:]))
                         .with { $0.adminOnly = true; $0.confirm = "Stops the run and removes its faults." }],
-                     refreshSecs: 10),
+                     refreshSecs: 10, accessory: .chaosRuns),
         ResourceSpec("chaos-faults", "Active faults", group: "Resilience", icon: "exclamationmark.triangle",
                      endpoint: .controllerGet("/api/v1/chaos/faults"), rowsPath: ["items"], idKey: "id",
                      columns: [.init("VM", "vm"), .init("Host", "host"), .init("Delay ms", "delay_ms"), .init("Jitter ms", "jitter_ms"), .init("Loss %", "loss_pct"),
@@ -151,6 +151,10 @@ extension FeatureRegistry {
                            bodyFields: ["profile": "name"], staticBody: obj(["count": .number(1)]))
                 .with { $0.adminOnly = true; $0.typeToConfirm = "name"
                     $0.confirm = "Allocates one ready server for this profile and installs its image, WIPING the machine's disks. The deploy starts immediately." },
+            ResourceAction("Provision machines…", "/api/v1/baremetal/provision", destructive: true, controller: true,
+                           bodyFields: ["profile": "name"], inputs: [.init("count", "How many machines (1 to 100)", .int, initial: "1", range: 1...100)])
+                .with { $0.adminOnly = true; $0.typeToConfirm = "name"
+                    $0.confirm = "Allocates that many ready servers for this profile and installs its image on each, WIPING their disks. Deploys start immediately; the answer says how many started and why it stopped early." },
             ResourceAction("Delete profile", "DELETE", "/api/v1/baremetal/profiles/{name}", destructive: true, controller: true).with { $0.adminOnly = true },
         ])
 

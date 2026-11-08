@@ -103,6 +103,8 @@ public struct ChaosDraft: Equatable, Sendable {
                 if secs <= 0 || secs > ChaosLimits.maxTotalSecs { return "\(at): duration 1 to \(ChaosLimits.maxTotalSecs) seconds." }
             case .partition(let c, let p, let secs):
                 if c.isEmpty && p.isEmpty { return "\(at): partition from what? Give CIDRs or peer VMs." }
+                if p.contains(where: { UUID(uuidString: $0) == nil }) { return "\(at): peer VMs are given by id." }
+                if p.count > ChaosLimits.maxTargets { return "\(at): at most \(ChaosLimits.maxTargets) peer VMs." }
                 if secs <= 0 || secs > ChaosLimits.maxTotalSecs { return "\(at): duration 1 to \(ChaosLimits.maxTotalSecs) seconds." }
             case .disk(let r, let w, let secs):
                 if r < 0 || w < 0 || (r == 0 && w == 0) { return "\(at): set a read or write IOPS limit." }
