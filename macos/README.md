@@ -10,6 +10,7 @@ Server `https://HOST:5092` and a PAM user. The first connect asks you to trust t
 ## What is in it
 - **VMs:** list, detail tabs (Overview, Disks, Network, Snapshots, Backups, Metrics, Logs, Console, Doctor, Settings), New VM, clone, rename, delete, disk attach/resize/detach, CD-ROM eject, NICs, snapshots, backups. Power actions with live state from `/ws/v1/watch`.
 - **Consoles:** a VNC client (RFB 3.3/3.7/3.8, Raw/CopyRect/Hextile, keyboard, pointer, clipboard). Not supported: VNC password auth, ZRLE/Tight, SPICE/RDP. The serial console is disabled until the daemon bug below is fixed.
+- **Operations forms:** VMM guard, XDP shield, sched_ext and VM edge forms (admin-only, leases, typed confirmations); bare metal BMC login, image deploy, virtual media and serial-over-LAN; chaos experiment editor; stack drift, converge and auto-heal; VPC routes and subnet NAT; verified self-update (SHA-256, same Developer ID team, Gatekeeper).
 - **Fleet and platform:** fleet hosts, tasks, alerts, DRS, approvals, controller users, API keys, security groups, containers and pods, Kubernetes (with scale, restart and delete pod), security and eBPF pages, bare metal, autopilot, chaos, preemptible VMs, topology, AI operator.
 - **Fleet Cloud:** instances (with a six-step launch wizard), flavors, images, volumes, key pairs, networks, floating IPs, load balancers, stacks, projects, VPCs and subnets, server groups.
 - **Visual insight:** topology map, VM grid with sparklines, capacity heatmap, "what changed" timeline.
@@ -21,10 +22,11 @@ Server `https://HOST:5092` and a PAM user. The first connect asks you to trust t
 Every write goes through a confirmation and the role gate (admin-only controls are disabled for operators). eBPF enforcement needs an explicit lease (60 to 900 s) and never relies on the server default. Node isolation starts as a dry run; arming needs the typed phrase `ISOLATE NODE`, a lease, an allowlist that keeps TCP 22 (or an exempt CIDR) and a second confirmation. Bulk and destructive actions list what will happen first. The copied curl never contains credentials.
 
 ## Known limits
+- **Bare metal serial-over-LAN may not connect:** the daemon does not proxy `/ws/v1/baremetal/{id}/sol`, so the app dials the controller on :5093 and its pinned certificate may not match. Unverified.
 - **Serial console is disabled** (`VMConsoleTab.serialEnabled = false`): on the test host, opening and closing the serial WebSocket was followed by the daemon exiting and being restarted by systemd. Suspected cause: `handle_console` in `daemon/src/routes/ws.rs` opens the VM's PTY without `O_NOCTTY`. Unconfirmed.
-- **UI has not been screenshot-verified.** The app was built, unit-tested (99 tests) and checked against a live host through its API layer, but no one has looked at every screen.
+- **UI has not been screenshot-verified.** The app was built, unit-tested (146 tests) and checked against a live host through its API layer, but no one has looked at every screen.
 - Shortcuts and Siri only discover App Intents from metadata Xcode generates, so build once with Xcode to use them. There is no widget (needs a signed `.appex` and an app group).
-- Not built: VMM guard, shield, sched_ext and VM-edge forms; chaos authoring; BMC credentials, image deploy, virtual media and serial-over-LAN; load balancer listener editing beyond health checks; stack drift, converge and auto-heal; VPC route tables and NAT; auto-install of updates; SSO.
+- Not built: per-host eBPF writes through the controller passthrough; boot-device override and image catalog import for bare metal; peer-VM editing in chaos partitions; SSO ([#224](https://github.com/zyvorai/zyvor-machina/issues/224)). Server-side gaps: load balancers have one listener and route tables have no association API in the native controller (only the SigV4 EC2 API), and there is no converge preview for stacks.
 - Writes were live-tested only on throwaway resources created and deleted by name. Container writes, approve/reject, notification actions, bulk actions, Kubernetes and DRS writes, HA policy, ISO upload and the network, VPC and load balancer writes have unit tests but were not exercised against a live host.
 
 ## Layout
