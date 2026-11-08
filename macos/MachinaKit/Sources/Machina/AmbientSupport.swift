@@ -124,6 +124,7 @@ struct VMDoctorTab: View {
                 Text("Doctor").font(.title2.weight(.semibold))
                 if let r = report { Image(systemName: icon(r.level)).foregroundStyle(color(r.level)) }
                 Spacer()
+                AIExplainButton(request: .vm(id: nil, name: vm.name))
                 Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }
             }
             if let r = report {

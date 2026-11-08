@@ -63,6 +63,7 @@ struct ResourceListView: View {
                     Button(spec.create == c && c.title == "New…" ? "New…" : c.title) { openCreate(c) }
                         .disabled(!allowed(admin: c.adminOnly)).help(roleHelp(admin: c.adminOnly))
                 }
+                if let sel = selected, let req = AIExplainRequest.forRow(specID: spec.id, row: sel) { AIExplainButton(request: req) }
                 ForEach(spec.actions) { a in
                     Button(a.title) { run(a) }
                         .disabled((selected == nil && !a.global) || !allowed(admin: a.adminOnly))

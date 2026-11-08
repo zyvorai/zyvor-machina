@@ -109,6 +109,7 @@ struct TasksView: View {
                     .disabled(selected?.isActive != true)
                 Button("Retry") { if let t = selected { Task { await model.taskAction(cancel: false, t) } } }
                     .disabled(selected?.isFailed != true)
+                AIExplainButton(request: selected.flatMap { $0.isFailed ? .failedTask(id: $0.id, operation: $0.operation, status: $0.status, message: $0.message) : nil })
             }
             PlatformErrorBanner(text: model.platformError)
             if rows.isEmpty {
@@ -155,6 +156,7 @@ struct AlertsView: View {
                             Text(a.message).font(.callout).foregroundStyle(.secondary)
                         }
                         Spacer()
+                        AIExplainButton(request: .alert(id: a.id, rule: a.ruleName, severity: a.severity, message: a.message), compact: true).buttonStyle(.borderless)
                         Text(a.timestamp).font(.caption).foregroundStyle(.secondary).monospacedDigit()
                     }.opacity(a.acknowledged ? 0.55 : 1)
                 }

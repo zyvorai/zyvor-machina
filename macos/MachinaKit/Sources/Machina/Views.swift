@@ -47,6 +47,7 @@ struct MainWindow: View {
                     Label("Fleet", systemImage: "server.rack").tag(SidebarItem.fleet)
                     Label("Tasks", systemImage: "checklist").tag(SidebarItem.tasks)
                     Label("Alerts", systemImage: "bell").badge(model.unackedAlerts).tag(SidebarItem.alerts)
+                    Label("Knowledge", systemImage: "books.vertical").tag(SidebarItem.knowledge)
                 }
                 Section("Visual insight") {
                     ForEach(InsightPage.allCases, id: \.self) { p in Label(p.title, systemImage: p.icon).tag(SidebarItem.insight(p)) }
@@ -81,6 +82,7 @@ struct MainWindow: View {
             case .fleet: FleetView()
             case .tasks: TasksView()
             case .alerts: AlertsView()
+            case .knowledge: KnowledgeView()
             case .insight(let p): InsightRouter(page: p)
             case .page(let id):
                 if let spec = FeatureRegistry.spec(id) { ResourceListView(spec: spec).id(id) }
