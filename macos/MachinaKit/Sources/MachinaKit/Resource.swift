@@ -61,6 +61,13 @@ public struct ResourceCreate: Hashable, Sendable {
     public var adminOnly = false
     /// Refuse a request that could cut off the operator: `allow_tcp` without 22 and no `exempt` entry.
     public var guardLockout = false
+    /// Body keys that must be present and non-empty (checked after the fixed values are merged).
+    public var requiredKeys: [String] = []
+    /// At least one of these body keys must be present, non-empty and not `false`.
+    public var requireAnyOf: [String] = []
+    /// Rewrites the flat body into the nested shape an endpoint wants (see `EbpfForms.swift`).
+    public var shape: BodyShape?
+    public enum BodyShape: Hashable, Sendable { case vmEdge, shield }
     public var timeout: TimeInterval?
     /// After success, show this key of the JSON answer (for example a chat `reply`).
     public var resultKey: String?
@@ -86,7 +93,18 @@ public struct ResourceCreate: Hashable, Sendable {
                 throw Invalid(message: "Allow TCP 22 or add an exempt CIDR (your own address), or this could lock you out.")
             }
         }
+        for k in requiredKeys where Self.isEmpty(o[k]) { throw Invalid(message: "\(k) is required here.") }
+        if !requireAnyOf.isEmpty, requireAnyOf.allSatisfy({ Self.isEmpty(o[$0]) || o[$0] == .bool(false) }) {
+            throw Invalid(message: "Set at least one of: \(requireAnyOf.joined(separator: ", ")).")
+        }
+        if let shape { return try shape.apply(.object(o)) }
         return .object(o)
+    }
+    static func isEmpty(_ v: JSONValue?) -> Bool {
+        guard let v, v != .null else { return true }
+        if let a = v.array { return a.isEmpty }
+        if case .string(let s) = v { return s.isEmpty }
+        return false
     }
 
     /// Typed body for a set of form fields (shared by "New…" forms and action inputs).
