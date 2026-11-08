@@ -175,7 +175,9 @@ struct ResourceListView: View {
                 for (id, map) in labels { values[id] = map[values[id] ?? ""] ?? "" }
                 let body: JSONValue
                 do { body = try c.body(from: values) } catch { model.error = error.localizedDescription; return }
-                var draft = c.endpoint; draft.body = body
+                var draft: Endpoint
+                do { draft = try c.endpoint(values: values) } catch { model.error = error.localizedDescription; return }
+                draft.body = body
                 let e = draft
                 let send: @MainActor () async -> Void = {
                     let ok = await model.perform(c.title, { client in
@@ -186,7 +188,7 @@ struct ResourceListView: View {
                     })
                     if ok { model.notice = "\(c.title): done"; await load() }
                 }
-                model.confirmAction("\(c.title)?", message: c.warning ?? "This changes the server.", label: "Send", destructive: true, run: send)
+                model.confirmAction("\(c.title)?", message: c.confirmation(values: values, body: body), label: "Send", destructive: true, run: send)
             }
         }
     }

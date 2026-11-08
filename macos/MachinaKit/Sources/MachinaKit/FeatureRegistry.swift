@@ -2,7 +2,7 @@ import Foundation
 
 /// Read-only pages (Phase 1). Shapes come from live responses and `web/src/api/*.ts`.
 public enum FeatureRegistry {
-    public static let all: [ResourceSpec] = base + opsSpecs + cloudOpsSpecs + ebpfFormSpecs
+    public static let all: [ResourceSpec] = base + opsSpecs + cloudOpsSpecs + ebpfFormSpecs + FleetEbpf.specs
 
     static let base: [ResourceSpec] = [
         ResourceSpec("node", "Host info", group: "Host", icon: "desktopcomputer", endpoint: .get("/api/v1/node"), layout: .keyValue),

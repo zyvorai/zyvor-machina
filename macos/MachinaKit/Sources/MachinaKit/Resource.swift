@@ -73,7 +73,9 @@ public struct ResourceCreate: Hashable, Sendable {
     public var requireAnyOf: [String] = []
     /// Rewrites the flat body into the nested shape an endpoint wants (see `EbpfForms.swift`).
     public var shape: BodyShape?
-    public enum BodyShape: Hashable, Sendable { case vmEdge, shield }
+    public enum BodyShape: Hashable, Sendable { case vmEdge, shield
+        /// A bpfd request for one fleet host (see `FleetEbpf.swift`); the value is its `op`.
+        case fleet(String) }
     public var timeout: TimeInterval?
     /// After success, show this key of the JSON answer (for example a chat `reply`).
     public var resultKey: String?

@@ -139,6 +139,7 @@ extension ResourceCreate.BodyShape {
     func apply(_ flat: JSONValue) throws -> JSONValue {
         let o = flat.object ?? [:]
         switch self {
+        case .fleet(let op): return try FleetEbpf.wrap(op: op, flat)
         case .shield:
             for k in ["allow", "deny", "protected"] {
                 for item in o[k]?.array ?? [] where !EbpfForms.isAddressOrCIDR(item.text) {
