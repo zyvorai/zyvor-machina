@@ -21,6 +21,7 @@ struct MainWindow: View {
     @Environment(AppModel.self) private var model
     @State private var search = ""
     @State private var confirmStop: VmInfo?
+    @State private var dropTargeted = false
     @Environment(\.openWindow) private var openWindow
     // Long sections start collapsed; the Cmd-K palette reaches every page regardless.
     @State private var collapsed: Set<String> = ["Containers", "Kubernetes", "Control plane", "Security", "Fleet security", "Bare metal", "Insight", "Storage & network", "Fleet Cloud"]
@@ -105,6 +106,14 @@ struct MainWindow: View {
             while !Task.isCancelled {
                 await model.refreshApprovals()
                 try? await Task.sleep(nanoseconds: 30_000_000_000)
+            }
+        }
+        .dropDestination(for: URL.self) { urls, _ in model.handleDrop(urls) } isTargeted: { dropTargeted = $0 }
+        .overlay {
+            if dropTargeted {
+                RoundedRectangle(cornerRadius: 14).strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [10, 6])).padding(6)
+                    .overlay { Label("Drop .iso files to upload", systemImage: "opticaldisc").font(.title2.weight(.semibold)).padding(16).background(.regularMaterial, in: .rect(cornerRadius: 12)) }
+                    .allowsHitTesting(false)
             }
         }
         .sheet(isPresented: $model.showPalette) { CommandPalette().environment(model) }

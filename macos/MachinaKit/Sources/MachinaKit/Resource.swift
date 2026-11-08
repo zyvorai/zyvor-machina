@@ -2,7 +2,7 @@ import Foundation
 
 /// A "New…" form: typed fields turned into a JSON body. Int fields must be whole numbers; empty optional fields are left out.
 public struct ResourceCreate: Hashable, Sendable {
-    public enum Kind: Hashable, Sendable { case text, int, bool }
+    public enum Kind: Hashable, Sendable { case text, int, bool, json, choice([String]) }   // json: a JSON object typed in a multi-line box, sent as a parsed value
     public struct Field: Hashable, Sendable, Identifiable {
         public var id: String          // JSON key
         public var label: String
@@ -23,7 +23,10 @@ public struct ResourceCreate: Hashable, Sendable {
         self.title = title; self.path = path; self.controller = controller; self.fields = fields
     }
 
-    public func body(from values: [String: String]) throws -> JSONValue {
+    public func body(from values: [String: String]) throws -> JSONValue { try Self.body(fields: fields, from: values) }
+
+    /// Typed body for a set of form fields (shared by "New…" forms and action inputs).
+    public static func body(fields: [Field], from values: [String: String]) throws -> JSONValue {
         var o: [String: JSONValue] = [:]
         for f in fields {
             let raw = (values[f.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -34,6 +37,14 @@ public struct ResourceCreate: Hashable, Sendable {
                 guard let n = Int(raw), n >= 0 else { throw Invalid(message: "\(f.label) must be a whole number.") }
                 o[f.id] = .number(Double(n))
             case .bool: o[f.id] = .bool(raw == "yes" || raw == "true")
+            case .choice(let options):
+                guard options.contains(raw) else { throw Invalid(message: "\(f.label) must be one of \(options.joined(separator: ", ")).") }
+                o[f.id] = .string(raw)
+            case .json:
+                guard let v = try? JSONDecoder().decode(JSONValue.self, from: Data(raw.utf8)), v.object != nil else {
+                    throw Invalid(message: "\(f.label) must be a JSON object.")
+                }
+                o[f.id] = v
             }
         }
         return .object(o)
@@ -50,9 +61,12 @@ public struct FanOut: Hashable, Sendable {
     public var labelKey: String
     public var childPath: String
     public var controller: Bool
-    public init(parent: Endpoint, parentRowsPath: [String] = [], idKey: String = "id", labelKey: String = "name", childPath: String, controller: Bool = true) {
+    /// Optional middle level: parent -> `intermediatePath` rows -> `childPath` rows (e.g. project -> VPCs -> subnets).
+    public var intermediatePath: String?
+    public init(parent: Endpoint, parentRowsPath: [String] = [], idKey: String = "id", labelKey: String = "name", childPath: String,
+                controller: Bool = true, intermediatePath: String? = nil) {
         self.parent = parent; self.parentRowsPath = parentRowsPath; self.idKey = idKey; self.labelKey = labelKey
-        self.childPath = childPath; self.controller = controller
+        self.childPath = childPath; self.controller = controller; self.intermediatePath = intermediatePath
     }
 }
 
@@ -88,16 +102,48 @@ public struct ResourceAction: Hashable, Sendable, Identifiable {
     public var bodyFields: [String: String]
     public var query: [URLQueryItem]
     public var staticBody: JSONValue?
+    /// Typed fields the user fills in before the request; merged into the body (they win over `bodyFields`).
+    public var input: [ResourceCreate.Field]
+    /// Pre-fills an input field (`id`) from a row value (`key`); objects are shown as pretty JSON.
+    public var prefill: [String: String]
+    /// Show the response in a sheet (used for read-only previews such as a stack plan).
+    public var showsResult: Bool
     public var id: String { title }
     /// POST by default.
     public init(_ title: String, _ path: String, destructive: Bool = false, controller: Bool = false,
-                bodyFields: [String: String] = [:], query: [URLQueryItem] = [], staticBody: JSONValue? = nil) {
-        self.init(title, "POST", path, destructive: destructive, controller: controller, bodyFields: bodyFields, query: query, staticBody: staticBody)
+                bodyFields: [String: String] = [:], query: [URLQueryItem] = [], staticBody: JSONValue? = nil,
+                input: [ResourceCreate.Field] = [], prefill: [String: String] = [:], showsResult: Bool = false) {
+        self.init(title, "POST", path, destructive: destructive, controller: controller, bodyFields: bodyFields, query: query, staticBody: staticBody,
+                  input: input, prefill: prefill, showsResult: showsResult)
     }
     public init(_ title: String, _ method: String, _ path: String, destructive: Bool = false, controller: Bool = false,
-                bodyFields: [String: String] = [:], query: [URLQueryItem] = [], staticBody: JSONValue? = nil) {
+                bodyFields: [String: String] = [:], query: [URLQueryItem] = [], staticBody: JSONValue? = nil,
+                input: [ResourceCreate.Field] = [], prefill: [String: String] = [:], showsResult: Bool = false) {
         self.title = title; self.method = method; self.path = path; self.destructive = destructive
         self.controller = controller; self.bodyFields = bodyFields; self.query = query; self.staticBody = staticBody
+        self.input = input; self.prefill = prefill; self.showsResult = showsResult
+    }
+
+    /// The request with the user's typed input merged into the body. Throws `ResourceCreate.Invalid` on a bad value.
+    public func endpoint(for row: ResourceRow, input values: [String: String]) throws -> Endpoint? {
+        guard var e = endpoint(for: row) else { return nil }
+        guard !input.isEmpty else { return e }
+        var o = e.body?.object ?? [:]
+        for (k, v) in (try ResourceCreate.body(fields: input, from: values).object ?? [:]) { o[k] = v }
+        e.body = .object(o)
+        return e
+    }
+
+    /// Initial text for each input field: the row value when `prefill` names one, else the field's own default.
+    public func initialValues(for row: ResourceRow) -> [String: String] {
+        var out: [String: String] = [:]
+        for f in input {
+            guard let key = prefill[f.id], let v = row.values.value(at: key), v != .null else { out[f.id] = f.initial; continue }
+            if v.isScalar { out[f.id] = v.text }
+            else if let data = try? JSONEncoder.pretty.encode(v) { out[f.id] = String(decoding: data, as: UTF8.self) }
+            else { out[f.id] = f.initial }
+        }
+        return out
     }
 
     /// nil when a placeholder has no value in the row (so a bad request is never sent).
@@ -150,6 +196,8 @@ public struct ResourceColumn: Hashable, Sendable, Identifiable {
 /// "derive from the first rows", so long-tail pages need only an endpoint.
 public struct ResourceSpec: Identifiable, Hashable, Sendable {
     public enum Layout: Hashable, Sendable { case table, keyValue }
+    /// Extra UI a page carries beyond the table: the ISO transfer panel or the Fleet Cloud launch wizard.
+    public enum Accessory: Hashable, Sendable { case isoTransfer, instanceWizard }
     public var id: String
     public var title: String
     public var group: String
@@ -163,13 +211,14 @@ public struct ResourceSpec: Identifiable, Hashable, Sendable {
     public var create: ResourceCreate?
     public var fanOut: FanOut?
     public var transform: RowTransform?
+    public var accessory: Accessory?
 
     public init(_ id: String, _ title: String, group: String, icon: String, endpoint: Endpoint, rowsPath: [String] = [],
                 idKey: String? = nil, columns: [ResourceColumn] = [], layout: Layout = .table, actions: [ResourceAction] = [],
-                create: ResourceCreate? = nil, fanOut: FanOut? = nil, transform: RowTransform? = nil) {
+                create: ResourceCreate? = nil, fanOut: FanOut? = nil, transform: RowTransform? = nil, accessory: Accessory? = nil) {
         self.id = id; self.title = title; self.group = group; self.icon = icon; self.endpoint = endpoint
         self.rowsPath = rowsPath; self.idKey = idKey; self.columns = columns; self.layout = layout; self.actions = actions
-        self.create = create; self.fanOut = fanOut; self.transform = transform
+        self.create = create; self.fanOut = fanOut; self.transform = transform; self.accessory = accessory
     }
 
     public func rows(from json: JSONValue) -> [ResourceRow] {
@@ -199,22 +248,21 @@ public struct ResourceSpec: Identifiable, Hashable, Sendable {
 }
 
 
+extension JSONEncoder {
+    static var pretty: JSONEncoder { let e = JSONEncoder(); e.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]; return e }
+}
+
 public extension MachinaClient {
-    /// Loads a page's data: a plain call, a derived transform, or a fan-out over parents.
-    func load(_ spec: ResourceSpec) async throws -> JSONValue {
-        guard let f = spec.fanOut else {
-            let json = try await call(spec.endpoint)
-            return spec.transform?.apply(json) ?? json
-        }
-        var node: JSONValue = try await call(f.parent)
-        for k in f.parentRowsPath { node = node[k] ?? .null }
-        let parents = Array((node.array ?? []).prefix(50))
-        guard !parents.isEmpty else { return .array([]) }
+    /// Fetches `template` (with `{id}`) for each parent in parallel and tags every child row with `_parent`.
+    /// One failing parent is skipped; the call throws only when every parent failed.
+    private func fan(_ parents: [JSONValue], _ f: FanOut, path template: String) async throws -> [JSONValue] {
+        let parents = Array(parents.prefix(50))
+        guard !parents.isEmpty else { return [] }
         let results: [Result<[JSONValue], Error>] = await withTaskGroup(of: (Int, Result<[JSONValue], Error>).self) { group in
             for (i, p) in parents.enumerated() {
                 guard let id = p[f.idKey]?.text else { continue }
                 let label = p[f.labelKey]?.text ?? id
-                let path = f.childPath.replacingOccurrences(of: "{id}", with: MachinaClient.seg(id))
+                let path = template.replacingOccurrences(of: "{id}", with: MachinaClient.seg(id))
                 group.addTask { [self] in
                     do {
                         let v = try await call(Endpoint("GET", path, controller: f.controller))
@@ -232,6 +280,19 @@ public extension MachinaClient {
         var rows: [JSONValue] = []; var firstError: Error?; var ok = 0
         for r in results { switch r { case .success(let v): rows += v; ok += 1; case .failure(let e): firstError = firstError ?? e } }
         if ok == 0, let e = firstError { throw e }
-        return .array(rows)
+        return rows
+    }
+
+    /// Loads a page's data: a plain call, a derived transform, or a fan-out over parents.
+    func load(_ spec: ResourceSpec) async throws -> JSONValue {
+        guard let f = spec.fanOut else {
+            let json = try await call(spec.endpoint)
+            return spec.transform?.apply(json) ?? json
+        }
+        var node: JSONValue = try await call(f.parent)
+        for k in f.parentRowsPath { node = node[k] ?? .null }
+        var parents = node.array ?? []
+        if let mid = f.intermediatePath { parents = try await fan(parents, f, path: mid) }
+        return .array(try await fan(parents, f, path: f.childPath))
     }
 }

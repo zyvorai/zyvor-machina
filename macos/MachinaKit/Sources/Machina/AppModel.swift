@@ -34,6 +34,8 @@ final class AppModel {
     var role: String?
     var canWrite: Bool { role == "admin" || role == "operator" }
     var showPalette = false
+    /// ISO uploads and downloads in flight (see `Transfers.swift`).
+    let transfers = TransferCenter()
 
     // Saved servers (without passwords: those live in the Keychain, certificate pins too).
     var servers: [ServerProfile] = {

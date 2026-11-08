@@ -15,6 +15,7 @@ struct PromptField: Identifiable {
     var label: String
     var initial = ""
     var options: [String]?      // nil = free text, otherwise a picker
+    var multiline = false       // a monospaced text editor (JSON documents)
 }
 
 struct PromptRequest: Identifiable {
@@ -53,6 +54,12 @@ struct PromptSheet: View {
             ForEach(request.fields) { f in
                 if let options = f.options {
                     Picker(f.label, selection: binding(f)) { ForEach(options, id: \.self) { Text($0).tag($0) } }
+                } else if f.multiline {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(f.label).font(.callout).foregroundStyle(.secondary)
+                        TextEditor(text: binding(f)).font(.system(.callout, design: .monospaced)).autocorrectionDisabled()
+                            .frame(minHeight: 200).overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+                    }
                 } else {
                     TextField(f.label, text: binding(f))
                 }
@@ -67,7 +74,7 @@ struct PromptSheet: View {
                 }.keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
             }
         }
-        .padding(22).frame(width: 440)
+        .padding(22).frame(width: request.fields.contains { $0.multiline } ? 580 : 440)
         .onAppear { for f in request.fields { values[f.id] = f.initial.isEmpty ? (f.options?.first ?? "") : f.initial } }
     }
 
