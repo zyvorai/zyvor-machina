@@ -204,6 +204,10 @@ struct ResourceListView: View {
             let outcome = box.value
             if let why = ResourceAction.failure(in: outcome) { model.error = "\(a.title) \(target): \(why)"; return }
             model.notice = ResourceAction.summary(of: outcome).map { "\(a.title): \($0)" } ?? "\(a.title): done"
+            if let next = a.followUpEndpoint(for: row, inputValues: extra) {      // e.g. the power step a boot override needs
+                let ok2 = await model.perform("\(a.title) follow-up \(target)", { _ = try await $0.call(next) })
+                if ok2 { model.notice = "\(a.title): done, then \(next.body?["action"]?.text ?? "follow-up") sent" }
+            }
             await load()
         }
         // Every write is confirmed (and a typed name when the action asks for one) before it is sent.
@@ -232,7 +236,26 @@ struct ResourceListView: View {
             confirmThenRun(extra)
         }
         if a.inputs.isEmpty { go([:]); return }
-        model.ask("\(a.title) \(target)", submit: "Continue", fields: Self.promptFields(a.inputs, initial: a.initialValues(for: row))) { go($0) }
+        Task {
+            // Inputs with `choices` are pickers filled from the server; a failed lookup leaves only the fixed `extra` values.
+            let initial = a.initialValues(for: row)
+            var labels: [String: [String: String]] = [:]
+            var fields: [PromptField] = []
+            for f in a.inputs {
+                if let ch = f.choices {
+                    let json = (try? await model.api().call(ch.endpoint)) ?? .null
+                    let opts = ch.options(from: json)
+                    labels[f.id] = Dictionary(opts.map { ($0.label, $0.value) }, uniquingKeysWith: { x, _ in x })
+                    let start = opts.first { $0.value == initial[f.id] }?.label ?? opts.first?.label ?? ""
+                    fields.append(PromptField(id: f.id, label: f.label, initial: start, options: opts.map(\.label)))
+                } else { fields.append(contentsOf: Self.promptFields([f], initial: initial)) }
+            }
+            model.ask("\(a.title) \(target)", submit: "Continue", fields: fields) { values in
+                var values = values
+                for (id, map) in labels { values[id] = map[values[id] ?? ""] ?? values[id] ?? "" }
+                go(values)
+            }
+        }
     }
 
     private func load() async {

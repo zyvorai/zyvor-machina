@@ -36,18 +36,27 @@ public struct ResourceCreate: Hashable, Sendable {
         public var valueKeys: [String]
         public var valueJoin: String
         public var labelKeys: [String]
-        public init(_ endpoint: Endpoint, rowsPath: [String] = [], valueKeys: [String], valueJoin: String = "@", labelKeys: [String]) {
+        /// Fixed values offered before the loaded ones (and alone when the lookup fails), label = value.
+        public var extra: [String]
+        /// Only rows whose key equals the value (for example `status` = `ready`).
+        public var only: [String: String]
+        public init(_ endpoint: Endpoint, rowsPath: [String] = [], valueKeys: [String], valueJoin: String = "@", labelKeys: [String],
+                    extra: [String] = [], only: [String: String] = [:]) {
             self.endpoint = endpoint; self.rowsPath = rowsPath; self.valueKeys = valueKeys; self.valueJoin = valueJoin; self.labelKeys = labelKeys
+            self.extra = extra; self.only = only
         }
         public func options(from json: JSONValue) -> [(label: String, value: String)] {
             var node: JSONValue? = json
             for k in rowsPath { node = node?[k] }
-            return (node?.array ?? []).compactMap { row in
+            let loaded: [(label: String, value: String)] = (node?.array ?? []).filter { row in
+                only.allSatisfy { row.value(at: $0.key)?.text == $0.value }
+            }.compactMap { row in
                 let parts = valueKeys.compactMap { row.value(at: $0).map { $0.text } }
                 guard parts.count == valueKeys.count, !parts.contains("") else { return nil }
                 let label = labelKeys.compactMap { row.value(at: $0).map { $0.text } }.filter { !$0.isEmpty }.joined(separator: " · ")
                 return (label.isEmpty ? parts.joined(separator: valueJoin) : label, parts.joined(separator: valueJoin))
             }
+            return extra.map { (label: $0, value: $0) } + loaded.filter { l in !extra.contains(l.value) }
         }
     }
     public struct Invalid: Error, LocalizedError, Sendable { public var message: String; public var errorDescription: String? { message } }
@@ -232,6 +241,16 @@ public struct ResourceAction: Hashable, Sendable, Identifiable {
     public var showsResult: Bool
     /// Like `confirm`, with `{key}` placeholders filled from the selected row (see `confirmText(for:)`).
     public var confirmTemplate: String?
+    /// A second request sent after this one succeeds, when the user picked a step for `gate` (see `followUpEndpoint`).
+    public var followUp: FollowUp?
+    public struct FollowUp: Hashable, Sendable {
+        public var method: String, path: String
+        /// Input field whose chosen value becomes `bodyKey` of the second request; `skip` means "do not send it".
+        public var gate: String, bodyKey: String, skip: String
+        public init(_ method: String = "POST", _ path: String, gate: String, bodyKey: String, skip: String = "none") {
+            self.method = method; self.path = path; self.gate = gate; self.bodyKey = bodyKey; self.skip = skip
+        }
+    }
     public var id: String { title }
     public func with(_ edit: (inout ResourceAction) -> Void) -> ResourceAction { var a = self; edit(&a); return a }
 
@@ -306,9 +325,24 @@ public struct ResourceAction: Hashable, Sendable, Identifiable {
         if !inputValues.isEmpty {
             var o = body?.object ?? [:]
             for (k, v) in inputValues { o[k] = v }
+            if let g = followUp?.gate { o[g] = nil }      // consumed by the follow-up, not part of this request
             body = .object(o)
         }
         return Endpoint(method, out, query: query, body: body, controller: controller, timeout: timeout)
+    }
+
+    /// The follow-up request (for example a power step after a boot override), nil when the user chose to skip it.
+    public func followUpEndpoint(for row: ResourceRow, inputValues: [String: JSONValue]) -> Endpoint? {
+        guard let f = followUp, let pick = inputValues[f.gate]?.text, !pick.isEmpty, pick != f.skip else { return nil }
+        var out = ""; var rest = Substring(f.path)
+        while let open = rest.firstIndex(of: "{") {
+            out += rest[..<open]
+            guard let close = rest[open...].firstIndex(of: "}"), let v = row.values.value(at: String(rest[rest.index(after: open)..<close])), v != .null else { return nil }
+            out += MachinaClient.seg(v.text)
+            rest = rest[rest.index(after: close)...]
+        }
+        out += rest
+        return Endpoint(f.method, out, body: .object([f.bodyKey: .string(pick)]), controller: controller, timeout: timeout)
     }
 
     /// Typed body values from the raw text the user entered for `inputs`.
