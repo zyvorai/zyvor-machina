@@ -46,13 +46,18 @@ struct MachinaApp: App {
                 if let name = SpotlightIndexer.vmName(from: activity) { model.open(.vm(name)) }
             }
         }
+        .commands { MachinaCommands(model: model) }
         // One VM per window: opened from the sidebar's context menu.
         WindowGroup("VM", id: "vm-window", for: String.self) { $name in
             VMWindow(name: name ?? "").environment(model)
         }
-        MenuBarExtra("Machina", systemImage: "server.rack") {
+        MenuBarExtra {
             MenuBarContent().environment(model)
+        } label: {
+            // Glyph follows fleet health: rack when clear, circle/triangle with open alerts, offline hosts or approvals.
+            Image(systemName: model.phase == .ready ? model.health.symbol : "server.rack")
         }
+        Settings { SettingsView().environment(model) }
     }
 }
 

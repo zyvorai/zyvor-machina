@@ -27,4 +27,13 @@ enum Keychain {
         SecItemDelete([kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
                        kSecAttrAccount as String: account] as CFDictionary)
     }
+
+    /// Account names stored by this app (used to list pinned certificates).
+    static func accounts() -> [String] {
+        let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
+                                kSecReturnAttributes as String: true, kSecMatchLimit as String: kSecMatchLimitAll]
+        var out: AnyObject?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let rows = out as? [[String: Any]] else { return [] }
+        return rows.compactMap { $0[kSecAttrAccount as String] as? String }
+    }
 }

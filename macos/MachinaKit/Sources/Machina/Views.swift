@@ -19,21 +19,20 @@ struct StateBadge: View {
 
 struct MainWindow: View {
     @Environment(AppModel.self) private var model
-    @State private var search = ""
     @State private var confirmStop: VmInfo?
-    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openWindow) var openWindow
     // Long sections start collapsed; the Cmd-K palette reaches every page regardless.
     @State private var collapsed: Set<String> = ["Containers", "Kubernetes", "Control plane", "Security", "Fleet security", "Bare metal", "Insight", "Storage & network", "Fleet Cloud"]
 
     private var filtered: [VmInfo] {
-        search.isEmpty ? model.vms : model.vms.filter { $0.name.localizedCaseInsensitiveContains(search) }
+        VMFilter(model.vmQuery).apply(to: model.vms)
     }
     private var selectedVM: VmInfo? {
         if case .vm(let n) = model.selection { return model.vms.first { $0.name == n } }
         return nil
     }
     private var wantsPlatform: Bool {
-        switch model.selection { case .fleet, .tasks, .alerts: true; default: false }
+        switch model.selection { case .fleet, .tasks, .alerts, .insight: true; default: false }
     }
 
     var body: some View {
@@ -45,6 +44,9 @@ struct MainWindow: View {
                     Label("Tasks", systemImage: "checklist").tag(SidebarItem.tasks)
                     Label("Alerts", systemImage: "bell").badge(model.unackedAlerts).tag(SidebarItem.alerts)
                 }
+                Section("Visual insight") {
+                    ForEach(InsightPage.allCases, id: \.self) { p in Label(p.title, systemImage: p.icon).tag(SidebarItem.insight(p)) }
+                }
                 ForEach(FeatureRegistry.groups, id: \.name) { group in
                     Section(group.name, isExpanded: Binding(get: { !collapsed.contains(group.name) },
                                                            set: { if $0 { collapsed.remove(group.name) } else { collapsed.insert(group.name) } })) {
@@ -53,19 +55,13 @@ struct MainWindow: View {
                         }
                     }
                 }
-                Section("VMs") {
-                    ForEach(filtered) { vm in
-                        HStack {
-                            Text(vm.name)
-                            Spacer()
-                            Image(systemName: "circle.fill").font(.caption2)
-                                .foregroundStyle(vm.isRunning ? .green : .gray)
-                        }.tag(SidebarItem.vm(vm.name))
-                        .contextMenu { Button("Open in New Window") { openWindow(id: "vm-window", value: vm.name) } }
-                    }
+                let split = Pins.split(filtered, pins: model.pins)
+                if !split.pinned.isEmpty {
+                    Section("Pinned") { ForEach(split.pinned) { vmRow($0, tagPrefix: "pin") } }
                 }
+                Section("VMs") { ForEach(split.others) { vmRow($0, tagPrefix: "vm") } }
             }
-            .searchable(text: $search, placement: .sidebar, prompt: "Search VMs")
+            .searchable(text: $model.vmQuery, placement: .sidebar, prompt: "Search VMs (is:running vcpus>=4)")
             .navigationSplitViewColumnWidth(min: 200, ideal: 240)
             .safeAreaInset(edge: .bottom) {
                 HStack {
@@ -81,6 +77,7 @@ struct MainWindow: View {
             case .fleet: FleetView()
             case .tasks: TasksView()
             case .alerts: AlertsView()
+            case .insight(let p): InsightRouter(page: p)
             case .page(let id):
                 if let spec = FeatureRegistry.spec(id) { ResourceListView(spec: spec).id(id) }
                 else { ContentUnavailableView("Unknown page", systemImage: "questionmark.folder") }
@@ -101,19 +98,27 @@ struct MainWindow: View {
             }
         }
         .onAppear { if model.selection == nil { model.selection = .fleet } }
-        .task {
-            while !Task.isCancelled {
-                await model.refreshApprovals()
-                try? await Task.sleep(nanoseconds: 30_000_000_000)
-            }
-        }
         .sheet(isPresented: $model.showPalette) { CommandPalette().environment(model) }
+        .sheet(isPresented: $model.showBulk) { BulkActionsSheet().environment(model) }
+        .sheet(isPresented: $model.showShortcuts) { ShortcutsSheet() }
         .prompt($model.prompt)
         .confirm($model.pendingAction)
-        .background { Button("") { model.showPalette = true }.keyboardShortcut("k", modifiers: .command).opacity(0) }
         .toolbar {
             ToolbarItem { Button { Task { await model.presentCreateVM() } } label: { Image(systemName: "plus") }.help("New VM").disabled(!model.canWrite) }
             ToolbarItem { Button { Task { await model.refresh(); await model.refreshPlatform() } } label: { Image(systemName: "arrow.clockwise") } }
+            ToolbarItem { Button { model.showBulk = true } label: { Image(systemName: "checklist.checked") }.help("Bulk actions on VMs (⇧⌘B)") }
+            ToolbarItem {
+                Menu {
+                    if model.savedFilters.isEmpty { Text("No saved filters") }
+                    ForEach(model.savedFilters) { f in Button("\(f.name)  ·  \(f.query)") { model.vmQuery = f.query } }
+                    Divider()
+                    Button("Save Current Filter…") { model.saveCurrentFilter() }
+                    Button("Clear Filter") { model.vmQuery = "" }.disabled(model.vmQuery.isEmpty)
+                    if !model.savedFilters.isEmpty {
+                        Menu("Delete Saved Filter") { ForEach(model.savedFilters) { f in Button(f.name, role: .destructive) { model.savedFilters.removeAll { $0.name == f.name } } } }
+                    }
+                } label: { Image(systemName: "line.3.horizontal.decrease.circle") }.help("Saved VM filters")
+            }
             ToolbarItem {
                 Menu {
                     ForEach(model.servers) { p in
@@ -143,6 +148,25 @@ struct MainWindow: View {
                         .lineLimit(4).onTapGesture { model.error = nil }
                 }
             }.padding()
+        }
+    }
+}
+
+extension MainWindow {
+    /// One sidebar VM row; the tag prefix keeps a pinned VM's two possible rows distinct (it only appears once).
+    @ViewBuilder func vmRow(_ vm: VmInfo, tagPrefix: String) -> some View {
+        HStack {
+            if model.pins.contains(vm.name) { Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.orange) }
+            Text(vm.name)
+            Spacer()
+            Image(systemName: "circle.fill").font(.caption2).foregroundStyle(vm.isRunning ? .green : .gray)
+        }.tag(SidebarItem.vm(vm.name))
+        .contextMenu {
+            Button(model.pins.contains(vm.name) ? "Unpin" : "Pin to Top") { model.togglePin(vm.name) }
+            Button("Open in New Window") { openWindow(id: "vm-window", value: vm.name) }
+            Divider()
+            Button("Copy Name") { model.copyToPasteboard(vm.name, vm.name) }
+            Button("Copy Details as curl") { model.copyCurl(Endpoint("GET", "/api/v1/vms/\(MachinaClient.seg(vm.name))", query: vm.scopeQuery)) }
         }
     }
 }
@@ -186,27 +210,46 @@ struct VMOverview: View {
 
 struct MenuBarContent: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openWindow) var openWindow
 
     var body: some View {
         if model.phase != .ready {
             Text("Not connected")
         } else {
+            let h = model.health
+            Label(h.summary, systemImage: h.level == .ok ? "checkmark.circle" : h.symbol)
             Text("\(model.runningCount) of \(model.vms.count) VMs running")
-            Divider()
-            ForEach(model.vms.prefix(15)) { vm in
-                Menu("\(vm.isRunning ? "●" : "○") \(vm.name)") {
-                    if vm.isRunning {
-                        Button("Shut Down") { Task { await model.power(.shutdown, vm) } }
-                        Button("Reboot") { Task { await model.power(.reboot, vm) } }
-                    } else {
-                        Button("Start") { Task { await model.power(.start, vm) } }
-                    }
-                }
+            if model.pendingApprovals > 0 { Button("Review \(model.pendingApprovals) pending approval\(model.pendingApprovals == 1 ? "" : "s")") { show(.page("approvals")) } }
+            if model.unackedAlerts > 0 { Button("Open \(model.unackedAlerts) alert\(model.unackedAlerts == 1 ? "" : "s")") { show(.alerts) } }
+            if !model.recentVMs.isEmpty {
+                Divider()
+                Text("Recent")
+                ForEach(model.recentVMs) { vm in vmMenu(vm) }
             }
+            Divider()
+            Menu("All VMs") { ForEach(model.vms.prefix(30)) { vm in vmMenu(vm) } }
+            Button("Fleet") { show(.fleet) }
         }
         Divider()
         Button("Open Machina") { openWindow(id: "main"); NSApp.activate(ignoringOtherApps: true) }
+        SettingsLink { Text("Settings…") }
         Button("Quit") { NSApp.terminate(nil) }
+    }
+
+    private func show(_ link: DeepLink) { openWindow(id: "main"); model.open(link) }
+
+    private func vmMenu(_ vm: VmInfo) -> some View {
+        Menu("\(vm.isRunning ? "●" : "○") \(vm.name)") {
+            Button("Open") { show(.vm(vm.name)) }
+            Divider()
+            if vm.isRunning {
+                Button("Shut Down") { Task { await model.power(.shutdown, vm) } }
+                Button("Reboot") { Task { await model.power(.reboot, vm) } }
+            } else if vm.state.lowercased() == "paused" {
+                Button("Resume") { Task { await model.power(.resume, vm) } }
+            } else {
+                Button("Start") { Task { await model.power(.start, vm) } }
+            }
+        }
     }
 }

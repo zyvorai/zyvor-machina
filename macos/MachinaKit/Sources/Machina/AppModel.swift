@@ -4,7 +4,14 @@ import MachinaKit
 import UserNotifications
 import AppKit
 
-enum SidebarItem: Hashable { case fleet, tasks, alerts, vm(String), page(String) }
+/// What the on-screen resource page exposes to menu commands.
+struct PageContext {
+    var spec: ResourceSpec
+    var columns: [ResourceColumn]
+    var rows: [ResourceRow]
+}
+
+enum SidebarItem: Hashable { case fleet, tasks, alerts, vm(String), page(String), insight(InsightPage) }
 
 @MainActor @Observable
 final class AppModel {
@@ -18,7 +25,14 @@ final class AppModel {
     var error: String?
     var live = false
     var pendingFingerprint: String?
-    var selection: SidebarItem?
+    var selection: SidebarItem? { didSet { if case .vm(let n) = selection { settings.recentVMs = RecentVMs.touching(settings.recentVMs, n) } } }
+    let settings = AppSettings.shared
+    private var ambientTask: Task<Void, Never>?
+    private var seenAlerts: Set<String>?
+    var health: FleetHealth {
+        FleetHealth.evaluate(alerts: alerts, hosts: hosts, pendingApprovals: pendingApprovals, connected: phase == .ready)
+    }
+    var recentVMs: [VmInfo] { RecentVMs.existing(settings.recentVMs, in: vms) }
 
     // Fleet / tasks / alerts (controller + fleet endpoints)
     var hosts: [PlatformHost] = []
@@ -27,6 +41,9 @@ final class AppModel {
     var unackedAlerts = 0
     var metrics: LocalMetrics?
     var history: [MetricsPoint] = []
+    var fleetVMs: [PlatformVM] = []
+    /// VM changes seen on the watch stream this session, newest first (for the "What changed" page).
+    var activity: [ActivityEntry] = []
     var platformError: String?
     var platformLoaded = false
 
@@ -34,6 +51,62 @@ final class AppModel {
     var role: String?
     var canWrite: Bool { role == "admin" || role == "operator" }
     var showPalette = false
+    var showShortcuts = false
+    var showBulk = false
+
+    // Productivity state, kept in UserDefaults per Mac (names only; nothing secret).
+    var pins: [String] = UserDefaults.standard.stringArray(forKey: "pinnedVMs") ?? [] { didSet { UserDefaults.standard.set(pins, forKey: "pinnedVMs") } }
+    var recents: [String] = UserDefaults.standard.stringArray(forKey: "paletteRecents") ?? [] { didSet { UserDefaults.standard.set(recents, forKey: "paletteRecents") } }
+    var savedFilters: [SavedFilter] = (UserDefaults.standard.data(forKey: "savedFilters")).flatMap { try? JSONDecoder().decode([SavedFilter].self, from: $0) } ?? [] {
+        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(savedFilters), forKey: "savedFilters") }
+    }
+    /// The sidebar's VM filter text (name words plus `is:running`, `vcpus>=4`, …).
+    var vmQuery = ""
+    /// The resource page on screen, so menu shortcuts can export it or copy its request as curl.
+    var page: PageContext?
+
+    func togglePin(_ name: String) { pins = Pins.toggling(name, in: pins) }
+    func remember(_ id: String) { recents = Recents.pushing(id, onto: recents) }
+    func saveCurrentFilter() {
+        guard !VMFilter(vmQuery).isEmpty else { error = "Type a filter in the sidebar first (for example is:running vcpus>=4)."; return }
+        ask("Save VM filter", message: vmQuery, submit: "Save", fields: [PromptField(id: "name", label: "Name")]) { [self] v in
+            savedFilters = SavedFilter.saving(SavedFilter(name: v["name"] ?? "", query: vmQuery), into: savedFilters)
+            notice = "Filter saved"
+        }
+    }
+
+    func copyToPasteboard(_ text: String, _ what: String) {
+        NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
+        notice = "Copied \(what)"
+    }
+    func copyCurl(_ e: Endpoint, _ what: String = "curl command") {
+        guard client != nil, let url = URL(string: serverURL.trimmingCharacters(in: .whitespaces)) else { return }
+        copyToPasteboard(Curl.script(e, server: url), what)
+    }
+
+    /// Runs one bulk action over the VMs it applies to, one at a time so a failure names the VM.
+    /// Goes through the same role gate and confirmation as single actions.
+    func bulk(_ action: BulkAction, on vms: [VmInfo]) {
+        guard canWrite else { error = "\(action.title): your role (\(role ?? "unknown")) cannot make changes"; return }
+        let plan = action.plan(vms)
+        guard !plan.apply.isEmpty else { error = "\(action.title): none of the selected VMs can do that right now."; return }
+        let names = plan.apply.map(\.name).joined(separator: ", ")
+        let skipped = plan.skip.isEmpty ? "" : " Skipped (wrong state): \(plan.skip.map(\.name).joined(separator: ", "))."
+        confirmAction("\(action.title) \(plan.apply.count) VM\(plan.apply.count == 1 ? "" : "s")?", message: names + "." + skipped,
+                      label: action.title, destructive: action.destructive) { [self] in
+            var failed: [String] = []
+            let snap = BulkAction.snapshotName(at: Date())
+            for vm in plan.apply {
+                let ok = await perform("\(action.title) \(vm.name)") { c in
+                    if let p = action.power { try await c.power(p, vm: vm) } else { try await c.createSnapshot(vm, name: snap, description: "Bulk snapshot from Machina for Mac") }
+                }
+                if !ok { failed.append(vm.name) }
+            }
+            if failed.isEmpty { notice = "\(action.title): \(plan.apply.count) done"; error = nil }
+            else { error = "\(action.title) failed for \(failed.joined(separator: ", "))" }
+            await refresh()
+        }
+    }
 
     // Saved servers (without passwords: those live in the Keychain, certificate pins too).
     var servers: [ServerProfile] = {
@@ -53,6 +126,8 @@ final class AppModel {
     /// Switches to a saved server, signing in with its stored password; without one the login form is prefilled.
     func switchTo(_ p: ServerProfile) async {
         if phase == .ready { await signOut() }
+        if hasSavedPassword(p), settings.biometric.storedPasswords,
+           !(await Biometric.authenticate("Sign in to \(p.name) with the saved password")) { error = "Authentication cancelled"; return }
         serverURL = p.url.absoluteString; username = p.username ?? ""
         if let pw = Keychain.get(passwordAccount(p)) { await signIn(password: pw) }
     }
@@ -96,7 +171,11 @@ final class AppModel {
 
     func confirmAction(_ title: String, message: String, label: String, destructive: Bool = true,
                        run: @escaping @MainActor () async -> Void) {
-        pendingAction = PendingAction(title: title, message: message, label: label, destructive: destructive, run: run)
+        let gated = settings.biometric.required(destructive: destructive)
+        pendingAction = PendingAction(title: title, message: message, label: label, destructive: destructive, run: {
+            if gated, !(await Biometric.authenticate("\(label): \(title)")) { self.notice = "Cancelled: authentication required"; return }
+            await run()
+        })
     }
 
     var serverURL: String = UserDefaults.standard.string(forKey: "serverURL") ?? "https://"
@@ -132,12 +211,14 @@ final class AppModel {
             await refresh()
             phase = .ready
             startWatching(c)
+            startAmbientLoop()
             notifications.model = self
             let center = UNUserNotificationCenter.current()
             center.delegate = notifications
-            // Review opens the app on the approvals page. Reject (the safe direction) needs the Mac to be unlocked;
-            // approving stays in the app, behind a confirmation, because a banner does not show the plan.
+            // Approve and Reject need the Mac unlocked; Approve also asks for Touch ID (see approveApproval), and the
+            // notification body carries the target and requester. Review opens the approvals page for the full plan.
             center.setNotificationCategories([UNNotificationCategory(identifier: "APPROVAL", actions: [
+                UNNotificationAction(identifier: "APPROVE", title: "Approve", options: [.authenticationRequired]),
                 UNNotificationAction(identifier: "REVIEW", title: "Review", options: [.foreground]),
                 UNNotificationAction(identifier: "REJECT", title: "Reject", options: [.authenticationRequired, .destructive]),
             ], intentIdentifiers: [], options: [])])
@@ -149,9 +230,9 @@ final class AppModel {
     }
 
     func signOut() async {
-        watchTask?.cancel(); watchTask = nil
+        watchTask?.cancel(); watchTask = nil; ambientTask?.cancel(); ambientTask = nil; seenAlerts = nil
         await client?.logout()
-        SpotlightIndexer.shared.clear(); client = nil; seenApprovals = nil; pendingApprovals = 0; role = nil; vms = []; hosts = []; tasks = []; alerts = []; metrics = nil
+        SpotlightIndexer.shared.clear(); client = nil; seenApprovals = nil; pendingApprovals = 0; role = nil; vms = []; hosts = []; tasks = []; alerts = []; metrics = nil; fleetVMs = []; activity = []
         platformLoaded = false; selection = nil; live = false; phase = .signedOut
     }
 
@@ -161,13 +242,50 @@ final class AppModel {
         pendingApprovals = pending.count
         let fresh = Approvals.newPending(seen: seenApprovals, current: pending.map { ($0.id, "pending") })
         seenApprovals = Set(pending.map(\.id))
-        for id in fresh {
+        for id in fresh where settings.notifyApprovals && settings.mayNotify(severity: "warning") {
             let content = UNMutableNotificationContent()
             content.title = "Firewall change needs approval"
             content.body = pending.first { $0.id == id }?.summary ?? ""
             content.categoryIdentifier = "APPROVAL"
             content.userInfo = ["approvalId": id]
             try? await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "approval-\(id)", content: content, trigger: nil))
+        }
+    }
+
+    /// Approve from a notification action. Asks for Touch ID first when `biometric.approvals` is on; a banner never approves silently.
+    func approveApproval(_ id: String) async {
+        if settings.biometric.approvals, !(await Biometric.authenticate("Approve firewall change \(id.prefix(8))")) {
+            notice = "Approval cancelled: authentication required"; return
+        }
+        if await perform("Approve", { _ = try await $0.call(Endpoint("POST", "/api/v1/zeus-firewall/approvals/\(MachinaClient.seg(id))/approve", body: .object([:]), controller: true)) }) {
+            notice = "Approved firewall change"; await refreshApprovals()
+        }
+    }
+
+    /// Background poll (settings.refreshSeconds): keeps the menu bar glyph, badge and notifications current without a page open.
+    private func startAmbientLoop() {
+        ambientTask?.cancel()
+        ambientTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                await self.refreshPlatform()
+                await self.refreshApprovals()
+                self.notifyNewAlerts()
+                try? await Task.sleep(for: .seconds(self.settings.refreshSeconds))
+            }
+        }
+    }
+
+    private func notifyNewAlerts() {
+        let open = alerts.filter { !$0.acknowledged }
+        defer { seenAlerts = Set(open.map(\.id)) }
+        guard let seen = seenAlerts, settings.notifyAlerts else { return }
+        for a in open where !seen.contains(a.id) && settings.mayNotify(severity: a.severity) {
+            let content = UNMutableNotificationContent()
+            content.title = "\(a.severity.capitalized) alert: \(a.ruleName)"
+            content.body = a.message
+            content.threadIdentifier = "alerts"
+            UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "alert-\(a.id)", content: content, trigger: nil))
         }
     }
 
@@ -201,8 +319,10 @@ final class AppModel {
         async let t = capture { try await client.tasks() }
         async let m = capture { try await client.localMetrics() }
         async let a = capture { try await client.alerts() }
+        async let fv = capture { try await client.fleetVMs() }
         async let hi = capture { try await client.metricsHistory(limit: 120) }
-        let (hr, tr, mr, ar, hir) = await (h, t, m, a, hi)
+        let (hr, tr, mr, ar, hir, fvr) = await (h, t, m, a, hi, fv)
+        if case .success(let v) = fvr { fleetVMs = v }
         if case .success(let v) = hir { history = v }
         var errors: [String] = []
         switch hr { case .success(let v): hosts = v; case .failure(let e): errors.append("hosts: \(e.localizedDescription)") }
@@ -229,6 +349,8 @@ final class AppModel {
 
     func power(_ action: PowerAction, _ vm: VmInfo) async {
         guard let client else { return }
+        if action == .stop, settings.biometric.required(destructive: true),
+           !(await Biometric.authenticate("Force stop \(vm.name)")) { error = "Force stop cancelled: authentication required"; return }
         do { try await client.power(action, vm: vm); error = nil }
         catch { self.error = "\(action.rawValue) \(vm.name): \(error.localizedDescription)" }
     }
@@ -260,6 +382,7 @@ final class AppModel {
                 case .disconnected: self.live = false
                 case .changes(let changes):
                     self.live = true
+                    self.activity = ActivityLog.append(self.activity, changes, at: Date())
                     self.notify(changes)
                     await self.refresh()
                 }
@@ -268,6 +391,7 @@ final class AppModel {
     }
 
     private func notify(_ changes: [VmChange]) {
+        guard settings.notifyStateChanges, settings.mayNotify(severity: "info") else { return }
         for ch in changes where ch.event == "state_change" {
             let content = UNMutableNotificationContent()
             content.title = ch.name
@@ -290,6 +414,7 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, @u
         await MainActor.run {
             guard let model else { return }
             if action == "REJECT" { Task { await model.rejectApproval(id) } }
+            else if action == "APPROVE" { Task { await model.approveApproval(id) } }
             else { model.selection = .page("approvals"); NSApp.activate(ignoringOtherApps: true) }
         }
     }

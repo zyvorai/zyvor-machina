@@ -1,5 +1,8 @@
 import SwiftUI
+import AppKit
 import MachinaKit
+
+private final class ResultBox: @unchecked Sendable { var value: JSONValue = .null }
 
 /// Renders any `ResourceSpec`: loads its endpoint, refreshes every 15 s, filters, and shows the
 /// selected row's raw fields in an inspector.
@@ -32,9 +35,20 @@ struct ResourceListView: View {
                 }
                 ForEach(spec.actions) { a in
                     Button(a.title) { run(a) }
-                        .disabled(selected == nil || !model.canWrite)
+                        .disabled((selected == nil && !a.global) || !model.canWrite)
                         .help(model.canWrite ? "" : "Your role cannot make changes")
                 }
+                Menu {
+                    Button("Export CSV…") { exportPage(csv: true) }
+                    Button("Export JSON…") { exportPage(csv: false) }
+                    Divider()
+                    Button("Copy as curl") { model.copyCurl(spec.endpoint, "curl for \(spec.title)") }
+                    if let r = selected {
+                        ForEach(spec.actions.filter { $0.endpoint(for: r) != nil }) { act in
+                            Button("Copy curl: \(act.title) selected row") { if let e = act.endpoint(for: r) { model.copyCurl(e, "curl for \(act.title)") } }
+                        }
+                    }
+                } label: { Image(systemName: "square.and.arrow.up") }.menuStyle(.borderlessButton).fixedSize().help("Export or copy as curl")
                 if spec.layout == .table {
                     Toggle(isOn: $inspect) { Image(systemName: "sidebar.right") }.toggleStyle(.button).help("Show details")
                 }
@@ -68,6 +82,9 @@ struct ResourceListView: View {
                 ContentUnavailableView("Select a row", systemImage: "cursorarrow.click").inspectorColumnWidth(min: 240, ideal: 300)
             }
         }
+        .onChange(of: rows) { model.page = PageContext(spec: spec, columns: columns, rows: filtered) }
+        .onChange(of: search) { model.page = PageContext(spec: spec, columns: columns, rows: filtered) }
+        .onDisappear { if model.page?.spec.id == spec.id { model.page = nil } }
         .task(id: spec.id) {
             await load()
             while !Task.isCancelled {
@@ -78,26 +95,70 @@ struct ResourceListView: View {
         }
     }
 
+    /// Saves the rows currently shown (after the filter) with a save panel; JSON keeps every field, CSV the visible columns.
+    private func exportPage(csv: Bool) {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = ResourceExport.fileName(spec.title, ext: csv ? "csv" : "json")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let text = csv ? ResourceExport.csv(columns: columns, rows: filtered) : ResourceExport.json(rows: filtered)
+        do { try text.write(to: url, atomically: true, encoding: .utf8); model.notice = "Exported \(filtered.count) rows to \(url.lastPathComponent)" }
+        catch { model.error = "Export failed: \(error.localizedDescription)" }
+    }
+
     private func openCreate(_ c: ResourceCreate) {
-        let fields = c.fields.map { f in PromptField(id: f.id, label: f.label, initial: f.initial, options: f.kind == .bool ? ["yes", "no"] : nil) }
-        model.ask(c.title, submit: "Create", fields: fields) { values in
-            let body: JSONValue
-            do { body = try c.body(from: values) } catch { model.error = error.localizedDescription; return }
-            var draft = c.endpoint; draft.body = body
-            let e = draft
-            if await model.perform(c.title, { _ = try await $0.call(e) }) { model.notice = "\(c.title): done"; await load() }
+        Task {
+            // Pickers are filled from the server first; a failed lookup leaves that field empty (and the form refuses to submit if it is required).
+            var labels: [String: [String: String]] = [:]   // field id -> option label -> value
+            var fields: [PromptField] = []
+            for f in c.fields {
+                if let ch = f.choices {
+                    let json = (try? await model.api().call(ch.endpoint)) ?? .null
+                    var opts = ch.options(from: json)
+                    if opts.isEmpty && f.required { model.error = "\(c.title): no \(f.label.lowercased()) available."; return }
+                    if !f.required { opts.insert(("none", ""), at: 0) }
+                    labels[f.id] = Dictionary(opts.map { ($0.label, $0.value) }, uniquingKeysWith: { a, _ in a })
+                    fields.append(PromptField(id: f.id, label: f.label, initial: opts.first?.label ?? "", options: opts.map(\.label)))
+                } else {
+                    fields.append(PromptField(id: f.id, label: f.label, initial: f.initial, options: f.kind == .bool ? ["yes", "no"] : nil))
+                }
+            }
+            model.ask(c.title, submit: "Create", fields: fields) { values in
+                var values = values
+                for (id, map) in labels { values[id] = map[values[id] ?? ""] ?? "" }
+                let body: JSONValue
+                do { body = try c.body(from: values) } catch { model.error = error.localizedDescription; return }
+                var draft = c.endpoint; draft.body = body
+                let e = draft
+                if await model.perform(c.title, { _ = try await $0.call(e) }) { model.notice = "\(c.title): queued"; await load() }
+            }
         }
     }
 
-    /// One row action: build the request from the selected row, confirm if it is destructive, run, reload.
+    /// One row action: ask for its inputs, confirm if destructive or flagged, run, report `ok: false` bodies, reload.
     private func run(_ a: ResourceAction) {
-        guard let row = selected, let endpoint = a.endpoint(for: row) else { model.error = "\(a.title): the row is missing a value the request needs."; return }
-        let target = columns.first.map { $0.render(row) } ?? row.id
-        let go: @MainActor () async -> Void = {
-            if await model.perform("\(a.title) \(target)", { _ = try await $0.call(endpoint) }) { model.notice = "\(a.title): done"; await load() }
+        let row = selected ?? ResourceRow(id: "", values: .object([:]))
+        guard a.global || selected != nil, a.endpoint(for: row) != nil else { model.error = "\(a.title): the row is missing a value the request needs."; return }
+        let target = a.global ? spec.title : (columns.first.map { $0.render(row) } ?? row.id)
+        let execute: @MainActor ([String: JSONValue]) async -> Void = { extra in
+            guard let endpoint = a.endpoint(for: row, inputValues: extra) else { return }
+            let box = ResultBox()
+            let ok = await model.perform("\(a.title) \(target)", { box.value = try await $0.call(endpoint) })
+            guard ok else { return }
+            let outcome = box.value
+            if let why = ResourceAction.failure(in: outcome) { model.error = "\(a.title) \(target): \(why)"; return }
+            model.notice = ResourceAction.summary(of: outcome).map { "\(a.title): \($0)" } ?? "\(a.title): done"
+            await load()
         }
-        if a.destructive { model.confirmAction("\(a.title) \(target)?", message: "This changes the server and may not be undoable.", label: a.title, run: go) }
-        else { Task { await go() } }
+        let confirmThenRun: @MainActor ([String: JSONValue]) -> Void = { extra in
+            if a.destructive || a.confirm != nil {
+                model.confirmAction("\(a.title) \(target)?", message: a.confirm ?? "This changes the server and may not be undoable.", label: a.title, destructive: a.destructive) { await execute(extra) }
+            } else { Task { await execute(extra) } }
+        }
+        if a.inputs.isEmpty { confirmThenRun([:]); return }
+        let fields = a.inputs.map { PromptField(id: $0.id, label: $0.label, initial: $0.initial, options: $0.kind == .bool ? ["yes", "no"] : nil) }
+        model.ask("\(a.title) \(target)", submit: "Continue", fields: fields) { values in
+            do { confirmThenRun(try a.inputBody(from: values)) } catch { model.error = error.localizedDescription }
+        }
     }
 
     private func load() async {
@@ -109,40 +170,4 @@ struct ResourceListView: View {
         }
         loaded = true
     }
-}
-
-/// Cmd-K: jump to any page, fleet view or VM.
-struct CommandPalette: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
-    @State private var query = ""
-
-    private struct Entry: Identifiable { var id: String; var title: String; var detail: String; var icon: String; var item: SidebarItem }
-
-    private var entries: [Entry] {
-        var e: [Entry] = [
-            .init(id: "fleet", title: "Fleet", detail: "Overview", icon: "server.rack", item: .fleet),
-            .init(id: "tasks", title: "Tasks", detail: "Overview", icon: "checklist", item: .tasks),
-            .init(id: "alerts", title: "Alerts", detail: "Overview", icon: "bell", item: .alerts),
-        ]
-        e += FeatureRegistry.all.map { .init(id: "p-" + $0.id, title: $0.title, detail: $0.group, icon: $0.icon, item: .page($0.id)) }
-        e += model.vms.map { .init(id: "vm-" + $0.name, title: $0.name, detail: "VM · \($0.state)", icon: "desktopcomputer", item: .vm($0.name)) }
-        return query.isEmpty ? e : e.filter { $0.title.localizedCaseInsensitiveContains(query) || $0.detail.localizedCaseInsensitiveContains(query) }
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            TextField("Go to…", text: $query).textFieldStyle(.plain).font(.title3).padding(14)
-                .onSubmit { if let f = entries.first { go(f.item) } }
-            Divider()
-            List(entries) { e in
-                Button { go(e.item) } label: {
-                    HStack { Label(e.title, systemImage: e.icon); Spacer(); Text(e.detail).foregroundStyle(.secondary).font(.caption) }
-                }.buttonStyle(.plain)
-            }
-        }
-        .frame(width: 520, height: 380)
-    }
-
-    private func go(_ item: SidebarItem) { model.selection = item; dismiss() }
 }
