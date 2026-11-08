@@ -3,11 +3,16 @@ import Foundation
 /// Pages of the "Visual insight" sidebar section.
 public enum InsightPage: String, CaseIterable, Hashable, Sendable {
     case topology, grid, heatmap, timeline
+    case aiBlackBox, aiPerformance, aiMigration, aiFleet, aiNoisy
     public var title: String {
-        switch self { case .topology: "Topology map"; case .grid: "VM grid"; case .heatmap: "Capacity heatmap"; case .timeline: "What changed" }
+        switch self { case .topology: "Topology map"; case .grid: "VM grid"; case .heatmap: "Capacity heatmap"; case .timeline: "What changed"
+            case .aiBlackBox: "Black Box root cause"; case .aiPerformance: "Performance autopilot"; case .aiMigration: "Migration oracle"
+            case .aiFleet: "Fleet insight"; case .aiNoisy: "Noisy neighbour graph" }
     }
     public var icon: String {
-        switch self { case .topology: "point.3.connected.trianglepath.dotted"; case .grid: "square.grid.3x3.fill"; case .heatmap: "square.grid.3x3.topleft.filled"; case .timeline: "clock.arrow.circlepath" }
+        switch self { case .topology: "point.3.connected.trianglepath.dotted"; case .grid: "square.grid.3x3.fill"; case .heatmap: "square.grid.3x3.topleft.filled"; case .timeline: "clock.arrow.circlepath"
+            case .aiBlackBox: "shippingbox"; case .aiPerformance: "speedometer"; case .aiMigration: "arrow.triangle.swap"
+            case .aiFleet: "chart.bar.doc.horizontal"; case .aiNoisy: "waveform.path.ecg" }
     }
 }
 
