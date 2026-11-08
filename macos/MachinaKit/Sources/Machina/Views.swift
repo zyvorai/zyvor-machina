@@ -23,6 +23,7 @@ struct StateBadge: View {
 struct MainWindow: View {
     @Environment(AppModel.self) private var model
     @State private var confirmStop: VmInfo?
+    @State private var dropTargeted = false
     @Environment(\.openWindow) var openWindow
     // Long sections start collapsed; the Cmd-K palette reaches every page regardless.
     @State private var collapsed: Set<String> = ["Containers", "Kubernetes", "Control plane", "Security", "Fleet security", "Bare metal", "Insight", "Storage & network", "Fleet Cloud"]
@@ -107,6 +108,14 @@ struct MainWindow: View {
         .prompt($model.prompt)
         .confirm($model.pendingAction)
         .textResult($model.textResult)
+        .dropDestination(for: URL.self) { urls, _ in model.handleDrop(urls) } isTargeted: { dropTargeted = $0 }
+        .overlay {
+            if dropTargeted {
+                RoundedRectangle(cornerRadius: 14).strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [10, 6])).padding(6)
+                    .overlay { Label("Drop .iso files to upload", systemImage: "opticaldisc").font(.title2.weight(.semibold)).padding(16).background(.regularMaterial, in: .rect(cornerRadius: 12)) }
+                    .allowsHitTesting(false)
+            }
+        }
         .toolbar {
             ToolbarItem { Button { Task { await model.presentCreateVM() } } label: { Image(systemName: "plus") }.help("New VM").accessibilityLabel("New VM").disabled(!model.canWrite) }
             ToolbarItem { Button { Task { await model.refresh(); await model.refreshPlatform() } } label: { Image(systemName: "arrow.clockwise") }.help("Refresh").accessibilityLabel("Refresh") }

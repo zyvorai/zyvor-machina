@@ -35,7 +35,7 @@ public actor MachinaClient {
         return URLSession(configuration: cfg, delegate: delegate, delegateQueue: nil)
     }
 
-    private func url(_ path: String, _ query: [URLQueryItem] = []) throws -> URL {
+    func url(_ path: String, _ query: [URLQueryItem] = []) throws -> URL {
         guard var c = URLComponents(url: server.url, resolvingAgainstBaseURL: false) else { throw MachinaError.badURL }
         c.percentEncodedPath = path   // callers pass an already-encoded path
         c.queryItems = query.isEmpty ? nil : query
@@ -60,6 +60,13 @@ public actor MachinaClient {
                 : MachinaError.http(code, String(data: data.prefix(300), encoding: .utf8) ?? "")
         }
         return data
+    }
+
+    /// Signs in again with the stored credentials (after a 401); false when there are none.
+    func reloginIfPossible() async throws -> Bool {
+        guard let c = credentials else { return false }
+        try await login(user: c.user, password: c.password)
+        return true
     }
 
     @discardableResult

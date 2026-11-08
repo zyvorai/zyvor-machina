@@ -112,6 +112,8 @@ final class AppModel {
     }
     /// Sign-in methods the typed server advertises (nil until probed or when unreachable).
     var providers: AuthProviders?
+    /// ISO uploads and downloads in flight (see `Transfers.swift`).
+    let transfers = TransferCenter()
 
     // Saved servers (without passwords: those live in the Keychain, certificate pins too).
     var servers: [ServerProfile] = {
