@@ -97,6 +97,7 @@ struct SettingsView: View {
             }.tabItem { Label("Trusted certificates", systemImage: "checkmark.shield") }
 
             QuickAccessSettingsForm().tabItem { Label("Quick access", systemImage: "bolt") }
+            AIOperatorSettingsForm().tabItem { Label("AI operator", systemImage: "sparkles") }
         }
         .formStyle(.grouped).frame(width: 520, height: 440).onAppear(perform: reload)
     }

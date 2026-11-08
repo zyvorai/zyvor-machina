@@ -48,6 +48,7 @@ struct MainWindow: View {
                     Label("Tasks", systemImage: "checklist").tag(SidebarItem.tasks)
                     Label("Alerts", systemImage: "bell").badge(model.unackedAlerts).tag(SidebarItem.alerts)
                 }
+                Label("AI operator", systemImage: "sparkles").tag(SidebarItem.aiOperator)
                 Section("Visual insight") {
                     ForEach(InsightPage.allCases, id: \.self) { p in Label(p.title, systemImage: p.icon).tag(SidebarItem.insight(p)) }
                 }
@@ -82,6 +83,7 @@ struct MainWindow: View {
             case .tasks: TasksView()
             case .alerts: AlertsView()
             case .insight(let p): InsightRouter(page: p)
+            case .aiOperator: AIOperatorView()
             case .page(let id):
                 if let spec = FeatureRegistry.spec(id) { ResourceListView(spec: spec).id(id) }
                 else { ContentUnavailableView("Unknown page", systemImage: "questionmark.folder") }

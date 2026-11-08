@@ -11,7 +11,7 @@ struct PageContext {
     var rows: [ResourceRow]
 }
 
-enum SidebarItem: Hashable { case fleet, tasks, alerts, vm(String), page(String), insight(InsightPage) }
+enum SidebarItem: Hashable { case fleet, tasks, alerts, vm(String), page(String), insight(InsightPage), aiOperator }
 
 @MainActor @Observable
 final class AppModel {
