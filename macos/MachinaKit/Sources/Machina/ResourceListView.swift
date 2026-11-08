@@ -29,7 +29,7 @@ struct ResourceListView: View {
                 Label(spec.title, systemImage: spec.icon).font(.largeTitle.weight(.semibold))
                 Spacer()
                 Text("\(filtered.count) of \(rows.count)").foregroundStyle(.secondary).monospacedDigit()
-                Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }
+                Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }.help("Reload").accessibilityLabel("Reload")
                 if let create = spec.create {
                     Button("New…") { openCreate(create) }.disabled(!model.canWrite).help(model.canWrite ? "" : "Your role cannot make changes")
                 }

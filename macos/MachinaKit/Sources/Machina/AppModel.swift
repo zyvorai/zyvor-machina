@@ -107,6 +107,8 @@ final class AppModel {
             await refresh()
         }
     }
+    /// Sign-in methods the typed server advertises (nil until probed or when unreachable).
+    var providers: AuthProviders?
 
     // Saved servers (without passwords: those live in the Keychain, certificate pins too).
     var servers: [ServerProfile] = {
@@ -186,6 +188,19 @@ final class AppModel {
     private var trustContinuation: CheckedContinuation<Bool, Never>?
 
     var runningCount: Int { vms.filter(\.isRunning).count }
+
+    /// Ask the typed server which sign-in methods it offers. Only runs for servers whose certificate is
+    /// already pinned or is publicly trusted; never prompts for trust.
+    func probeProviders() async {
+        providers = nil
+        guard let url = URL(string: serverURL.trimmingCharacters(in: .whitespaces)), url.host != nil else { return }
+        let account = "pin:\(url.host ?? ""):\(url.port ?? 443)"
+        let delegate = PinnedTLSDelegate(pinned: Keychain.get(account), confirmFirstUse: { _ in false }, persist: { _ in })
+        let c = MachinaClient(server: ServerProfile(name: url.host ?? "Server", url: url),
+                              session: MachinaClient.makeSession(delegate: delegate))
+        let result = await c.authProviders()
+        if !Task.isCancelled { providers = result }
+    }
 
     func signIn(password: String) async {
         error = nil

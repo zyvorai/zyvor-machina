@@ -47,6 +47,7 @@ struct MachinaApp: App {
             }
         }
         .commands { MachinaCommands(model: model) }
+        .commands { UpdateCommands() }
         // One VM per window: opened from the sidebar's context menu.
         WindowGroup("VM", id: "vm-window", for: String.self) { $name in
             VMWindow(name: name ?? "").environment(model)

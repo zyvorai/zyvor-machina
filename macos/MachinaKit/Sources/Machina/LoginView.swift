@@ -40,10 +40,11 @@ struct LoginView: View {
                         .textContentType(.password).focused($focus, equals: .password).onSubmit(go)
                     } trailing: {
                         Button { showPassword.toggle() } label: { Image(systemName: showPassword ? "eye.slash" : "eye").foregroundStyle(.secondary) }
-                            .buttonStyle(.plain).help(showPassword ? "Hide password" : "Show password")
-                            .accessibilityLabel(showPassword ? "Hide password" : "Show password")
+                            .buttonStyle(.plain).help(showPassword ? String(localized: "Hide password") : String(localized: "Show password"))
+                            .accessibilityLabel(showPassword ? String(localized: "Hide password") : String(localized: "Show password"))
                     }
                 }
+                if let p = model.providers, p.hasSSO { ssoNote(p) }
                 if let e = model.error { errorBanner(e) }
                 Button(action: go) {
                     ZStack {
@@ -63,6 +64,10 @@ struct LoginView: View {
             .modifier(ShakeEffect(travel: shake))
         }
         .onAppear { focus = model.serverURL.count > 8 && !model.username.isEmpty ? .password : (model.serverURL.count > 8 ? .user : .server) }
+        .task(id: model.serverURL) {
+            try? await Task.sleep(nanoseconds: 600_000_000)   // debounce typing
+            if !Task.isCancelled, urlLooksValid { await model.probeProviders() }
+        }
         .onChange(of: model.error) { _, new in
             if new != nil, !reduceMotion { withAnimation(.linear(duration: 0.45)) { shake += 1 } }
         }
@@ -111,6 +116,16 @@ struct LoginView: View {
         }
     }
 
+    /// The daemon's OIDC/SAML flow ends in an HttpOnly cookie on its own https origin, so the app cannot
+    /// receive a session from a browser; say so instead of offering a button that cannot work.
+    private func ssoNote(_ p: AuthProviders) -> some View {
+        let name = p.oidc ? (p.oidcLabel ?? "OIDC") : (p.samlLabel ?? "SAML")
+        let text = p.ssoOnly ? String(localized: "This server only offers \(name) sign-in, which Machina for Mac cannot use yet. Ask for a local account or use the web UI.")
+                             : String(localized: "\(name) sign-in is enabled on this server but works only in the web UI. Use a local account here.")
+        return Label(text, systemImage: "info.circle")
+            .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func errorBanner(_ text: String) -> some View {
         Label(text, systemImage: "exclamationmark.triangle.fill")
             .font(.callout).foregroundStyle(.red).lineLimit(3)
@@ -132,11 +147,11 @@ struct LoginView: View {
 /// One rounded input row: leading icon, the field, an optional trailing control.
 private struct LoginField<Field: View, Trailing: View>: View {
     let icon: String
-    let prompt: String
+    let prompt: LocalizedStringKey
     @ViewBuilder var field: Field
     @ViewBuilder var trailing: Trailing
 
-    init(icon: String, prompt: String, @ViewBuilder field: () -> Field, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
+    init(icon: String, prompt: LocalizedStringKey, @ViewBuilder field: () -> Field, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
         self.icon = icon; self.prompt = prompt; self.field = field(); self.trailing = trailing()
     }
 

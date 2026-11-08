@@ -94,7 +94,7 @@ struct VMLogsTab: View {
             HStack {
                 Text("Log").font(.title2.weight(.semibold)); Spacer()
                 TextField("Filter", text: $filter).textFieldStyle(.roundedBorder).frame(width: 220)
-                Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }
+                Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }.help("Reload").accessibilityLabel("Reload")
             }
             PlatformErrorBanner(text: loadError)
             ScrollViewReader { proxy in
