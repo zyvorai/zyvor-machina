@@ -10,7 +10,7 @@ A native SwiftUI app for macOS 15 or later that connects to a Machina daemon (`h
 
 ## Install
 
-Download `Machina-<version>.dmg` from the GitHub releases tagged `macos-v<version>`, open it and drag **Machina** to Applications. The DMG is signed with a Developer ID and notarized by Apple. The current release is 0.3.0.
+Download `Machina-<version>.dmg` from the GitHub releases tagged `macos-v<version>`, open it and drag **Machina** to Applications. The DMG is signed with a Developer ID and notarized by Apple. The current release is 0.4.0.
 
 **Updates:** *Check for Updates* finds the newest `macos-v*` release. From 0.3.0 on, the app can download and install it for you: it compares the SHA-256 in the release notes, requires the new app to be signed by the same Developer ID team and to pass Gatekeeper, asks you to confirm, then swaps the app and relaunches. If any check fails, nothing is installed.
 
@@ -22,9 +22,11 @@ Enter the server URL and a PAM user. The first connection asks you to trust the 
 
 - Manage VMs: power, clone, rename, disks, NICs, snapshots, backups, metrics and logs, with live state updates and a VNC console.
 - Run the fleet: hosts, tasks, alerts, approvals, DRS, Kubernetes and container pages, security and eBPF controls, bare metal, and Fleet Cloud (including a launch wizard).
-- Operate the data plane and hardware: forms for the VMM guard, XDP shield, sched_ext scheduler and VM edge; bare metal BMC logins, image deploy, virtual media and serial-over-LAN; a chaos experiment editor; stack drift, converge and auto-heal; VPC routes and subnet NAT.
+- Operate the data plane and hardware: forms for the VMM guard, XDP shield, sched_ext scheduler and VM edge (on this host or one chosen fleet host, never all at once); bare metal BMC logins, image deploy, virtual media and serial-over-LAN; a chaos experiment editor; stack drift, converge and auto-heal; VPC routes and subnet NAT.
+- Ask the AI (Zeus): an operator chat whose proposed actions you approve one at a time, "Explain" on VMs, alerts, failed tasks and security rows, a Knowledge page, Black Box root cause, performance autopilot, migration oracle, fleet insight and an AI governance page (cost, compliance, right-sizing, digest). Model output is shown as plain text and never runs automatically; several of the engines behind these pages were never run on a real fleet, and the pages say so.
 - See the fleet at a glance: topology map, VM grid with sparklines, capacity heatmap and an activity timeline.
 - Work faster: a Cmd-K palette, pinned VMs, saved filters, bulk actions, CSV/JSON export, copy-as-curl and drag-and-drop ISO upload.
+- Quick access (all opt-in): a global hotkey for the palette, a morning digest notification, `machina://vm` share links with Handoff and a floating VM panel.
 - Stay informed: a menu bar status glyph, notifications you can approve from (Touch ID protected) and quiet hours.
 
 Every change is confirmed first and follows your role: operators can't use admin-only controls. eBPF enforcement needs an explicit lease and a typed phrase, node isolation starts as a dry run, BMC passwords are masked and never copied or exported, and destructive bare metal actions need the hostname typed.
