@@ -19,6 +19,7 @@ struct ResourceListView: View {
     @State private var wizard = false
     @State private var solRow: ResourceRow?
     @State private var chaosSheet: ChaosSheet?
+    @State private var chaosRun: ChaosRunSheet?
 
 
     private var columns: [ResourceColumn] { spec.effectiveColumns(for: rows) }
@@ -53,6 +54,10 @@ struct ResourceListView: View {
                 if spec.accessory == .chaosEditor {
                     Button("New experiment…") { chaosSheet = ChaosSheet(row: nil) }.disabled(!model.isAdmin).help(model.isAdmin ? "" : "Needs the admin role")
                     Button("Edit…") { chaosSheet = ChaosSheet(row: selected) }.disabled(selected == nil || !model.isAdmin).help(model.isAdmin ? "" : "Needs the admin role")
+                    Button("Duplicate…") { chaosSheet = ChaosSheet(row: selected, duplicate: true) }.disabled(selected == nil || !model.isAdmin).help(model.isAdmin ? "Copy as a new experiment with no targets" : "Needs the admin role")
+                }
+                if spec.accessory == .chaosRuns {
+                    Button("Run details…") { if let r = selected { chaosRun = ChaosRunSheet(id: r.id, row: r) } }.disabled(selected == nil)
                 }
                 ForEach(spec.allCreates, id: \.title) { c in
                     Button(spec.create == c && c.title == "New…" ? "New…" : c.title) { openCreate(c) }
@@ -95,7 +100,8 @@ struct ResourceListView: View {
             }
         }
         .padding(24)
-        .sheet(item: $chaosSheet) { s in ChaosEditor(row: s.row) { saved in chaosSheet = nil; if saved { Task { await load() } } } }
+        .sheet(item: $chaosSheet) { s in ChaosEditor(row: s.row, duplicate: s.duplicate) { saved in chaosSheet = nil; if saved { Task { await load() } } } }
+        .sheet(item: $chaosRun) { s in ChaosRunDetailView(runID: s.id) { chaosRun = nil }.environment(model) }
         .searchable(text: $search, prompt: "Filter \(spec.title.lowercased())")
         .inspector(isPresented: $inspect) {
             if let r = selected, let o = r.values.object {

@@ -51,7 +51,7 @@ extension FeatureRegistry {
                                .init("Duration s", "report.duration_s"), .init("Findings", "report.findings"), .init("Abort reason", "abort_reason")],
                      actions: [ResourceAction("Abort", "/api/v1/chaos/runs/{id}/abort", destructive: true, controller: true, staticBody: obj([:]))
                         .with { $0.adminOnly = true; $0.confirm = "Stops the run and removes its faults." }],
-                     refreshSecs: 10),
+                     refreshSecs: 10, accessory: .chaosRuns),
         ResourceSpec("chaos-faults", "Active faults", group: "Resilience", icon: "exclamationmark.triangle",
                      endpoint: .controllerGet("/api/v1/chaos/faults"), rowsPath: ["items"], idKey: "id",
                      columns: [.init("VM", "vm"), .init("Host", "host"), .init("Delay ms", "delay_ms"), .init("Jitter ms", "jitter_ms"), .init("Loss %", "loss_pct"),
