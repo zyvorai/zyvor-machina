@@ -18,6 +18,7 @@ struct ResourceListView: View {
     @State private var inspect = false
     @State private var wizard = false
     @State private var solRow: ResourceRow?
+    @State private var chaosSheet: ChaosSheet?
 
 
     private var columns: [ResourceColumn] { spec.effectiveColumns(for: rows) }
@@ -48,6 +49,10 @@ struct ResourceListView: View {
                 }
                 if spec.accessory == .instanceWizard {
                     Button("Launch…") { wizard = true }.disabled(!model.canWrite).help(model.canWrite ? "" : "Your role cannot make changes")
+                }
+                if spec.accessory == .chaosEditor {
+                    Button("New experiment…") { chaosSheet = ChaosSheet(row: nil) }.disabled(!model.isAdmin).help(model.isAdmin ? "" : "Needs the admin role")
+                    Button("Edit…") { chaosSheet = ChaosSheet(row: selected) }.disabled(selected == nil || !model.isAdmin).help(model.isAdmin ? "" : "Needs the admin role")
                 }
                 ForEach(spec.allCreates, id: \.title) { c in
                     Button(spec.create == c && c.title == "New…" ? "New…" : c.title) { openCreate(c) }
@@ -90,6 +95,7 @@ struct ResourceListView: View {
             }
         }
         .padding(24)
+        .sheet(item: $chaosSheet) { s in ChaosEditor(row: s.row) { saved in chaosSheet = nil; if saved { Task { await load() } } } }
         .searchable(text: $search, prompt: "Filter \(spec.title.lowercased())")
         .inspector(isPresented: $inspect) {
             if let r = selected, let o = r.values.object {
