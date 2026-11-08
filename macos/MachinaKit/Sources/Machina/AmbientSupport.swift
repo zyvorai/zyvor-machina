@@ -97,6 +97,7 @@ struct SettingsView: View {
             }.tabItem { Label("Trusted certificates", systemImage: "checkmark.shield") }
 
             QuickAccessSettingsForm().tabItem { Label("Quick access", systemImage: "bolt") }
+            AIOperatorSettingsForm().tabItem { Label("AI operator", systemImage: "sparkles") }
         }
         .formStyle(.grouped).frame(width: 520, height: 440).onAppear(perform: reload)
     }
@@ -124,6 +125,7 @@ struct VMDoctorTab: View {
                 Text("Doctor").font(.title2.weight(.semibold))
                 if let r = report { Image(systemName: icon(r.level)).foregroundStyle(color(r.level)) }
                 Spacer()
+                AIExplainButton(request: .vm(id: nil, name: vm.name))
                 Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }
             }
             if let r = report {
