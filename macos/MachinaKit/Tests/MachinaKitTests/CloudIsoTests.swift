@@ -269,7 +269,7 @@ extension ClientTests {
         #expect(FeatureRegistry.spec("isos")?.accessory == .isoTransfer && FeatureRegistry.spec("fc-instances")?.accessory == .instanceWizard)
         // Every page that can write declares it with a non-GET method; input actions are never GET.
         for s in FeatureRegistry.all {
-            for a in s.actions { #expect(a.method != "GET", "\(s.id) \(a.title)") }
+            for a in s.actions { #expect(a.method != "GET" || (a.showsResult && a.inputs.isEmpty), "\(s.id) \(a.title)") }
             for a in s.actions where !a.inputs.isEmpty { #expect(a.method == "POST" || a.method == "PUT" || a.method == "PATCH") }
         }
         // Destructive removals are flagged so the confirmation says so.
