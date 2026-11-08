@@ -50,9 +50,9 @@ macos/scripts/test.sh            # swiftc + Swift Testing, runs in seconds
 ```bash
 macos/scripts/release.sh                                   # local DMG, ad-hoc signed, not notarized
 # Developer ID + notarization, with a stored profile ...
-SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" NOTARY_PROFILE=machina-notary MACHINA_VERSION=0.3.0 macos/scripts/release.sh
+SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" NOTARY_PROFILE=machina-notary MACHINA_VERSION=0.4.0 macos/scripts/release.sh
 # ... or with an App Store Connect API key (Developer role or higher; leave the issuer out for an individual key)
-SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" MACHINA_VERSION=0.3.0 \
+SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" MACHINA_VERSION=0.4.0 \
   ASC_API_KEY=<key id> ASC_API_KEY_PATH=~/path/AuthKey_<key id>.p8 ASC_API_ISSUER=<issuer uuid> macos/scripts/release.sh
 ```
 The script signs the app, builds and signs the DMG, submits it to Apple, waits and staples the ticket. Verify with `xcrun stapler validate` and `spctl -a -vv -t open --context context:primary-signature <dmg>` (expect `source=Notarized Developer ID`). If signing fails with `errSecInternalComponent`, unlock the login keychain first.
