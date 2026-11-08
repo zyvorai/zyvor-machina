@@ -4,7 +4,9 @@ import Foundation
 public struct ResourceCreate: Hashable, Sendable {
     /// `list` / `intList`: comma or space separated values sent as a JSON array. `json`: a JSON object typed in a
     /// multi-line box, sent as a parsed value. `choice`: one of the listed values (`Field.options` does the same for `.text`).
-    public enum Kind: Hashable, Sendable { case text, int, bool, list, intList, json, choice([String]) }
+    public enum Kind: Hashable, Sendable { case text, int, bool, list, intList, json, choice([String])
+        /// One value per line (SSH keys contain spaces), sent as a JSON array.
+        case lines }
     public struct Field: Hashable, Sendable, Identifiable {
         public var id: String          // JSON key
         public var label: String
@@ -17,10 +19,14 @@ public struct ResourceCreate: Hashable, Sendable {
         public var range: ClosedRange<Int>?
         /// Allowed values for a `.text` field (shown as a picker).
         public var options: [String]
+        /// A password or token: entered in a masked box, never pre-filled, never echoed, redacted from copied curl.
+        public var secret: Bool
+        /// Extra validation run on the typed value before anything is sent.
+        public var check: FieldCheck?
         public init(_ id: String, _ label: String, _ kind: Kind = .text, initial: String = "", required: Bool = true,
-                    choices: Choices? = nil, range: ClosedRange<Int>? = nil, options: [String] = []) {
+                    choices: Choices? = nil, range: ClosedRange<Int>? = nil, options: [String] = [], secret: Bool = false, check: FieldCheck? = nil) {
             self.id = id; self.label = label; self.kind = kind; self.initial = initial; self.required = required
-            self.choices = choices; self.range = range; self.options = options
+            self.choices = choices; self.range = range; self.options = options; self.secret = secret; self.check = check
         }
     }
     /// Picker options loaded from a list endpoint: the value is `valueKeys` joined with `valueJoin`, the label `labelKeys` joined with " · ".
@@ -93,8 +99,10 @@ public struct ResourceCreate: Hashable, Sendable {
     public static func body(fields: [Field], from values: [String: String]) throws -> JSONValue {
         var o: [String: JSONValue] = [:]
         for f in fields {
-            let raw = (values[f.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            if raw.isEmpty { if f.required { throw Invalid(message: "\(f.label) is required.") }; continue }
+            let trimmed = (values[f.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let raw = f.secret ? (values[f.id] ?? "") : trimmed     // a password keeps its exact characters
+            if trimmed.isEmpty { if f.required { throw Invalid(message: "\(f.label) is required.") }; continue }
+            if let why = f.check?.problem(raw) { throw Invalid(message: "\(f.label) \(why).") }
             switch f.kind {
             case .text:
                 if !f.options.isEmpty, !f.options.contains(raw) { throw Invalid(message: "\(f.label) must be one of \(f.options.joined(separator: ", ")).") }
@@ -105,6 +113,8 @@ public struct ResourceCreate: Hashable, Sendable {
                 o[f.id] = .number(Double(n))
             case .bool: o[f.id] = .bool(raw == "yes" || raw == "true")
             case .list: o[f.id] = .array(Self.split(raw).map(JSONValue.string))
+            case .lines:
+                o[f.id] = .array(raw.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.map(JSONValue.string))
             case .intList:
                 let parts = Self.split(raw)
                 let nums = parts.compactMap { Int($0) }.filter { (1...65535).contains($0) }
@@ -202,8 +212,21 @@ public struct ResourceAction: Hashable, Sendable, Identifiable {
     public var prefill: [String: String]
     /// Show the response in a sheet (used for read-only previews such as a stack plan).
     public var showsResult: Bool
+    /// Like `confirm`, with `{key}` placeholders filled from the selected row (see `confirmText(for:)`).
+    public var confirmTemplate: String?
     public var id: String { title }
     public func with(_ edit: (inout ResourceAction) -> Void) -> ResourceAction { var a = self; edit(&a); return a }
+
+    /// The confirmation text for this row: `confirmTemplate` with `{key}` replaced by the row's values, else `confirm`.
+    public func confirmText(for row: ResourceRow) -> String? {
+        guard var t = confirmTemplate else { return confirm }
+        while let open = t.firstIndex(of: "{"), let close = t[open...].firstIndex(of: "}") {
+            let key = String(t[t.index(after: open)..<close])
+            let v = row.values.value(at: key).map { $0 == .null ? "?" : $0.text } ?? "?"
+            t.replaceSubrange(open...close, with: v)
+        }
+        return t
+    }
 
     /// The phrase to type for this row, nil when the action needs none (or the row has no value).
     public func phrase(for row: ResourceRow) -> String? {
@@ -319,7 +342,7 @@ public struct ResourceColumn: Hashable, Sendable, Identifiable {
 public struct ResourceSpec: Identifiable, Hashable, Sendable {
     public enum Layout: Hashable, Sendable { case table, keyValue }
     /// Extra UI a page carries beyond the table: the ISO transfer panel or the Fleet Cloud launch wizard.
-    public enum Accessory: Hashable, Sendable { case isoTransfer, instanceWizard }
+    public enum Accessory: Hashable, Sendable { case isoTransfer, instanceWizard, bareMetalSol }
     public var id: String
     public var title: String
     public var group: String

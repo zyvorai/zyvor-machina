@@ -191,7 +191,7 @@ public enum Curl {
         var parts = ["curl", "-sk", "-b", cookieJar, "-X", e.method]
         if let body = e.body {
             let enc = JSONEncoder(); enc.outputFormatting = [.sortedKeys]
-            parts += ["-H", quote("Content-Type: application/json"), "-d", quote(String(decoding: (try? enc.encode(body)) ?? Data(), as: UTF8.self))]
+            parts += ["-H", quote("Content-Type: application/json"), "-d", quote(String(decoding: (try? enc.encode(SecretRedaction.redact(body))) ?? Data(), as: UTF8.self))]
         }
         parts.append(quote(url(e, server: server)))
         return parts.joined(separator: " ")

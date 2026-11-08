@@ -16,6 +16,7 @@ struct PromptField: Identifiable {
     var initial = ""
     var options: [String]?      // nil = free text, otherwise a picker
     var multiline = false       // a monospaced text editor (JSON documents)
+    var secure = false          // a masked box for passwords; the value is never shown again
 }
 
 struct TextResult: Identifiable {
@@ -76,6 +77,8 @@ struct PromptSheet: View {
                         TextEditor(text: binding(f)).font(.system(.callout, design: .monospaced)).autocorrectionDisabled()
                             .frame(minHeight: 200).overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
                     }
+                } else if f.secure {
+                    SecureField(f.label, text: binding(f))
                 } else {
                     TextField(f.label, text: binding(f))
                 }

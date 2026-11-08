@@ -135,11 +135,11 @@ extension FeatureRegistry {
                 .with { $0.adminOnly = true; $0.confirm = "Starts commissioning: the machine must PXE-boot the inventory image and report back with a one-time token." },
             ResourceAction("Release", "/api/v1/baremetal/servers/{id}/release", destructive: true, controller: true)
                 .with { $0.confirm = "Returns an allocated or deployed server to the ready pool." },
-        ],
+        ] + BareMetalOps.writeActions,
         create: ResourceCreate("Register server…", "/api/v1/baremetal/servers",
                                fields: [.init("hostname", "Hostname"), .init("bmc_address", "BMC address (host or URL)"),
                                         .init("mac_address", "PXE NIC MAC", required: false), .init("zone", "Zone", required: false)])
-            .with { $0.adminOnly = true; $0.warning = "Adds the record only. Set the BMC login in the web UI; the app never handles BMC passwords." })
+            .with { $0.adminOnly = true; $0.warning = "Adds the record only. Use Set BMC login on the new row to store its BMC user and password." }, accessory: .bareMetalSol)
 
     static let bareMetalProfiles = ResourceSpec(
         "bm-profiles", "Profiles", group: "Bare metal", icon: "slider.horizontal.3", endpoint: .controllerGet("/api/v1/baremetal/profiles"), idKey: "name",
