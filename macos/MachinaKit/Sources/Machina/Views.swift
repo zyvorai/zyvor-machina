@@ -14,6 +14,9 @@ struct StateBadge: View {
     var body: some View {
         Label(state.capitalized, systemImage: "circle.fill")
             .labelStyle(.titleAndIcon).foregroundStyle(color).font(.callout)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text("State"))
+            .accessibilityValue(Text(state.capitalized))
     }
 }
 
@@ -69,7 +72,7 @@ struct MainWindow: View {
             .navigationSplitViewColumnWidth(min: 200, ideal: 240)
             .safeAreaInset(edge: .bottom) {
                 HStack {
-                    Circle().fill(model.live ? .green : .orange).frame(width: 8, height: 8)
+                    Circle().fill(model.live ? .green : .orange).frame(width: 8, height: 8).accessibilityHidden(true)
                     Text(model.live ? "Live" : "Reconnecting").font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     if let r = model.role { Text(r).font(.caption).foregroundStyle(.secondary) }
@@ -112,8 +115,8 @@ struct MainWindow: View {
         .confirm($model.pendingAction)
         .background { Button("") { model.showPalette = true }.keyboardShortcut("k", modifiers: .command).opacity(0) }
         .toolbar {
-            ToolbarItem { Button { Task { await model.presentCreateVM() } } label: { Image(systemName: "plus") }.help("New VM").disabled(!model.canWrite) }
-            ToolbarItem { Button { Task { await model.refresh(); await model.refreshPlatform() } } label: { Image(systemName: "arrow.clockwise") } }
+            ToolbarItem { Button { Task { await model.presentCreateVM() } } label: { Image(systemName: "plus") }.help("New VM").accessibilityLabel("New VM").disabled(!model.canWrite) }
+            ToolbarItem { Button { Task { await model.refresh(); await model.refreshPlatform() } } label: { Image(systemName: "arrow.clockwise") }.help("Refresh").accessibilityLabel("Refresh") }
             ToolbarItem {
                 Menu {
                     ForEach(model.servers) { p in
@@ -206,6 +209,7 @@ struct MenuBarContent: View {
             }
         }
         Divider()
+        Button("Check for Updates…") { Task { await Updates.checkNow() } }
         Button("Open Machina") { openWindow(id: "main"); NSApp.activate(ignoringOtherApps: true) }
         Button("Quit") { NSApp.terminate(nil) }
     }

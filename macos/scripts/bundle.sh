@@ -21,11 +21,21 @@ SIGN_IDENTITY="${SIGN_IDENTITY:--}"      # "-" = ad-hoc; set to "Developer ID Ap
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$OBJ/Machina" "$APP/Contents/MacOS/Machina"
 ICON=""; if [ -f "$ROOT/Resources/Machina.icns" ]; then cp "$ROOT/Resources/Machina.icns" "$APP/Contents/Resources/"; ICON="<key>CFBundleIconFile</key><string>Machina</string>"; fi
+# Localizations: every Resources/<lang>.lproj/Localizable.strings is copied and listed in Info.plist.
+LOCS=""
+for d in "$ROOT"/Resources/*.lproj; do
+  [ -d "$d" ] || continue
+  l="$(basename "$d" .lproj)"; mkdir -p "$APP/Contents/Resources/$l.lproj"; cp "$d"/* "$APP/Contents/Resources/$l.lproj/"
+  plutil -lint "$d/Localizable.strings" >/dev/null
+  LOCS="$LOCS<string>$l</string>"
+done
 cat > "$APP/Contents/Info.plist" <<P
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleIdentifier</key><string>dev.zyvor.machina</string>
+<key>CFBundleDevelopmentRegion</key><string>en</string>
+<key>CFBundleLocalizations</key><array>$LOCS</array>
 <key>CFBundleName</key><string>Machina</string>
 <key>CFBundleDisplayName</key><string>Machina</string>
 <key>CFBundleExecutable</key><string>Machina</string>
