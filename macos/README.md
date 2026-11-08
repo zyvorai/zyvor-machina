@@ -18,8 +18,11 @@ Server `https://HOST:5092` and a PAM user. The first connect asks you to trust t
 - **Mac-native:** health-aware menu bar extra, actionable approval notifications (Touch ID gated), quiet hours, Settings window (cmd-,), Dock menu, Spotlight indexing of VMs, App Intents, `machina://` deep links, VM-per-window, Check for Updates, English and German strings, VoiceOver labels.
 - Most list pages are data-driven: adding one is a `ResourceSpec` in `FeatureRegistry.swift`.
 
+## Updates
+Check for Updates reads the highest `macos-v*` release. Install from the app verifies the DMG's SHA-256 against the release notes (when present), that the app inside has the same bundle id, a newer version, the same Developer ID team and passes `codesign` and Gatekeeper, then asks before replacing the running app. A dev (ad-hoc signed) build never auto-installs. The end-to-end flow has not been run yet and needs a Developer ID signed build to test.
+
 ## Safety rules
-Every write goes through a confirmation and the role gate (admin-only controls are disabled for operators). eBPF enforcement needs an explicit lease (60 to 900 s) and never relies on the server default. Node isolation starts as a dry run; arming needs the typed phrase `ISOLATE NODE`, a lease, an allowlist that keeps TCP 22 (or an exempt CIDR) and a second confirmation. Bulk and destructive actions list what will happen first. The copied curl never contains credentials.
+Every write goes through a confirmation and the role gate (admin-only controls are disabled for operators). eBPF enforcement needs an explicit lease (60 to 900 s) and never relies on the server default. Node isolation starts as a dry run; arming needs the typed phrase `ISOLATE NODE`, a lease, an allowlist that keeps TCP 22 (or an exempt CIDR) and a second confirmation. Bulk and destructive actions list what will happen first. The copied curl never contains credentials, and a request carrying a password or token is refused unless the server URL is https. BMC passwords are masked, never pre-filled and never shown after entry.
 
 ## Known limits
 - **Bare metal serial-over-LAN may not connect:** the daemon does not proxy `/ws/v1/baremetal/{id}/sol`, so the app dials the controller on :5093 and its pinned certificate may not match. Unverified.
@@ -46,9 +49,9 @@ macos/scripts/test.sh            # swiftc + Swift Testing, runs in seconds
 ```bash
 macos/scripts/release.sh                                   # local DMG, ad-hoc signed, not notarized
 # Developer ID + notarization, with a stored profile ...
-SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" NOTARY_PROFILE=machina-notary MACHINA_VERSION=0.2.0 macos/scripts/release.sh
+SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" NOTARY_PROFILE=machina-notary MACHINA_VERSION=0.3.0 macos/scripts/release.sh
 # ... or with an App Store Connect API key (Developer role or higher; leave the issuer out for an individual key)
-SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" MACHINA_VERSION=0.2.0 \
+SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" MACHINA_VERSION=0.3.0 \
   ASC_API_KEY=<key id> ASC_API_KEY_PATH=~/path/AuthKey_<key id>.p8 ASC_API_ISSUER=<issuer uuid> macos/scripts/release.sh
 ```
 The script signs the app, builds and signs the DMG, submits it to Apple, waits and staples the ticket. Verify with `xcrun stapler validate` and `spctl -a -vv -t open --context context:primary-signature <dmg>` (expect `source=Notarized Developer ID`). If signing fails with `errSecInternalComponent`, unlock the login keychain first.
