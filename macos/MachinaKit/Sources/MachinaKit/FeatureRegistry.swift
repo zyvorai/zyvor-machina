@@ -2,7 +2,9 @@ import Foundation
 
 /// Read-only pages (Phase 1). Shapes come from live responses and `web/src/api/*.ts`.
 public enum FeatureRegistry {
-    public static let all: [ResourceSpec] = [
+    public static let all: [ResourceSpec] = base + opsSpecs
+
+    static let base: [ResourceSpec] = [
         ResourceSpec("node", "Host info", group: "Host", icon: "desktopcomputer", endpoint: .get("/api/v1/node"), layout: .keyValue),
         ResourceSpec("libvirt", "Libvirt", group: "Host", icon: "externaldrive.connected.to.line.below", endpoint: .get("/api/v1/libvirt/summary"), layout: .keyValue),
         ResourceSpec("health", "Health problems", group: "Host", icon: "stethoscope", endpoint: .get("/api/v1/health/problems"), rowsPath: ["items"]),
@@ -109,6 +111,7 @@ public enum FeatureRegistry {
 
         // Host security: native eBPF telemetry from this daemon's host (observe only)
         ResourceSpec("bpf-status", "eBPF status", group: "Security", icon: "shield.lefthalf.filled", endpoint: .get("/api/v1/bpf/status"), layout: .keyValue),
+        enforcementMode,
         ResourceSpec("bpf-flows", "Network flows", group: "Security", icon: "arrow.left.arrow.right", endpoint: .get("/api/v1/bpf/flows"),
                      columns: [.init("Workload", "workload.name"), .init("Proto", "proto"), .init("Local", "local"), .init("Port", "local_port"),
                                .init("Remote", "remote"), .init("Port", "remote_port"), .init("Verdict", "verdict"),
@@ -125,11 +128,11 @@ public enum FeatureRegistry {
                      columns: [.init("Time", "ts", .date), .init("Kind", "kind"), .init("Command", "comm"), .init("PID", "pid"), .init("UID", "uid"),
                                .init("Unit", "unit"), .init("Workload", "workload.name")]),
         ResourceSpec("bpf-dns", "DNS queries", group: "Security", icon: "globe", endpoint: .get("/api/v1/bpf/dns")),
-        ResourceSpec("bpf-policies", "Enforcement policies", group: "Security", icon: "checklist.checked", endpoint: .get("/api/v1/bpf/policies")),
+        enforcementPolicies,
         ResourceSpec("bpf-drops", "Packet drop reasons", group: "Security", icon: "arrow.down.to.line", endpoint: .get("/api/v1/bpf/health"), rowsPath: ["drop_reasons"], idKey: "name",
                      columns: [.init("Reason", "name"), .init("Code", "reason"), .init("Count", "count")]),
         ResourceSpec("bpf-guard", "VMM guard", group: "Security", icon: "lock.shield", endpoint: .get("/api/v1/bpf/guard"), layout: .keyValue),
-        ResourceSpec("bpf-nodeiso", "Node isolation", group: "Security", icon: "network.slash", endpoint: .get("/api/v1/bpf/node-iso"), layout: .keyValue),
+        nodeIsolation,
         ResourceSpec("bpf-cni", "Kubernetes CNI (native)", group: "Security", icon: "point.3.filled.connected.trianglepath.dotted", endpoint: .get("/api/v1/bpf/cni"), layout: .keyValue),
 
         // Fleet security (controller)
@@ -144,10 +147,10 @@ public enum FeatureRegistry {
         ResourceSpec("netpol-evidence", "Segmentation evidence", group: "Fleet security", icon: "doc.badge.gearshape", endpoint: .controllerGet("/api/v1/vm-network-policies/evidence"), layout: .keyValue),
 
         // Bare metal (read-only)
-        ResourceSpec("bm-servers", "Servers", group: "Bare metal", icon: "server.rack", endpoint: .controllerGet("/api/v1/baremetal/servers"), idKey: "id"),
+        bareMetalServers,
         ResourceSpec("bm-images", "Image catalog", group: "Bare metal", icon: "opticaldisc", endpoint: .controllerGet("/api/v1/baremetal/images"), rowsPath: ["catalog"], idKey: "name",
                      columns: [.init("Name", "name"), .init("OS", "os"), .init("Arch", "arch"), .init("Format", "format"), .init("Checksum", "checksum_algo")]),
-        ResourceSpec("bm-profiles", "Profiles", group: "Bare metal", icon: "slider.horizontal.3", endpoint: .controllerGet("/api/v1/baremetal/profiles"), idKey: "id"),
+        bareMetalProfiles,
 
         // Insight (controller AI engine reports; read-only)
         ResourceSpec("ai-cost", "Cost estimate", group: "Insight", icon: "dollarsign.circle", endpoint: .controllerGet("/api/v1/ai/cost"), layout: .keyValue),
@@ -176,7 +179,12 @@ public enum FeatureRegistry {
                                .init("Enable HA", "/api/v1/vms/{id}/ha", controller: true, staticBody: .object(["enabled": .bool(true), "restart_attempts": .number(3), "restart_priority": .string("medium")]),
                                      confirm: "Turns on HA: the controller restarts this VM on another host if its host fails."),
                                .init("Disable HA", "/api/v1/vms/{id}/ha", destructive: true, controller: true, staticBody: .object(["enabled": .bool(false)]),
-                                     confirm: "The VM will no longer be restarted elsewhere if its host fails.")],
+                                     confirm: "The VM will no longer be restarted elsewhere if its host fails."),
+                               ResourceAction("Make preemptible", "PUT", "/api/v1/vms/{id}/preemptible", destructive: true, controller: true,
+                                              staticBody: .object(["preemptible": .bool(true), "priority": .number(0)]))
+                                   .with { $0.confirm = "Marks this VM as preemptible (priority 0, the lowest). When preemption is on, the controller may stop it to free memory for other VMs." },
+                               ResourceAction("Make non-preemptible", "PUT", "/api/v1/vms/{id}/preemptible", destructive: true, controller: true,
+                                              staticBody: .object(["preemptible": .bool(false), "priority": .number(0)]))],
                      create: .init("Create instance", "/api/v1/vms/from-template", fields: [
                         .init("name", "Name"),
                         .init("template_ref", "Image", choices: .init(.controllerGet("/api/v1/templates"), valueKeys: ["name", "version"], labelKeys: ["name", "version", "os_family"])),

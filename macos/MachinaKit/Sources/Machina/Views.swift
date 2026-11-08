@@ -106,6 +106,7 @@ struct MainWindow: View {
         .sheet(isPresented: $model.showShortcuts) { ShortcutsSheet() }
         .prompt($model.prompt)
         .confirm($model.pendingAction)
+        .textResult($model.textResult)
         .toolbar {
             ToolbarItem { Button { Task { await model.presentCreateVM() } } label: { Image(systemName: "plus") }.help("New VM").accessibilityLabel("New VM").disabled(!model.canWrite) }
             ToolbarItem { Button { Task { await model.refresh(); await model.refreshPlatform() } } label: { Image(systemName: "arrow.clockwise") }.help("Refresh").accessibilityLabel("Refresh") }

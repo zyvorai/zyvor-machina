@@ -30,13 +30,14 @@ struct ResourceListView: View {
                 Spacer()
                 Text("\(filtered.count) of \(rows.count)").foregroundStyle(.secondary).monospacedDigit()
                 Button { Task { await load() } } label: { Image(systemName: "arrow.clockwise") }.help("Reload").accessibilityLabel("Reload")
-                if let create = spec.create {
-                    Button("New…") { openCreate(create) }.disabled(!model.canWrite).help(model.canWrite ? "" : "Your role cannot make changes")
+                ForEach(spec.allCreates, id: \.title) { c in
+                    Button(spec.create == c && c.title == "New…" ? "New…" : c.title) { openCreate(c) }
+                        .disabled(!allowed(admin: c.adminOnly)).help(roleHelp(admin: c.adminOnly))
                 }
                 ForEach(spec.actions) { a in
                     Button(a.title) { run(a) }
-                        .disabled((selected == nil && !a.global) || !model.canWrite)
-                        .help(model.canWrite ? "" : "Your role cannot make changes")
+                        .disabled((selected == nil && !a.global) || !allowed(admin: a.adminOnly))
+                        .help(roleHelp(admin: a.adminOnly))
                 }
                 Menu {
                     Button("Export CSV…") { exportPage(csv: true) }
@@ -87,8 +88,8 @@ struct ResourceListView: View {
         .onDisappear { if model.page?.spec.id == spec.id { model.page = nil } }
         .task(id: spec.id) {
             await load()
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 15_000_000_000)
+            while !Task.isCancelled, spec.refreshSecs > 0 {
+                try? await Task.sleep(nanoseconds: UInt64(spec.refreshSecs) * 1_000_000_000)
                 if Task.isCancelled { break }
                 await load()
             }
@@ -105,6 +106,11 @@ struct ResourceListView: View {
         catch { model.error = "Export failed: \(error.localizedDescription)" }
     }
 
+    private func allowed(admin: Bool) -> Bool { admin ? model.isAdmin : model.canWrite }
+    private func roleHelp(admin: Bool) -> String {
+        allowed(admin: admin) ? "" : (admin ? "Needs the admin role" : "Your role cannot make changes")
+    }
+
     private func openCreate(_ c: ResourceCreate) {
         Task {
             // Pickers are filled from the server first; a failed lookup leaves that field empty (and the form refuses to submit if it is required).
@@ -119,17 +125,27 @@ struct ResourceListView: View {
                     labels[f.id] = Dictionary(opts.map { ($0.label, $0.value) }, uniquingKeysWith: { a, _ in a })
                     fields.append(PromptField(id: f.id, label: f.label, initial: opts.first?.label ?? "", options: opts.map(\.label)))
                 } else {
-                    fields.append(PromptField(id: f.id, label: f.label, initial: f.initial, options: f.kind == .bool ? ["yes", "no"] : nil))
+                    fields.append(PromptField(id: f.id, label: f.label, initial: f.initial, options: f.kind == .bool ? ["yes", "no"] : (f.options.isEmpty ? nil : f.options)))
                 }
             }
-            model.ask(c.title, submit: "Create", fields: fields) { values in
+            if let phrase = c.typedPhrase { fields.append(PromptField(id: ResourceCreate.phraseKey, label: "Type \(phrase) to confirm")) }
+            model.ask(c.title, message: c.warning ?? "", submit: "Continue", fields: fields) { values in
                 var values = values
                 for (id, map) in labels { values[id] = map[values[id] ?? ""] ?? "" }
                 let body: JSONValue
                 do { body = try c.body(from: values) } catch { model.error = error.localizedDescription; return }
                 var draft = c.endpoint; draft.body = body
                 let e = draft
-                if await model.perform(c.title, { _ = try await $0.call(e) }) { model.notice = "\(c.title): queued"; await load() }
+                let send: @MainActor () async -> Void = {
+                    let ok = await model.perform(c.title, { client in
+                        let answer = try await client.call(e)
+                        if let key = c.resultKey, let text = answer[key]?.text {
+                            await MainActor.run { model.textResult = TextResult(title: c.title, text: text) }
+                        }
+                    })
+                    if ok { model.notice = "\(c.title): done"; await load() }
+                }
+                model.confirmAction("\(c.title)?", message: c.warning ?? "This changes the server.", label: "Send", destructive: true, run: send)
             }
         }
     }
@@ -149,13 +165,20 @@ struct ResourceListView: View {
             model.notice = ResourceAction.summary(of: outcome).map { "\(a.title): \($0)" } ?? "\(a.title): done"
             await load()
         }
+        // Every write is confirmed (and a typed name when the action asks for one) before it is sent.
         let confirmThenRun: @MainActor ([String: JSONValue]) -> Void = { extra in
-            if a.destructive || a.confirm != nil {
+            let confirm: @MainActor () -> Void = {
                 model.confirmAction("\(a.title) \(target)?", message: a.confirm ?? "This changes the server and may not be undoable.", label: a.title, destructive: a.destructive) { await execute(extra) }
-            } else { Task { await execute(extra) } }
+            }
+            if let phrase = a.phrase(for: row) {
+                model.ask("\(a.title) \(target)", message: (a.confirm ?? "") + "\n\nType \(phrase) to continue.", submit: "Continue", fields: [PromptField(id: "typed", label: "Type \(phrase)")]) { values in
+                    guard (values["typed"] ?? "").trimmingCharacters(in: .whitespaces) == phrase else { model.error = "\(a.title): the typed name did not match, nothing was sent."; return }
+                    confirm()
+                }
+            } else { confirm() }
         }
         if a.inputs.isEmpty { confirmThenRun([:]); return }
-        let fields = a.inputs.map { PromptField(id: $0.id, label: $0.label, initial: $0.initial, options: $0.kind == .bool ? ["yes", "no"] : nil) }
+        let fields = a.inputs.map { PromptField(id: $0.id, label: $0.label, initial: $0.initial, options: $0.kind == .bool ? ["yes", "no"] : ($0.options.isEmpty ? nil : $0.options)) }
         model.ask("\(a.title) \(target)", submit: "Continue", fields: fields) { values in
             do { confirmThenRun(try a.inputBody(from: values)) } catch { model.error = error.localizedDescription }
         }
