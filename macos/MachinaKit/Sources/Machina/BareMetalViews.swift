@@ -2,14 +2,12 @@ import SwiftUI
 import MachinaKit
 
 /// Serial-over-LAN for an IPMI bare-metal server. Admin only; asks for a single-use token (audited by the controller)
-/// each time it connects. The WebSocket lives on the controller's own port, which may use a different certificate than
-/// the daemon: it is checked against the saved pin and refused when it differs.
+/// each time it connects. The WebSocket goes through the daemon's proxy, so the saved certificate pin applies.
 struct SolConsoleSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let row: ResourceRow
     @State private var sol = SerialConsoleModel()
-    @State private var port = 5093
 
     private var name: String { row.values["hostname"]?.text ?? row.id }
     private var blocker: String? { model.isAdmin ? BareMetalOps.solBlocker(row: row) : BareMetalError.notAdmin.errorDescription }
@@ -43,7 +41,7 @@ struct SolConsoleSheet: View {
 
     private func connect() {
         guard blocker == nil, let api = try? model.api() else { return }
-        let id = row.id, port = port
-        sol.connect { try await api.openSol(serverId: id, controllerPort: port) }
+        let id = row.id
+        sol.connect { try await api.openSol(serverId: id) }
     }
 }

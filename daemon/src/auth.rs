@@ -866,9 +866,11 @@ pub async fn ws_auth_middleware(
     // Platform VNC/serial use controller-issued tokens; machina-controller validates them.
     // The WS routes are nested at /ws/v1, so the full path is /ws/v1/platform/vnc/... or
     // /ws/v1/platform/serial/... — match either prefix to accommodate future re-nesting.
+    // The bare-metal SOL proxy is the same case: the controller validates its single-use token.
     if path.contains("/platform/vnc/")
         || path.contains("/platform/serial/")
         || path.contains("/platform/spice/")
+        || (path.starts_with("/ws/v1/baremetal/") && path.ends_with("/sol"))
     {
         return next.run(req).await;
     }

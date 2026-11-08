@@ -466,9 +466,13 @@ async fn handle_console(socket: WebSocket, name: String, pty_path: Option<String
     // socat's OPEN: mode fails on PTY devices (/dev/pts/N). Direct async file I/O is the
     // only approach that works reliably for bidirectional serial console over WebSocket.
     // Do NOT change this to socat, Command::new, or any other process-based approach.
+    // O_NOCTTY: without it, opening a PTY as a session leader without a controlling
+    // terminal makes the PTY the daemon's controlling terminal, and closing it (the
+    // WebSocket going away) then delivers SIGHUP to the whole daemon.
     let pty_file = match tokio::fs::OpenOptions::new()
         .read(true)
         .write(true)
+        .custom_flags(libc::O_NOCTTY)
         .open(&pty)
         .await
     {

@@ -122,7 +122,7 @@ extension ClientTests {
             (req.httpMethod == "POST" && req.url!.path == "\(pc)/api/v1/baremetal/servers/s-1/sol-token") ? (200, #"{"ws_path":"/ws/v1/baremetal/s-1/sol?token=abc123"}"#) : (500, "")
         }
         let u = try await bmClient().solURL(serverId: "s-1")
-        #expect(u.absoluteString == "wss://h:5093/ws/v1/baremetal/s-1/sol?token=abc123")
+        #expect(u.absoluteString == "wss://h:5092/ws/v1/baremetal/s-1/sol?token=abc123")
         MockProtocol.handler = { _ in (200, #"{"ws_path":"/ws/v1/baremetal/OTHER/sol?token=abc"}"#) }
         await #expect(throws: BareMetalError.badSolPath) { try await bmClient().solURL(serverId: "s-1") }
         MockProtocol.handler = { _ in (403, "admin required") }
