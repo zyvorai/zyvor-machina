@@ -42,14 +42,15 @@ extension FeatureRegistry {
                                .init("Last status", "last_status"), .init("Last run", "last_run_at", .date), .init("Created by", "created_by")],
                      actions: [
                         ResourceAction("Run", "/api/v1/chaos/experiments/{id}/run", destructive: true, controller: true, bodyFields: ["confirm": "name"])
-                            .with { $0.typeToConfirm = "name"; $0.confirm = "Injects REAL faults (latency, loss, partitions, disk throttling or a VM kill) into the targets named by this experiment. It aborts by itself if its probes fall below the experiment's threshold." },
-                        ResourceAction("Delete", "DELETE", "/api/v1/chaos/experiments/{id}", destructive: true, controller: true),
-                     ]),
+                            .with { $0.adminOnly = true; $0.typeToConfirm = "name"; $0.confirm = "Injects REAL faults (latency, loss, partitions, disk throttling or a VM kill) into the targets named by this experiment. It aborts by itself if its probes fall below the experiment's threshold." },
+                        ResourceAction("Delete", "DELETE", "/api/v1/chaos/experiments/{id}", destructive: true, controller: true)
+                            .with { $0.adminOnly = true; $0.typeToConfirm = "name"; $0.confirm = "Deletes the experiment definition. Its past runs stay listed." },
+                     ], accessory: .chaosEditor),
         ResourceSpec("chaos-runs", "Chaos runs", group: "Resilience", icon: "play.circle", endpoint: .controllerGet("/api/v1/chaos/runs"), idKey: "id",
                      columns: [.init("Started", "started_at", .date), .init("Status", "status"), .init("By", "started_by"), .init("Verdict", "report.verdict"),
                                .init("Duration s", "report.duration_s"), .init("Findings", "report.findings"), .init("Abort reason", "abort_reason")],
                      actions: [ResourceAction("Abort", "/api/v1/chaos/runs/{id}/abort", destructive: true, controller: true, staticBody: obj([:]))
-                        .with { $0.confirm = "Stops the run and removes its faults." }],
+                        .with { $0.adminOnly = true; $0.confirm = "Stops the run and removes its faults." }],
                      refreshSecs: 10),
         ResourceSpec("chaos-faults", "Active faults", group: "Resilience", icon: "exclamationmark.triangle",
                      endpoint: .controllerGet("/api/v1/chaos/faults"), rowsPath: ["items"], idKey: "id",

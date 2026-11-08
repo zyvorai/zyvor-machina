@@ -319,7 +319,7 @@ public struct ResourceColumn: Hashable, Sendable, Identifiable {
 public struct ResourceSpec: Identifiable, Hashable, Sendable {
     public enum Layout: Hashable, Sendable { case table, keyValue }
     /// Extra UI a page carries beyond the table: the ISO transfer panel or the Fleet Cloud launch wizard.
-    public enum Accessory: Hashable, Sendable { case isoTransfer, instanceWizard }
+    public enum Accessory: Hashable, Sendable { case isoTransfer, instanceWizard, chaosEditor }
     public var id: String
     public var title: String
     public var group: String
