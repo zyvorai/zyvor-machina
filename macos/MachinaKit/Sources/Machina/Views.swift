@@ -87,7 +87,8 @@ struct MainWindow: View {
             case .insight(let p): InsightRouter(page: p)
             case .aiOperator: AIOperatorView()
             case .page(let id):
-                if let spec = FeatureRegistry.spec(id) { ResourceListView(spec: spec).id(id) }
+                if id == AIGov.pageID { AIGovernanceView() }
+                else if let spec = FeatureRegistry.spec(id) { ResourceListView(spec: spec).id(id) }
                 else { ContentUnavailableView("Unknown page", systemImage: "questionmark.folder") }
             case .vm: if let vm = selectedVM { VMDetail(vm: vm, confirmStop: $confirmStop).advertisesHandoff(vm: vm.name) }
                       else { ContentUnavailableView("VM not found", systemImage: "server.rack") }
