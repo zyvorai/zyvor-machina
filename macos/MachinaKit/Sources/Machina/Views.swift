@@ -85,7 +85,7 @@ struct MainWindow: View {
             case .page(let id):
                 if let spec = FeatureRegistry.spec(id) { ResourceListView(spec: spec).id(id) }
                 else { ContentUnavailableView("Unknown page", systemImage: "questionmark.folder") }
-            case .vm: if let vm = selectedVM { VMDetail(vm: vm, confirmStop: $confirmStop) }
+            case .vm: if let vm = selectedVM { VMDetail(vm: vm, confirmStop: $confirmStop).advertisesHandoff(vm: vm.name) }
                       else { ContentUnavailableView("VM not found", systemImage: "server.rack") }
             case nil: ContentUnavailableView("Select an item", systemImage: "sidebar.left")
             }
