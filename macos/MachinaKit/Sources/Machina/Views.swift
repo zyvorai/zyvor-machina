@@ -47,6 +47,7 @@ struct MainWindow: View {
                     Label("Fleet", systemImage: "server.rack").tag(SidebarItem.fleet)
                     Label("Tasks", systemImage: "checklist").tag(SidebarItem.tasks)
                     Label("Alerts", systemImage: "bell").badge(model.unackedAlerts).tag(SidebarItem.alerts)
+                    Label("Knowledge", systemImage: "books.vertical").tag(SidebarItem.knowledge)
                 }
                 Label("AI operator", systemImage: "sparkles").tag(SidebarItem.aiOperator)
                 Section("Visual insight") {
@@ -82,6 +83,7 @@ struct MainWindow: View {
             case .fleet: FleetView()
             case .tasks: TasksView()
             case .alerts: AlertsView()
+            case .knowledge: KnowledgeView()
             case .insight(let p): InsightRouter(page: p)
             case .aiOperator: AIOperatorView()
             case .page(let id):
