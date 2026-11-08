@@ -31,4 +31,18 @@ import Foundation
         #expect(only.ssoOnly)
         #expect(AuthProviders.decode(Data("x".utf8)) == nil)
     }
+
+    @Test func updateCheckReadsOnlyMacReleases() throws {
+        let json = """
+        [{"tag_name":"v0.3.2","html_url":"https://x/p","assets":[]},
+         {"tag_name":"macos-v0.1.0","html_url":"https://x/a","assets":[]},
+         {"tag_name":"macos-v0.10.0","html_url":"https://x/b","assets":[{"name":"Machina-0.10.0.dmg","browser_download_url":"https://x/b.dmg"}]},
+         {"tag_name":"macos-v0.11.0","draft":true,"html_url":"https://x/c","assets":[]},
+         {"tag_name":"macos-v0.12.0","prerelease":true,"html_url":"https://x/d","assets":[]}]
+        """
+        let rel = try #require(UpdateChecker.parseList(Data(json.utf8)))
+        #expect(rel.version == "0.10.0" && rel.dmgURL?.absoluteString == "https://x/b.dmg")
+        #expect(UpdateChecker.evaluate(current: "0.2.0", release: rel) == .available(rel))
+        #expect(UpdateChecker.parseList(Data(#"[{"tag_name":"v0.3.2","html_url":"https://x"}]"#.utf8)) == nil)
+    }
 }

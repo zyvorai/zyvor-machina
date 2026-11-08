@@ -55,9 +55,10 @@ make && sudo make deploy     # manual equivalent
 ### macOS app (macOS only)
 ```bash
 macos/scripts/bundle.sh debug   # build macos/build/Machina.app (swiftc, no SwiftPM)
-cd macos/MachinaKit && swift test
+macos/scripts/test.sh           # unit tests (swiftc + Swift Testing; `swift test` stalls on some volumes)
+macos/scripts/release.sh        # signed, notarized DMG (see macos/README.md "Releasing")
 ```
-Native SwiftUI client over the daemon REST/WS API (`macos/README.md`).
+Native SwiftUI client over the daemon REST/WS API and the controller proxy (`macos/README.md`). Keep Swift sources flat in `Sources/MachinaKit` and `Sources/Machina` (the scripts glob them). Mac app releases are tagged `macos-v<version>` and never marked Latest (the `v*` tags are the platform's).
 
 ### Dev mode (no install, Linux only)
 ```bash

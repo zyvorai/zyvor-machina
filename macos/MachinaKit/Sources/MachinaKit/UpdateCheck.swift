@@ -35,7 +35,22 @@ public enum UpdateStatus: Equatable, Sendable {
 }
 
 public enum UpdateChecker {
-    public static let latestURL = URL(string: "https://api.github.com/repos/zyvorai/zyvor-machina/releases/latest")!
+    /// The repository's `v*` releases belong to the Machina platform; the Mac app publishes as `macos-v<version>`.
+    public static let tagPrefix = "macos-v"
+    public static let latestURL = URL(string: "https://api.github.com/repos/zyvorai/zyvor-machina/releases?per_page=50")!
+
+    /// Picks the highest `macos-v*` release from GitHub's release list. Drafts and prereleases are ignored.
+    public static func parseList(_ data: Data) -> ReleaseInfo? {
+        guard let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return nil }
+        let found: [(AppVersion, ReleaseInfo)] = arr.compactMap { o in
+            guard let tag = o["tag_name"] as? String, tag.hasPrefix(tagPrefix),
+                  let v = AppVersion(String(tag.dropFirst(tagPrefix.count))) else { return nil }
+            var o = o; o["tag_name"] = String(tag.dropFirst(tagPrefix.count))
+            guard let d = try? JSONSerialization.data(withJSONObject: o), let info = parse(d) else { return nil }
+            return (v, info)
+        }
+        return found.max { $0.0 < $1.0 }?.1
+    }
 
     /// Parse GitHub's "latest release" JSON. Drafts and prereleases are ignored.
     public static func parse(_ data: Data) -> ReleaseInfo? {
@@ -61,7 +76,7 @@ public enum UpdateChecker {
             let (data, resp) = try await session.data(for: req)
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             guard code == 200 else { return .failed("GitHub answered HTTP \(code)") }
-            guard let rel = parse(data) else { return .failed("No published release found") }
+            guard let rel = parseList(data) else { return .failed("No Mac app release found") }
             return evaluate(current: current, release: rel)
         } catch { return .failed(error.localizedDescription) }
     }
