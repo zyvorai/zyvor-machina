@@ -116,14 +116,24 @@ struct LoginView: View {
         }
     }
 
-    /// The daemon's OIDC/SAML flow ends in an HttpOnly cookie on its own https origin, so the app cannot
-    /// receive a session from a browser; say so instead of offering a button that cannot work.
-    private func ssoNote(_ p: AuthProviders) -> some View {
-        let name = p.oidc ? (p.oidcLabel ?? "OIDC") : (p.samlLabel ?? "SAML")
-        let text = p.ssoOnly ? String(localized: "This server only offers \(name) sign-in, which Machina for Mac cannot use yet. Ask for a local account or use the web UI.")
-                             : String(localized: "\(name) sign-in is enabled on this server but works only in the web UI. Use a local account here.")
-        return Label(text, systemImage: "info.circle")
-            .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+    /// OIDC works through the daemon's native code exchange (`machina://auth`). A daemon without it, and
+    /// SAML (no login flow in the daemon), get an explanation instead of a button that cannot work.
+    @ViewBuilder private func ssoNote(_ p: AuthProviders) -> some View {
+        if p.canSignInWithSSO {
+            let name = p.oidcLabel ?? "SSO"
+            Button { Task { await model.signInWithSSO() } } label: {
+                Label(String(localized: "Sign in with \(name)"), systemImage: "person.badge.key").frame(maxWidth: .infinity).frame(height: 24)
+            }
+            .buttonStyle(.bordered).controlSize(.large).disabled(!urlLooksValid || busy)
+        } else {
+            let name = p.oidc ? (p.oidcLabel ?? "OIDC") : (p.samlLabel ?? "SAML")
+            let text = p.ssoServerTooOld
+                ? String(localized: "\(name) sign-in is enabled, but this server is too old for single sign-on from Machina for Mac. Update the daemon, or use a local account.")
+                : (p.ssoOnly ? String(localized: "This server only offers \(name) sign-in, which Machina for Mac cannot use yet. Ask for a local account or use the web UI.")
+                             : String(localized: "\(name) sign-in is enabled on this server but works only in the web UI. Use a local account here."))
+            Label(text, systemImage: "info.circle")
+                .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     private func errorBanner(_ text: String) -> some View {

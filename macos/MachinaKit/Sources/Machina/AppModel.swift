@@ -222,9 +222,51 @@ final class AppModel {
                               session: MachinaClient.makeSession(delegate: delegate))
         do {
             try await c.login(user: username, password: password)
+            await finishSignIn(c, url: url, password: password)
+        } catch {
+            self.error = error.localizedDescription
+            phase = .signedOut
+        }
+    }
+
+    /// Single sign-on through the system web authentication sheet and the daemon's native code exchange.
+    /// Needs a daemon that reports `native_sso`; nothing is stored in the Keychain (there is no password).
+    func signInWithSSO() async {
+        error = nil
+        guard let url = URL(string: serverURL.trimmingCharacters(in: .whitespaces)), url.host != nil else {
+            error = NativeSSOError.badServerURL.localizedDescription; return
+        }
+        guard providers?.canSignInWithSSO == true else {
+            error = NativeSSOError.serverTooOld.localizedDescription; return
+        }
+        phase = .connecting
+        let account = "pin:\(url.host ?? ""):\(url.port ?? 443)"
+        let delegate = PinnedTLSDelegate(
+            pinned: Keychain.get(account),
+            confirmFirstUse: { [weak self] fp in await self?.askTrust(fp) ?? false },
+            persist: { Keychain.set($0, for: account) })
+        let c = MachinaClient(server: ServerProfile(name: url.host ?? "Server", url: url),
+                              session: MachinaClient.makeSession(delegate: delegate))
+        do {
+            let pkce = PKCE.generate()
+            let state = NativeSSO.newState()
+            guard let start = NativeSSO.startURL(server: url, challenge: pkce.challenge, state: state) else { throw NativeSSOError.badServerURL }
+            let callback = try await SSOWebSession.run(startURL: start)
+            let code = try NativeSSO.parseCallback(callback, expectedState: state).get()
+            let info = try await c.nativeExchange(code: code, verifier: pkce.verifier)
+            if let u = info.username { username = u }
+            await finishSignIn(c, url: url, password: nil)
+        } catch {
+            self.error = error.localizedDescription
+            phase = .signedOut
+        }
+    }
+
+    private func finishSignIn(_ c: MachinaClient, url: URL, password: String?) async {
+        do {
             UserDefaults.standard.set(serverURL, forKey: "serverURL")
             UserDefaults.standard.set(username, forKey: "username")
-            Keychain.set(password, for: "pw:\(username)@\(url.host ?? "")")
+            if let password { Keychain.set(password, for: "pw:\(username)@\(url.host ?? "")") }
             servers = ServerList.remembering(servers, url: url, username: username); saveServers()
             client = c
             role = (try? await c.sessionInfo())?.role
@@ -243,9 +285,6 @@ final class AppModel {
                 UNNotificationAction(identifier: "REJECT", title: "Reject", options: [.authenticationRequired, .destructive]),
             ], intentIdentifiers: [], options: [])])
             _ = try? await center.requestAuthorization(options: [.alert, .sound])
-        } catch {
-            self.error = error.localizedDescription
-            phase = .signedOut
         }
     }
 

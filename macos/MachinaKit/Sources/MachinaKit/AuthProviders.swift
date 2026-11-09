@@ -10,15 +10,19 @@ public struct AuthProviders: Equatable, Sendable {
     public var samlLabel: String?
     /// Server-side flag: the daemon has no SAML login flow yet (it always reports false).
     public var samlLoginAvailable = false
+    /// Server-side flag (`native_sso`): the daemon supports the `machina://auth` code exchange (issue #224).
+    public var nativeSSO = false
 
     public init() {}
 
-    /// True when the server offers browser SSO that this app cannot complete.
-    /// The daemon's OIDC callback sets the HttpOnly `machina_session` cookie on its own https
-    /// origin and redirects to `/`; it never redirects to a custom URL scheme, so an
-    /// ASWebAuthenticationSession cannot receive anything and the cookie is not readable by the app.
+    /// True when the server offers only SSO. OIDC works through the native code exchange on servers
+    /// that report `native_sso`; SAML has no login flow in the daemon yet.
     public var ssoOnly: Bool { (oidc || saml) && !pam && !ldap }
     public var hasSSO: Bool { oidc || saml }
+    /// OIDC is on and the server can hand the app a session through `machina://auth`.
+    public var canSignInWithSSO: Bool { oidc && nativeSSO }
+    /// OIDC is on but the daemon predates the native exchange endpoint.
+    public var ssoServerTooOld: Bool { oidc && !nativeSSO }
 
     public static func decode(_ data: Data) -> AuthProviders? {
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
@@ -31,6 +35,7 @@ public struct AuthProviders: Equatable, Sendable {
         p.pam = obj["pam"] == nil ? true : on("pam")
         p.ldap = on("ldap"); p.oidc = on("oidc"); p.saml = on("saml")
         p.oidcLabel = label("oidc"); p.samlLabel = label("saml")
+        p.nativeSSO = obj["native_sso"] as? Bool ?? false
         p.samlLoginAvailable = (obj["saml"] as? [String: Any])?["login_available"] as? Bool ?? false
         return p
     }

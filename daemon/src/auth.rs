@@ -1249,9 +1249,12 @@ async fn oidc_callback_handler(
             .unwrap_or_else(|| "OIDC provider rejected the login".to_string());
         warn!("OIDC callback error '{}': {}", err, msg);
         stats.inc_auth_attempt("oidc", "failure");
-        if let Some(flow) = query.state.as_deref().and_then(|s| store.native.take_flow(s)) {
-            let target =
-                crate::native_auth::error_redirect("oidc", flow.client_state.as_deref());
+        if let Some(flow) = query
+            .state
+            .as_deref()
+            .and_then(|s| store.native.take_flow(s))
+        {
+            let target = crate::native_auth::error_redirect("oidc", flow.client_state.as_deref());
             return axum::response::Redirect::temporary(&target).into_response();
         }
         return axum::response::Redirect::temporary("/login?error=oidc").into_response();
