@@ -18,6 +18,7 @@ mod kubevirt_exec;
 mod kubevirt_k8s_ws_proxy;
 mod ldap_auth;
 mod metrics_history;
+mod native_auth;
 mod obs_reload;
 mod obs_workers;
 mod otlp_worker;

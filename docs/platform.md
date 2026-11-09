@@ -221,11 +221,22 @@ max_sessions_global = 1000
 When `max_sessions_per_user` is `0`, multiple browsers can stay signed in as the same PAM user without evicting each other. Set a positive value only if you want oldest-session eviction per user.
 
 **Daemon login rate limiting (`:5092`)** — `/auth/login`, `/auth/oidc/login`,
-and `/auth/oidc/callback` are throttled to 10 attempts per (client IP, path)
+`/auth/oidc/callback` and `/auth/native/exchange` are throttled to 10 attempts per (client IP, path)
 per 60s (in-memory fixed window, not configurable via env/config). Every
 other daemon route is unaffected. This bounds brute-force/credential-
 stuffing against PAM/LDAP login and caps how often an anonymous caller can
 force an outbound request to the OIDC IdP.
+
+**Native-app SSO (OIDC)** — the Mac app signs in without a browser cookie.
+`GET /api/v1/auth/oidc/login?native=1&redirect_uri=machina://auth&code_challenge=<S256>&code_challenge_method=S256[&state=<opaque>]`
+(only that exact `redirect_uri` is accepted) runs the normal OIDC flow; on success
+the callback redirects to `machina://auth?code=<code>[&state=...]` instead of
+setting a cookie. The code is single use and valid for 60 seconds, held in
+memory. `POST /api/v1/auth/native/exchange {code, code_verifier}` checks the PKCE
+verifier and returns the usual session JSON with the `machina_session`
+`Set-Cookie`. Without `native=1` the web flow is unchanged. SAML has no login
+route yet, so native SSO is OIDC only. `GET /auth/providers` reports
+`native_sso: true` on servers that have this.
 
 **Controller rate limits (`:5093`)** — in `/etc/default/machina-platform`:
 

@@ -86,6 +86,8 @@ pub struct SessionStore {
     sessions: Arc<RwLock<HashMap<String, SessionData>>>,
     ws_tokens: Arc<Mutex<HashMap<String, WsTokenData>>>,
     oidc_states: Arc<Mutex<HashMap<String, machina_core::oidc::OidcStateEntry>>>,
+    /// Native-app SSO: pending logins and single-use exchange codes (issue #224).
+    native: crate::native_auth::NativeAuthStore<RequestActor>,
     max_sessions_global: usize,
     /// `0` = unlimited concurrent sessions per username.
     max_sessions_per_user: usize,
@@ -122,6 +124,7 @@ impl SessionStore {
             sessions: Arc::new(RwLock::new(HashMap::new())),
             ws_tokens: Arc::new(Mutex::new(HashMap::new())),
             oidc_states: Arc::new(Mutex::new(HashMap::new())),
+            native: crate::native_auth::NativeAuthStore::new(),
             max_sessions_global: max_sessions_global.max(1),
             max_sessions_per_user,
         }
@@ -556,6 +559,17 @@ struct OidcCallbackQuery {
     error_description: Option<String>,
 }
 
+/// Query of `GET /auth/oidc/login`. All fields are only used by the native-app flow;
+/// the web flow sends none of them.
+#[derive(Debug, Deserialize)]
+struct OidcLoginQuery {
+    native: Option<String>,
+    redirect_uri: Option<String>,
+    code_challenge: Option<String>,
+    code_challenge_method: Option<String>,
+    state: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 struct OidcTokenResponse {
     id_token: Option<String>,
@@ -759,7 +773,11 @@ pub async fn auth_rate_limit_middleware(
     next: Next,
 ) -> Response {
     let path = req.uri().path();
-    if path == "/auth/login" || path == "/auth/oidc/login" || path == "/auth/oidc/callback" {
+    if path == "/auth/login"
+        || path == "/auth/oidc/login"
+        || path == "/auth/oidc/callback"
+        || path == "/auth/native/exchange"
+    {
         let key = format!("{}:{}", addr.ip(), path);
         if !limiter.check(&key) {
             warn!("rate limit exceeded for {} from {}", path, addr.ip());
@@ -1105,6 +1123,7 @@ async fn auth_providers_handler(Extension(auth): Extension<OidcAuth>) -> Respons
     (
         StatusCode::OK,
         Json(serde_json::json!({
+            "native_sso": true,
             "pam": { "enabled": !ldap_on },
             "ldap": { "enabled": ldap_on },
             "oidc": OidcProviderMetadata {
@@ -1121,9 +1140,18 @@ async fn auth_providers_handler(Extension(auth): Extension<OidcAuth>) -> Respons
         .into_response()
 }
 
+fn native_bad_request(msg: &str) -> Response {
+    (
+        StatusCode::BAD_REQUEST,
+        Json(serde_json::json!({ "error": msg, "error_code": "invalid_request" })),
+    )
+        .into_response()
+}
+
 async fn oidc_login_handler(
     Extension(store): Extension<SessionStore>,
     Extension(auth): Extension<OidcAuth>,
+    Query(query): Query<OidcLoginQuery>,
 ) -> Response {
     let cfg = &auth.0.oidc;
     if !cfg.is_enabled() {
@@ -1132,6 +1160,36 @@ async fn oidc_login_handler(
             Json(serde_json::json!({ "error": "OIDC login is not enabled" })),
         )
             .into_response();
+    }
+
+    // Native-app flow is opt-in; without `native` the web flow below is untouched.
+    // Everything is validated before any outbound request to the IdP.
+    let mut native_params: Option<(String, Option<String>)> = None;
+    if let Some(native) = query.native.as_deref() {
+        if native != "1" {
+            return native_bad_request("native must be 1");
+        }
+        let redirect_ok = query
+            .redirect_uri
+            .as_deref()
+            .map(crate::native_auth::redirect_uri_allowed)
+            .unwrap_or(false);
+        if !redirect_ok {
+            return native_bad_request("redirect_uri is not allowed");
+        }
+        if query.code_challenge_method.as_deref() != Some("S256") {
+            return native_bad_request("code_challenge_method must be S256");
+        }
+        let challenge = match query.code_challenge.as_deref() {
+            Some(c) if crate::native_auth::challenge_valid(c) => c.to_string(),
+            _ => return native_bad_request("code_challenge is missing or malformed"),
+        };
+        let client_state = match query.state.as_deref() {
+            None => None,
+            Some(s) if crate::native_auth::client_state_valid(s) => Some(s.to_string()),
+            Some(_) => return native_bad_request("state is malformed"),
+        };
+        native_params = Some((challenge, client_state));
     }
 
     let discovery = match fetch_oidc_discovery(cfg).await {
@@ -1143,6 +1201,9 @@ async fn oidc_login_handler(
     let nonce_bytes: [u8; 32] = rng.gen();
     let nonce = hex::encode(nonce_bytes);
     let state = store.create_oidc_state(nonce.clone());
+    if let Some((challenge, client_state)) = native_params {
+        store.native.begin(&state, &challenge, client_state);
+    }
     let mut url = match reqwest::Url::parse(&discovery.authorization_endpoint) {
         Ok(url) => url,
         Err(e) => {
@@ -1188,6 +1249,14 @@ async fn oidc_callback_handler(
             .unwrap_or_else(|| "OIDC provider rejected the login".to_string());
         warn!("OIDC callback error '{}': {}", err, msg);
         stats.inc_auth_attempt("oidc", "failure");
+        if let Some(flow) = query
+            .state
+            .as_deref()
+            .and_then(|s| store.native.take_flow(s))
+        {
+            let target = crate::native_auth::error_redirect("oidc", flow.client_state.as_deref());
+            return axum::response::Redirect::temporary(&target).into_response();
+        }
         return axum::response::Redirect::temporary("/login?error=oidc").into_response();
     }
 
@@ -1211,6 +1280,8 @@ async fn oidc_callback_handler(
             .into_response();
         }
     };
+    // Present only when this login was started by a native app.
+    let native_flow = store.native.take_flow(&state);
     let code = match query.code {
         Some(code) if !code.is_empty() => code,
         _ => {
@@ -1298,6 +1369,26 @@ async fn oidc_callback_handler(
             }
         };
 
+    if let Some(flow) = native_flow {
+        // Native app: hand back a single-use exchange code instead of a cookie. The
+        // session itself is created at exchange time, so an unredeemed code leaves
+        // nothing behind.
+        let actor = browser_actor(
+            username.clone(),
+            effective_linux_user,
+            role,
+            AuthSource::Oidc,
+        );
+        let exchange_code = store.native.mint(actor, &flow.code_challenge);
+        info!(
+            "OIDC login validated for user '{}' (native app, awaiting code exchange)",
+            username
+        );
+        let target =
+            crate::native_auth::success_redirect(&exchange_code, flow.client_state.as_deref());
+        return axum::response::Redirect::temporary(&target).into_response();
+    }
+
     let token = store.create_session(browser_actor(
         username.clone(),
         effective_linux_user,
@@ -1315,6 +1406,59 @@ async fn oidc_callback_handler(
         ],
     )
         .into_response()
+}
+
+#[derive(Debug, Deserialize)]
+struct NativeExchangeRequest {
+    code: String,
+    code_verifier: String,
+}
+
+/// `POST /auth/native/exchange`: trade a native-app exchange code plus its PKCE verifier
+/// for the same session a cookie login would give. Single use; never logs the inputs.
+async fn native_exchange_handler(
+    Extension(store): Extension<SessionStore>,
+    Extension(auth): Extension<OidcAuth>,
+    Extension(stats): Extension<std::sync::Arc<crate::daemon_stats::DaemonStats>>,
+    Json(req): Json<NativeExchangeRequest>,
+) -> Response {
+    match store
+        .native
+        .redeem(req.code.trim(), req.code_verifier.trim())
+    {
+        Ok(actor) => {
+            let session_token = store.create_session(actor.clone());
+            let cookie = session_cookie(&session_token, auth.0.tls_enabled);
+            stats.inc_auth_attempt("oidc", "success");
+            info!(
+                "OIDC login successful for user '{}' (native app)",
+                actor.username
+            );
+            (
+                StatusCode::OK,
+                [(header::SET_COOKIE, cookie)],
+                Json(serde_json::json!({
+                    "status": "ok",
+                    "username": actor.username,
+                    "role": actor.role,
+                    "auth_source": actor.auth_source,
+                })),
+            )
+                .into_response()
+        }
+        Err(_) => {
+            stats.inc_auth_attempt("oidc", "failure");
+            warn!("native SSO code exchange rejected");
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(serde_json::json!({
+                    "error": "Invalid or expired code",
+                    "error_code": "invalid_grant"
+                })),
+            )
+                .into_response()
+        }
+    }
 }
 
 pub fn require_destroy_vm(actor: &RequestActor) -> Result<(), AppError> {
@@ -1566,6 +1710,7 @@ pub fn auth_routes(session_store: SessionStore, auth_cfg: AuthConfig) -> Router<
         .route("/auth/login", post(login_handler))
         .route("/auth/oidc/login", get(oidc_login_handler))
         .route("/auth/oidc/callback", get(oidc_callback_handler))
+        .route("/auth/native/exchange", post(native_exchange_handler))
         .route("/auth/token/session", post(token_session_handler))
         .route("/auth/saml/metadata", get(saml_metadata_handler))
         .route("/auth/logout", post(logout_handler))
