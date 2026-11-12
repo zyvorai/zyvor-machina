@@ -292,16 +292,16 @@ async fn routes_and_peerings_never_claim_live_forwarding() {
         false
     );
     assert_eq!(f.admin("POST", &routes, body).await.0, StatusCode::OK);
-    assert_eq!(
-        f.admin(
+    let (nat_st, nat) = f
+        .admin(
             "POST",
             &routes,
-            json!({"destination":"0.0.0.0/0","target":"nat"})
+            json!({"destination":"0.0.0.0/0","target":"nat"}),
         )
-        .await
-        .0,
-        StatusCode::BAD_REQUEST
-    );
+        .await;
+    assert_eq!(nat_st, StatusCode::OK);
+    // No agent in the fixture: store the route, never claim live forwarding.
+    assert_eq!(nat["forwarding_active"], false);
     let (_, plan) = f
         .admin("GET", &format!("/api/v1/cloud/vpcs/{a}/plan"), json!({}))
         .await;
