@@ -46,6 +46,18 @@ pub async fn identity_versions(State(state): State<AppState>) -> Json<Value> {
     }))
 }
 
+fn project_json(id: uuid::Uuid, name: &str, description: &str, enabled: bool) -> Value {
+    json!({
+        "id": id.to_string(),
+        "name": name,
+        "description": description,
+        "enabled": enabled,
+        "domain_id": "default",
+        "is_domain": false,
+        "links": {"self": null},
+    })
+}
+
 pub async fn list_projects(
     State(state): State<AppState>,
     Extension(actor): Extension<OsActor>,
@@ -57,19 +69,43 @@ pub async fn list_projects(
             .await?;
     let projects: Vec<Value> = rows
         .into_iter()
-        .map(|(id, name, description, enabled)| {
-            json!({
-                "id": id.to_string(),
-                "name": name,
-                "description": description,
-                "enabled": enabled,
-                "domain_id": "default",
-                "is_domain": false,
-                "links": {"self": null},
-            })
-        })
+        .map(|(id, name, description, enabled)| project_json(id, &name, &description, enabled))
         .collect();
     Ok(Json(json!({ "projects": projects })))
+}
+
+pub async fn create_project(
+    State(state): State<AppState>,
+    Extension(actor): Extension<OsActor>,
+    Json(body): Json<Value>,
+) -> Result<(axum::http::StatusCode, Json<Value>), OsError> {
+    crate::auth::require_admin(&actor.user).map_err(OsError::from)?;
+    let proj = body
+        .get("project")
+        .cloned()
+        .ok_or_else(|| OsError::bad_request("project object required"))?;
+    let name = proj
+        .get("name")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| OsError::bad_request("project.name required"))?
+        .to_string();
+    let description = proj
+        .get("description")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let Json(row) = crate::api::projects::create_project(
+        State(state),
+        Extension(actor.user.clone()),
+        Json(crate::api::projects::CreateProjectBody { name, description }),
+    )
+    .await?;
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(json!({
+            "project": project_json(row.id, &row.name, &row.description, row.enabled)
+        })),
+    ))
 }
 
 pub async fn list_users(

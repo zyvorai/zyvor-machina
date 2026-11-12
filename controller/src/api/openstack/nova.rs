@@ -423,9 +423,198 @@ pub async fn server_action(
         let _ = crate::api::vms::resume_vm(State(state), user, Path(id)).await?;
         return Ok(axum::http::StatusCode::ACCEPTED);
     }
+    if let Some(resize) = body.get("resize") {
+        let flavor = resize
+            .get("flavorRef")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| OsError::bad_request("resize.flavorRef required"))?;
+        let flavor_id = parse_uuid(flavor)?;
+        let _ = crate::api::vms::change_vm_type(
+            State(state),
+            user,
+            Path(id),
+            Json(crate::api::vms::ChangeTypeBody { flavor_id }),
+        )
+        .await?;
+        return Ok(axum::http::StatusCode::ACCEPTED);
+    }
+    if body.get("confirmResize").is_some() || body.get("revertResize").is_some() {
+        // change_vm_type applies immediately; confirm/revert are no-ops for clients.
+        return Ok(axum::http::StatusCode::NO_CONTENT);
+    }
+    if let Some(img) = body.get("createImage") {
+        let name = img
+            .get("name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| OsError::bad_request("createImage.name required"))?
+            .to_string();
+        let volume: Option<(Uuid, String)> = crate::db::query_as(
+            "SELECT id, name FROM volumes WHERE attached_vm_id = ? ORDER BY attached_device LIMIT 1",
+        )
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?;
+        let source_disk = match volume {
+            Some((_vid, vname)) => vname,
+            None => {
+                let vm_name: String = crate::db::query_scalar("SELECT name FROM vms WHERE id = ?")
+                    .bind(id)
+                    .fetch_one(&state.pool)
+                    .await?;
+                format!("{vm_name}-root")
+            }
+        };
+        let _ = crate::api::templates::create_template(
+            State(state),
+            user,
+            Json(crate::api::templates::CreateTemplateBody {
+                name,
+                version: "1".into(),
+                source_disk,
+                cloud_init: true,
+                os_family: None,
+                category: "instance".into(),
+                description: format!("Nova createImage of {id}"),
+                featured: false,
+                marketplace: false,
+                icon: None,
+            }),
+        )
+        .await?;
+        return Ok(axum::http::StatusCode::ACCEPTED);
+    }
     Err(OsError::not_implemented(
-        "supported actions: os-start, os-stop, reboot, pause, unpause, suspend, resume",
+        "supported actions: os-start, os-stop, reboot, pause, unpause, suspend, resume, resize, confirmResize, createImage",
     ))
+}
+
+pub async fn get_remote_console(
+    State(state): State<AppState>,
+    Extension(actor): Extension<OsActor>,
+    Path(id): Path<String>,
+    Json(body): Json<Value>,
+) -> Result<Json<Value>, OsError> {
+    require_operator(&actor)?;
+    let id = parse_uuid(&id)?;
+    let _ = crate::api::vms::get_vm(State(state), Path(id)).await?;
+    let base = std::env::var("MACHINA_WEB_URL").unwrap_or_else(|_| "http://127.0.0.1:5173".into());
+    let url = format!(
+        "{}/fleet-cloud/instances/{}/console",
+        base.trim_end_matches('/'),
+        id
+    );
+    let kind = body
+        .pointer("/remote_console/protocol")
+        .or_else(|| body.pointer("/os-getVNCConsole/type"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("vnc");
+    Ok(Json(json!({
+        "remote_console": {
+            "protocol": kind,
+            "type": "novnc",
+            "url": url,
+        },
+        "console": { "type": "novnc", "url": url }
+    })))
+}
+
+pub async fn list_os_interfaces(
+    State(state): State<AppState>,
+    Extension(actor): Extension<OsActor>,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, OsError> {
+    require_operator(&actor)?;
+    let vm = parse_uuid(&id)?;
+    let Json(rows) = crate::api::networking::list_ports(
+        State(state),
+        Extension(actor.user.clone()),
+        axum::extract::Query(crate::api::networking::ListPortsQuery {
+            network_id: None,
+            vm_id: Some(vm),
+        }),
+    )
+    .await?;
+    let interfaceAttachments: Vec<Value> = rows
+        .into_iter()
+        .map(|p| {
+            json!({
+                "port_id": p.id.to_string(),
+                "net_id": p.network_id.to_string(),
+                "mac_addr": p.mac_address.clone().unwrap_or_default(),
+                "port_state": p.status,
+                "fixed_ips": p.private_ip.as_ref().map(|ip| vec![json!({"ip_address": ip, "subnet_id": p.subnet_id})]).unwrap_or_default(),
+            })
+        })
+        .collect();
+    Ok(Json(json!({ "interfaceAttachments": interfaceAttachments })))
+}
+
+pub async fn attach_os_interface(
+    State(state): State<AppState>,
+    Extension(actor): Extension<OsActor>,
+    Path(id): Path<String>,
+    Json(body): Json<Value>,
+) -> Result<(axum::http::StatusCode, Json<Value>), OsError> {
+    require_operator(&actor)?;
+    let vm = parse_uuid(&id)?;
+    let iface = body
+        .get("interfaceAttachment")
+        .cloned()
+        .unwrap_or(body);
+    let net = iface
+        .get("net_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| OsError::bad_request("net_id required"))?;
+    let net_id = parse_uuid(net)?;
+    let libvirt: Uuid = crate::db::query_scalar(
+        "SELECT network_id FROM cloud_subnets WHERE vpc_id = ? ORDER BY name LIMIT 1",
+    )
+    .bind(net_id)
+    .fetch_optional(&state.pool)
+    .await?
+    .unwrap_or(net_id);
+    let Json(p) = crate::api::networking::create_port(
+        State(state),
+        Extension(actor.user.clone()),
+        Json(crate::api::networking::CreatePortBody {
+            network_id: libvirt,
+            vm_id: Some(vm),
+            security_group_id: None,
+            project_id: Some(actor.project_id),
+            private_ip: None,
+            description: format!("os-interface-{vm}"),
+        }),
+    )
+    .await?;
+    Ok((
+        axum::http::StatusCode::OK,
+        Json(json!({
+            "interfaceAttachment": {
+                "port_id": p.id.to_string(),
+                "net_id": p.network_id.to_string(),
+                "mac_addr": p.mac_address.clone().unwrap_or_default(),
+                "port_state": p.status,
+                "fixed_ips": p.private_ip.as_ref().map(|ip| vec![json!({"ip_address": ip})]).unwrap_or_default(),
+            }
+        })),
+    ))
+}
+
+pub async fn detach_os_interface(
+    State(state): State<AppState>,
+    Extension(actor): Extension<OsActor>,
+    Path((id, port_id)): Path<(String, String)>,
+) -> Result<axum::http::StatusCode, OsError> {
+    require_operator(&actor)?;
+    let _vm = parse_uuid(&id)?;
+    let port = parse_uuid(&port_id)?;
+    let _ = crate::api::networking::delete_port(
+        State(state),
+        Extension(actor.user.clone()),
+        Path(port),
+    )
+    .await?;
+    Ok(axum::http::StatusCode::ACCEPTED)
 }
 
 pub async fn list_keypairs(
@@ -623,5 +812,31 @@ pub async fn create_server_group(
             }
         })),
     ))
+}
+
+pub async fn delete_server_group(
+    State(state): State<AppState>,
+    Extension(actor): Extension<OsActor>,
+    Path(name): Path<String>,
+) -> Result<axum::http::StatusCode, OsError> {
+    require_operator(&actor)?;
+    let tag = format!("anti-affinity:{name}");
+    let Json(rows) = crate::api::vms::list_vms(
+        State(state.clone()),
+        axum::extract::Query(vm_list_query(&actor.project_name)),
+    )
+    .await?;
+    for vm in rows {
+        if !vm.tags.0.iter().any(|t| t == &tag) {
+            continue;
+        }
+        let new_tags: Vec<String> = vm.tags.0.iter().filter(|t| *t != &tag).cloned().collect();
+        let _ = crate::db::query("UPDATE vms SET tags = ? WHERE id = ?")
+            .bind(serde_json::to_string(&new_tags).unwrap_or_else(|_| "[]".into()))
+            .bind(vm.id)
+            .execute(&state.pool)
+            .await;
+    }
+    Ok(axum::http::StatusCode::NO_CONTENT)
 }
 

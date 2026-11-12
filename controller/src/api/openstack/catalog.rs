@@ -73,6 +73,18 @@ pub fn build_catalog(public_base: &str) -> Value {
                 "region_id": "RegionOne",
                 "url": format!("{base}/v2.0")
             }]
+        },
+        {
+            "type": "load-balancer",
+            "id": "load-balancer",
+            "name": "octavia",
+            "endpoints": [{
+                "id": "octavia-public",
+                "interface": "public",
+                "region": "RegionOne",
+                "region_id": "RegionOne",
+                "url": format!("{base}/v2.0")
+            }]
         }
     ])
 }
