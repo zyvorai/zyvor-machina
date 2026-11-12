@@ -23,14 +23,22 @@ pub struct ImportRequest {
 
 pub async fn run_import_job(state: &AppState, job_id: &str, cfg: &ConnectionConfig, req: &ImportRequest) -> anyhow::Result<Uuid> {
     set_job(state, job_id, "downloading", 10, "").await?;
-    if req.kind != InventoryKind::Image {
-        anyhow::bail!("only Glance image imports are supported in v1 (create a Glance image from the Cinder volume first)");
+    if !matches!(req.kind, InventoryKind::Image | InventoryKind::Volume) {
+        anyhow::bail!("only Glance image and Cinder volume imports are supported (Nova disks: export via Glance first)");
     }
     let client = OpenStackClient::connect(cfg).await?;
     if client.image.is_empty() {
         anyhow::bail!("no Glance endpoint in Keystone catalog");
     }
-    let file_url = format!("{}/v2/images/{}/file", client.image, req.remote_id);
+    let image_id = match req.kind {
+        InventoryKind::Image => req.remote_id.clone(),
+        InventoryKind::Volume => {
+            set_job(state, job_id, "upload-image", 20, "").await?;
+            volume_to_glance_image(&client, &req.remote_id, &req.dest_name).await?
+        }
+        InventoryKind::Server => unreachable!(),
+    };
+    let file_url = format!("{}/v2/images/{image_id}/file", client.image);
     let bytes = client.download_bytes(&file_url).await?;
     set_job(state, job_id, "importing", 60, "").await?;
 
@@ -77,6 +85,53 @@ pub async fn run_import_job(state: &AppState, job_id: &str, cfg: &ConnectionConf
     .execute(&state.pool)
     .await?;
     Ok(template_id)
+}
+
+/// Cinder `os-volume_upload_image` → wait for Glance `active` → return image id.
+async fn volume_to_glance_image(
+    client: &OpenStackClient,
+    volume_id: &str,
+    dest_name: &str,
+) -> anyhow::Result<String> {
+    if client.volume.is_empty() {
+        anyhow::bail!("no Cinder endpoint in Keystone catalog");
+    }
+    let image_name = if dest_name.trim().is_empty() {
+        format!("machina-vol-{volume_id}")
+    } else {
+        dest_name.to_string()
+    };
+    let body = serde_json::json!({
+        "os-volume_upload_image": {
+            "image_name": image_name,
+            "force": true,
+            "disk_format": "qcow2",
+            "container_format": "bare",
+        }
+    });
+    let resp = client
+        .post_json(&format!("{}/volumes/{volume_id}/action", client.volume), &body)
+        .await?;
+    let image_id = resp
+        .pointer("/os-volume_upload_image/image_id")
+        .or_else(|| resp.pointer("/image_id"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Cinder upload-to-image response missing image_id"))?
+        .to_string();
+    for _ in 0..60 {
+        let st = client
+            .get_json(&format!("{}/v2/images/{image_id}", client.image))
+            .await?;
+        let status = st.get("status").and_then(|v| v.as_str()).unwrap_or("");
+        if status.eq_ignore_ascii_case("active") {
+            return Ok(image_id);
+        }
+        if status.eq_ignore_ascii_case("killed") || status.eq_ignore_ascii_case("error") {
+            anyhow::bail!("Glance image {image_id} ended in status {status}");
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    }
+    anyhow::bail!("timed out waiting for Glance image {image_id} from volume {volume_id}")
 }
 
 async fn set_job(state: &AppState, id: &str, status: &str, progress: i64, error: &str) -> anyhow::Result<()> {

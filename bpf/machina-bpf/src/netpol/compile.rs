@@ -63,6 +63,15 @@ pub struct NetpolVm {
     pub labels: BTreeMap<String, String>,
     #[serde(default)]
     pub addresses: Vec<String>,
+    /// Mbit/s from the VM; 0 = unlimited (from `vm_qos_bindings`).
+    #[serde(default)]
+    pub egress_mbps: u32,
+    /// Mbit/s towards the VM; 0 = unlimited.
+    #[serde(default)]
+    pub ingress_mbps: u32,
+    /// Packets/s each direction; 0 = unlimited.
+    #[serde(default)]
+    pub pps: u32,
 }
 
 /// A service `toServices` can select: a Fleet Cloud load balancer
@@ -1001,6 +1010,9 @@ pub fn compile(inp: &Inputs) -> Compiled {
                 addresses: v.vm.addresses.clone(),
                 isolate_ingress: ing,
                 isolate_egress: eg,
+                egress_mbps: v.vm.egress_mbps,
+                ingress_mbps: v.vm.ingress_mbps,
+                pps: v.vm.pps,
                 identity: Some(v.id),
                 labels: v.labels.clone(),
                 ..Default::default()

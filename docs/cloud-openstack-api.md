@@ -14,10 +14,10 @@ See claims **C74**. Full OSC server CRUD and Terraform OpenStack provider matrix
 | Service | Base path | Covered ops |
 |---------|-----------|-------------|
 | Keystone v3 | `/v3` | `POST /v3/auth/tokens`, catalog, projects, users, version discovery |
-| Nova v2.1 | `/v2.1` | flavors CRUD, servers CRUD/power actions, keypairs, server groups (anti-affinity tags only) |
+| Nova v2.1 | `/v2.1` | flavors CRUD, servers CRUD/power (`os-start`/`os-stop`/`reboot`/`pause`/`unpause`/`suspend`/`resume`), keypairs, server groups (anti-affinity tags only) |
 | Glance v2 | `/v2` | images list/show/create/delete ← Fleet Cloud templates |
 | Cinder v3 | `/v3` (+ `/{project_id}/…`) | volumes CRUD, attach/detach actions, snapshots |
-| Neutron v2.0 | `/v2.0` | networks (= VPCs), subnets, ports (read-mostly), security groups + rules, floating IPs (= elastic IPs) |
+| Neutron v2.0 | `/v2.0` | networks (= VPCs), subnets, ports (read-mostly), security groups + rules, floating IPs (= elastic IPs), QoS policies (= `/api/v1/vm-qos`) |
 
 Public auth and version routes are rate-limited with `/ec2` and login. Token-gated service routes sit
 beside the rest of the controller API.
@@ -74,25 +74,26 @@ export MACHINA_CONTROLLER_URL=http://127.0.0.1:15093 MACHINA_ADMIN_PASSWORD=…
 ## First-party importer
 
 Separate from the wire façade: connect to a **source** OpenStack, sync inventory, import Glance
-images as Fleet Cloud templates.
+images (and Cinder volumes via `os-volume_upload_image`) as Fleet Cloud templates.
 
 | Surface | Path |
 |---------|------|
 | REST | `/api/v1/openstack/connections`, `…/inventory`, `…/imports` (`api/openstack_import.rs`) |
-| Engine | `engine/openstack/` — Keystone client, inventory, download, in-process mock |
+| Engine | `engine/openstack/` — Keystone client, inventory, import/stage, in-process mock |
 | UI | Platform → Migration → **OpenStack** |
 | Schema | migration **093** (`openstack_connections`, `openstack_inventory`, `openstack_import_jobs`) |
 | Smoke | unit: `cargo test -p machina-controller openstack`; live list: `scripts/openstack/mock-import-smoke.sh` |
 
-Credentials are stored with `crypto::store_api_key`. v1 land path: stage on host → daemon
-`POST /api/v1/import/disk` → `POST /api/v1/templates` with `source_disk`. Cinder volumes need a
-Glance image-from-volume when direct download is unavailable. **Not yet run** against a production
-OpenStack cloud (claim **C75**).
+Credentials are stored with `crypto::store_api_key`. Land path: curl stage on host with
+`X-Auth-Token` → INSERT `templates` (`source_disk`). Volume imports call Cinder
+`os-volume_upload_image`, wait for Glance `active`, then download. **Not yet run** against a
+production OpenStack cloud (claim **C75**).
 
 ## VM QoS (Neutron-ish)
 
-Controller QoS policy objects push intended VM-edge rate limits (`egress_mbps` / `ingress_mbps` /
-`pps`) that the eBPF datapath already enforces:
+Controller QoS policy objects push VM-edge rate limits (`egress_mbps` / `ingress_mbps` / `pps`)
+into bpfd on bind (forced `vm_netpol` reconcile). Neutron façade:
+`/v2.0/qos/policies` (+ bandwidth_limit_rules).
 
 ```
 GET|POST /api/v1/vm-qos/policies
@@ -107,7 +108,8 @@ Migration **094**. Live create exercised on the lab host (claim **C76**).
 - Not a drop-in for every microversion or extension. Unsupported actions return OpenStack JSON
   errors (`Not Implemented` / `Bad Request`).
 - Neutron networks map to Fleet Cloud VPCs (need an online host; optional `machina:host_id` /
-  `machina:cidr` on create). No OVN/VXLAN tenant overlay, full Neutron BGP/L3 HA, or amphora Octavia.
+  `machina:cidr` on create). No OVN/VXLAN tenant overlay, provider/flat uplink networks, full
+  Neutron BGP/L3 HA, or amphora Octavia.
 - Server groups only support anti-affinity (VM tag `anti-affinity:<name>`).
 - Glance create registers an existing host disk path (`machina_source_disk`); it does not upload
   image bytes through the Glance HTTP body.

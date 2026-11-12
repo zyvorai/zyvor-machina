@@ -241,6 +241,18 @@ fn protected_routes() -> Router<AppState> {
                 .put(neutron::update_floating_ip)
                 .delete(neutron::delete_floating_ip),
         )
+        .route(
+            "/v2.0/qos/policies",
+            get(neutron::list_qos_policies).post(neutron::create_qos_policy),
+        )
+        .route(
+            "/v2.0/qos/policies/{id}",
+            delete(neutron::delete_qos_policy),
+        )
+        .route(
+            "/v2.0/qos/policies/{id}/bandwidth_limit_rules",
+            post(neutron::create_qos_policy_bandwidth_rule),
+        )
 }
 
 /// Token-gated OpenStack service routes (mount beside the rate-limited public auth routes).

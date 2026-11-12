@@ -164,6 +164,58 @@ pub async fn desired_for_host(pool: &DbPool, host: Uuid) -> anyhow::Result<HostC
                 }),
         );
 
+    // Native igw / nat: same uplink ACCEPT path as EC2 internet gateways.
+    // NAT keeps the host's existing masquerade; we only admit the forward.
+    let native_igw: Vec<(String, String)> = crate::db::query_as(
+        "SELECT v.cidr, r.destination FROM cloud_routes r JOIN cloud_vpcs v ON v.id = r.vpc_id \
+         WHERE v.host_id = ? AND r.target IN ('igw', 'nat')",
+    )
+    .bind(host)
+    .fetch_all(pool)
+    .await?;
+    out.internet_routes.extend(native_igw.into_iter().map(|(source, destination)| {
+        InternetRoute {
+            source,
+            destination,
+            uplink: None,
+        }
+    }));
+
+    // Transit: next-hop VPC in target_id; install like a one-sided peering
+    // route whose destination may be any CIDR behind the hub.
+    let native_transit: Vec<(Uuid, Uuid, String, String, Uuid)> = crate::db::query_as(
+        "SELECT v.id, v.host_id, v.cidr, r.destination, r.target_id \
+         FROM cloud_routes r \
+         JOIN cloud_vpcs v ON v.id = r.vpc_id \
+         WHERE r.target = 'transit' AND r.target_id IS NOT NULL",
+    )
+    .fetch_all(pool)
+    .await?;
+    for (_local_vpc, local_host, source, destination, hub) in native_transit {
+        let remote_host = vpc_host(pool, hub).await?;
+        if local_host == remote_host {
+            if local_host == host {
+                out.local_routes.push(PeerRoute {
+                    source,
+                    destination,
+                });
+            }
+            continue;
+        }
+        if local_host == host {
+            out.peer_routes.push(PeerRoute {
+                source: source.clone(),
+                destination: destination.clone(),
+            });
+        }
+        if remote_host == host {
+            out.peer_ingress.push(PeerRoute {
+                source,
+                destination,
+            });
+        }
+    }
+
     // EC2 route tables: explicit subnet association wins; main applies when
     // a subnet has no explicit association. Keep the source subnet in the
     // dataplane policy even though the kernel route itself is host-wide.

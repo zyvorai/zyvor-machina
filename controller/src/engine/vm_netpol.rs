@@ -123,6 +123,7 @@ pub async fn set_enabled(pool: &DbPool, name: &str, enabled: bool) -> anyhow::Re
 /// libvirt VMs of the fleet (KubeVirt VMs are pod endpoints, not taps).
 pub async fn inventory(pool: &DbPool) -> Vec<NetpolVm> {
     type Row = (
+        Uuid,
         String,
         Option<Uuid>,
         Option<String>,
@@ -132,14 +133,15 @@ pub async fn inventory(pool: &DbPool) -> Vec<NetpolVm> {
         Option<String>,
     );
     let rows: Vec<Row> = crate::db::query_as(
-        "SELECT name, host_id, project, labels, tags, guest_ip, guest_ips FROM vms
+        "SELECT id, name, host_id, project, labels, tags, guest_ip, guest_ips FROM vms
              WHERE COALESCE(inventory_source, 'libvirt') != 'kubevirt' ORDER BY name",
     )
     .fetch_all(pool)
     .await
     .unwrap_or_default();
+    let qos: BTreeMap<String, (u32, u32, u32)> = load_vm_qos(pool).await;
     rows.into_iter()
-        .map(|(name, host, project, labels, tags, ip, ips)| {
+        .map(|(id, name, host, project, labels, tags, ip, ips)| {
             let mut l: BTreeMap<String, String> = labels
                 .as_deref()
                 .and_then(|s| serde_json::from_str(s).ok())
@@ -166,13 +168,39 @@ pub async fn inventory(pool: &DbPool) -> Vec<NetpolVm> {
                     addresses.push(a);
                 }
             }
+            let (egress_mbps, ingress_mbps, pps) = qos.get(&id.to_string()).copied().unwrap_or_default();
             NetpolVm {
                 name,
                 host: host.map(|h| h.to_string()),
                 project: project.filter(|p| !p.is_empty()),
                 labels: l,
                 addresses,
+                egress_mbps,
+                ingress_mbps,
+                pps,
             }
+        })
+        .collect()
+}
+
+async fn load_vm_qos(pool: &DbPool) -> BTreeMap<String, (u32, u32, u32)> {
+    let rows: Vec<(String, Option<i64>, Option<i64>, Option<i64>)> = crate::db::query_as(
+        "SELECT b.vm_id, q.egress_mbps, q.ingress_mbps, q.pps \
+         FROM vm_qos_bindings b JOIN vm_qos_policies q ON q.id = b.policy_id",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+    rows.into_iter()
+        .map(|(vm_id, eg, ing, pps)| {
+            (
+                vm_id,
+                (
+                    eg.unwrap_or(0).clamp(0, u32::MAX as i64) as u32,
+                    ing.unwrap_or(0).clamp(0, u32::MAX as i64) as u32,
+                    pps.unwrap_or(0).clamp(0, u32::MAX as i64) as u32,
+                ),
+            )
         })
         .collect()
 }
@@ -1303,6 +1331,7 @@ mod tests {
             project: Some(project.into()),
             labels: BTreeMap::new(),
             addresses: vec![ip.into()],
+            ..Default::default()
         }
     }
 

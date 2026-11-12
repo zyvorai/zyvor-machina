@@ -154,6 +154,28 @@ impl OpenStackClient {
         Ok(resp.bytes().await?.to_vec())
     }
 
+    pub async fn post_json(&self, url: &str, body: &Value) -> anyhow::Result<Value> {
+        let resp = self
+            .http
+            .post(url)
+            .header("X-Auth-Token", &self.token)
+            .json(body)
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            anyhow::bail!(
+                "POST {url} failed ({status}): {}",
+                text.chars().take(500).collect::<String>()
+            );
+        }
+        if resp.status().as_u16() == 204 {
+            return Ok(json!({}));
+        }
+        Ok(resp.json().await.unwrap_or(json!({})))
+    }
+
     pub fn token(&self) -> &str {
         &self.token
     }

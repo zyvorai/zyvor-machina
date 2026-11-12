@@ -655,6 +655,7 @@ mod tests {
             project: project.map(Into::into),
             labels: BTreeMap::new(),
             addresses: vec![ip.into()],
+            ..Default::default()
         }
     }
 

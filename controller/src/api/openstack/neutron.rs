@@ -777,3 +777,186 @@ pub async fn delete_floating_ip(
     .await?;
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
+
+fn qos_policy_json(p: &crate::api::vm_qos::QosPolicy) -> Value {
+    let mut rules = Vec::new();
+    if let Some(mbps) = p.egress_mbps {
+        rules.push(json!({
+            "id": format!("{}-egress", p.id),
+            "type": "bandwidth_limit",
+            "max_kbps": mbps.saturating_mul(1000),
+            "max_burst_kbps": mbps.saturating_mul(1000),
+            "direction": "egress",
+        }));
+    }
+    if let Some(mbps) = p.ingress_mbps {
+        rules.push(json!({
+            "id": format!("{}-ingress", p.id),
+            "type": "bandwidth_limit",
+            "max_kbps": mbps.saturating_mul(1000),
+            "max_burst_kbps": mbps.saturating_mul(1000),
+            "direction": "ingress",
+        }));
+    }
+    if let Some(pps) = p.pps {
+        rules.push(json!({
+            "id": format!("{}-pps", p.id),
+            "type": "packet_rate_limit",
+            "max_kpps": pps,
+            "direction": "egress",
+        }));
+    }
+    json!({
+        "id": p.id,
+        "name": p.name,
+        "description": p.description,
+        "shared": false,
+        "project_id": p.project_id.clone().unwrap_or_default(),
+        "tenant_id": p.project_id.clone().unwrap_or_default(),
+        "is_default": false,
+        "rules": rules,
+    })
+}
+
+pub async fn list_qos_policies(
+    State(state): State<AppState>,
+    Extension(actor): Extension<OsActor>,
+) -> Result<Json<Value>, OsError> {
+    require_operator(&actor)?;
+    let Json(rows) =
+        crate::api::vm_qos::list_policies(State(state), Extension(actor.user.clone())).await?;
+    Ok(Json(json!({
+        "policies": rows.iter().map(qos_policy_json).collect::<Vec<_>>()
+    })))
+}
+
+pub async fn create_qos_policy(
+    State(state): State<AppState>,
+    Extension(actor): Extension<OsActor>,
+    Json(body): Json<Value>,
+) -> Result<(axum::http::StatusCode, Json<Value>), OsError> {
+    require_operator(&actor)?;
+    let pol = body
+        .get("policy")
+        .cloned()
+        .ok_or_else(|| OsError::bad_request("policy object required"))?;
+    let name = pol
+        .get("name")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| OsError::bad_request("policy.name required"))?
+        .to_string();
+    let description = pol
+        .get("description")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let mut egress_mbps = None;
+    let mut ingress_mbps = None;
+    let mut pps = None;
+    if let Some(rules) = pol.get("rules").and_then(|v| v.as_array()) {
+        for r in rules {
+            let typ = r.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            let dir = r.get("direction").and_then(|v| v.as_str()).unwrap_or("egress");
+            if typ == "bandwidth_limit" {
+                let kbps = r.get("max_kbps").and_then(|v| v.as_i64()).unwrap_or(0);
+                let mbps = (kbps + 999) / 1000;
+                if dir == "ingress" {
+                    ingress_mbps = Some(mbps);
+                } else {
+                    egress_mbps = Some(mbps);
+                }
+            } else if typ == "packet_rate_limit" {
+                pps = r.get("max_kpps").and_then(|v| v.as_i64());
+            }
+        }
+    }
+    let Json(created) = crate::api::vm_qos::create_policy(
+        State(state),
+        Extension(actor.user.clone()),
+        Json(crate::api::vm_qos::CreateQos {
+            name,
+            project_id: Some(actor.project_id),
+            egress_mbps,
+            ingress_mbps,
+            pps,
+            description,
+        }),
+    )
+    .await?;
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(json!({ "policy": qos_policy_json(&created) })),
+    ))
+}
+
+pub async fn delete_qos_policy(
+    State(state): State<AppState>,
+    Extension(actor): Extension<OsActor>,
+    Path(id): Path<String>,
+) -> Result<axum::http::StatusCode, OsError> {
+    require_operator(&actor)?;
+    let _ = crate::api::vm_qos::delete_policy(
+        State(state),
+        Extension(actor.user.clone()),
+        Path(id),
+    )
+    .await?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+pub async fn create_qos_policy_bandwidth_rule(
+    State(state): State<AppState>,
+    Extension(actor): Extension<OsActor>,
+    Path(id): Path<String>,
+    Json(body): Json<Value>,
+) -> Result<(axum::http::StatusCode, Json<Value>), OsError> {
+    require_operator(&actor)?;
+    // Neutron creates rules under a policy; Machina stores limits on the policy row.
+    // Re-create via bind is out of scope — update the policy columns in place.
+    let rule = body
+        .get("bandwidth_limit_rule")
+        .or_else(|| body.get("packet_rate_limit_rule"))
+        .cloned()
+        .ok_or_else(|| OsError::bad_request("bandwidth_limit_rule required"))?;
+    let dir = rule
+        .get("direction")
+        .and_then(|v| v.as_str())
+        .unwrap_or("egress");
+    let kbps = rule.get("max_kbps").and_then(|v| v.as_i64());
+    let kpps = rule.get("max_kpps").and_then(|v| v.as_i64());
+    let mbps = kbps.map(|k| (k + 999) / 1000);
+    if dir == "ingress" {
+        if let Some(m) = mbps {
+            crate::db::query("UPDATE vm_qos_policies SET ingress_mbps = ? WHERE id = ?")
+                .bind(m)
+                .bind(&id)
+                .execute(&state.pool)
+                .await?;
+        }
+    } else if let Some(m) = mbps {
+        crate::db::query("UPDATE vm_qos_policies SET egress_mbps = ? WHERE id = ?")
+            .bind(m)
+            .bind(&id)
+            .execute(&state.pool)
+            .await?;
+    }
+    if let Some(p) = kpps {
+        crate::db::query("UPDATE vm_qos_policies SET pps = ? WHERE id = ?")
+            .bind(p)
+            .bind(&id)
+            .execute(&state.pool)
+            .await?;
+    }
+    let _ = actor;
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(json!({
+            "bandwidth_limit_rule": {
+                "id": format!("{id}-rule"),
+                "max_kbps": kbps.unwrap_or(0),
+                "max_burst_kbps": kbps.unwrap_or(0),
+                "direction": dir,
+            }
+        })),
+    ))
+}

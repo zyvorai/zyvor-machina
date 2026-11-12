@@ -15,6 +15,26 @@ fn cilium_backup_configs_are_not_cilium() {
     assert!(!cni_config_name("05-cilium.conflist.bak"));
 }
 
+#[test]
+fn vm_qos_rates_copy_into_edge_state() {
+    let mut web = vm("web-1", "h1", "10.0.0.5", &[("app", "web")]);
+    web.egress_mbps = 100;
+    web.ingress_mbps = 50;
+    web.pps = 1000;
+    let c = compile(&Inputs {
+        policies: &[],
+        vms: &[web],
+        services: &[],
+        host: Some("h1"),
+        host_addresses: &[],
+        remote_node_addresses: &[],
+    });
+    let edge = c.state.vms.iter().find(|v| v.name == "web-1").unwrap();
+    assert_eq!(edge.egress_mbps, 100);
+    assert_eq!(edge.ingress_mbps, 50);
+    assert_eq!(edge.pps, 1000);
+}
+
 fn vm(name: &str, host: &str, ip: &str, labels: &[(&str, &str)]) -> NetpolVm {
     NetpolVm {
         name: name.into(),
@@ -25,6 +45,7 @@ fn vm(name: &str, host: &str, ip: &str, labels: &[(&str, &str)]) -> NetpolVm {
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect::<BTreeMap<_, _>>(),
         addresses: vec![ip.into()],
+        ..Default::default()
     }
 }
 

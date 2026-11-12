@@ -97,6 +97,7 @@ pub async fn delete_policy(
         .bind(&id)
         .execute(&state.pool)
         .await?;
+    let _ = crate::engine::vm_netpol::reconcile(&state.pool, true).await;
     Ok(Json(json!({"deleted": true})))
 }
 
@@ -136,15 +137,18 @@ pub async fn bind_policy(
     .execute(&state.pool)
     .await?;
 
-    // Limits are stored for the next VM-edge reconcile (vm_netpol / bpf VmEdgeSync).
-    let _ = vm_name;
+    // Push rates into bpfd VM-edge on the next forced reconcile.
+    let synced = crate::engine::vm_netpol::reconcile(&state.pool, true).await;
+    let edge_pushed = synced.iter().any(|s| s.ok && s.pushed);
 
     Ok(Json(json!({
         "bound": true,
         "policy_id": id,
         "vm_id": body.vm_id,
+        "vm_name": vm_name,
         "egress_mbps": policy.egress_mbps,
         "ingress_mbps": policy.ingress_mbps,
         "pps": policy.pps,
+        "edge_pushed": edge_pushed,
     })))
 }
