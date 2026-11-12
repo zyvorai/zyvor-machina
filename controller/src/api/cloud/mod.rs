@@ -63,6 +63,10 @@ pub fn routes() -> Router<AppState> {
             post(network::accept_peering),
         )
         .route(
+            "/api/v1/cloud/peerings/{id}",
+            axum::routing::delete(network::delete_peering),
+        )
+        .route(
             "/api/v1/cloud/projects/{id}/launch-templates",
             get(elastic::list_templates).post(elastic::create_template),
         )

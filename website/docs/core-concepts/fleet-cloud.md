@@ -26,5 +26,7 @@ controller's own APIs; there is no external cloud to integrate.
 
 ![Fleet Cloud](/machina-fleet-cloud-dark.png)
 
-If you know OpenStack, these map to Nova, Glance, Cinder, Neutron security groups, Heat and Octavia. See
-[Machina vs OpenStack](/vs-openstack).
+If you know OpenStack, these map to Nova, Glance, Cinder, Neutron security groups, Heat and Octavia. The same objects are
+also reachable through the [OpenStack-compatible API](openstack-api.md) (`openstack` CLI) and the
+[EC2-compatible API](ec2-api.md). See [Machina vs OpenStack](/vs-openstack) and
+[Replacing OpenStack](../getting-started/from-openstack.md).

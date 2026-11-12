@@ -42,8 +42,9 @@ the [subscription model](../SUBSCRIPTION-MODEL.md); we do not publish savings fi
 [evaluation guide](evaluation-guide.md) is how you measure them on your own workload.
 
 ## Where Machina is not the answer
-Thousands of tenants, Neutron-grade SDN breadth, or a dependency on the OpenStack ecosystem: choose OpenStack. Machina targets
-fleets you own and a cloud one person can install, understand and upgrade.
+Thousands of tenants, OVN/VXLAN/BGP-as-Neutron breadth, or a hard dependency on OpenStack ecosystem projects (Trove, Manila,
+Heat HOT, amphora Octavia): choose OpenStack. Machina targets fleets you own and a cloud one person can install, understand
+and upgrade — including an OpenStack-compatible façade and importer when you are leaving OpenStack itself.
 
 ## Next step
 Book a demo or start a 30-day proof of concept (links in the [README](../../README.md)), or try it yourself with the

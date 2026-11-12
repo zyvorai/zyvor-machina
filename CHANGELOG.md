@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.4.0 — 2026-11-12
+
+OpenStack compatibility and importer, cloud-fabric leftovers, and Neutron-ish QoS. Live-checked on lab host
+`212.8.248.187` (claims C74–C76); see `scripts/regression/RESULTS.md`.
+
+- **OpenStack-compatible API.** Keystone v3 / Nova v2.1 / Glance v2 / Cinder v3 / Neutron v2.0 façades on the
+  controller (`:5093`), reshaped onto Fleet Cloud handlers. Opaque `os_tokens` (migration 092). Live:
+  `python-openstackclient` token/catalog/image list; curl list ops and flavor/network CRUD smoke.
+- **First-party OpenStack importer.** Connections, inventory sync, Glance→template import jobs (migration 093);
+  Platform → Migration → OpenStack tab; in-process mock + `scripts/openstack/mock-import-smoke.sh`. Unit mock import
+  passed; not yet run against a production OpenStack cloud.
+- **Cloud fabric leftovers.** Native peering delete and EC2 `DeleteVpcPeeringConnection`; native route targets
+  `igw` / `nat` / `transit`.
+- **VM QoS policies.** Controller catalog binding `egress_mbps` / `ingress_mbps` / `pps` for the VM-edge datapath
+  (migration 094).
+- **Docs and site.** README, vs-OpenStack page, migration guide, `docs/cloud-openstack-api.md`, website OpenStack API
+  page, regenerated replace-OpenStack card.
+
 ## v0.3.2 — 2026-11-04
 
 Everything merged since v0.3.1 (#207 to #216).

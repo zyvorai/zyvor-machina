@@ -60,7 +60,7 @@ export const FEATURES: Feature[] = [
     eyebrow: 'Self-service',
     title: 'Fleet Cloud: a public-cloud experience on your metal.',
     body: 'Flavors, images, instances, volumes, security groups, keypairs, floating IPs, server groups, stacks, projects and load balancers, all native controller APIs.',
-    bullets: ['OpenStack-style primitives, no OpenStack', 'Load balancers as host rules, no amphora VM', 'Cloud-init on every instance'],
+    bullets: ['OpenStack-style primitives + Keystone/Nova façade', 'Load balancers as host rules, no amphora VM', 'Cloud-init on every instance'],
     shot: SHOTS[2],
     doc: '/docs/core-concepts/fleet-cloud',
   },

@@ -1,8 +1,10 @@
 # Replacing OpenStack with Machina
 
 Machina covers the private-cloud primitives a typical OpenStack deployment provides, with four Rust services instead of nine
-or more plus Galera, RabbitMQ and Memcached. It is **not a drop-in**: there is no Nova or Neutron API, so clients and
-automation move to Machina's REST API or its [EC2-compatible API](../cloud-ec2-api.md), and guests move as disk images.
+or more plus Galera, RabbitMQ and Memcached. It is **not a full drop-in**: native clients should use Machina's REST API or
+its [EC2-compatible API](../cloud-ec2-api.md). A [Keystone/Nova/Glance/Cinder/Neutron compatibility façade](../cloud-openstack-api.md)
+also lets `openstack` CLI and Terraform's `openstack` provider drive the same Fleet Cloud resources. Guests can move as
+disk images or through the first-party OpenStack importer.
 
 ![Replace OpenStack, service by service](../ux/readme-replace-openstack.jpg)
 
@@ -10,11 +12,11 @@ automation move to Machina's REST API or its [EC2-compatible API](../cloud-ec2-a
 
 | OpenStack | Machina | Notes |
 |---|---|---|
-| Keystone (identity) | PAM, OIDC, SAML, LDAP, RBAC, project-scoped API keys | See [LDAP](../ldap-auth.md) and [scoped API keys](../guides/scoped-api-keys.md). No Keystone API. |
-| Nova (compute) | `machina-daemon` + `machina-agent` on libvirt/KVM; the controller schedules | Flavors are instance types. Live migration, HA failover and DRS are built in. |
-| Neutron (networking) | Native eBPF VM edge and network policy, VPC objects, NAT, Elastic IPs | VPC peering, internet-gateway and blackhole routes and network ACLs are enforced on the hosts, across hosts over the WireGuard overlay (cross-host not yet run end to end): see [cloud-fabric.md](../cloud-fabric.md). No VXLAN/OVN tenant overlay. |
-| Glance (images) | Images and templates, Golden Forge builds (virt-builder, Packer) | [Volumes and images](../guides/volumes-and-images.md) |
-| Cinder (block storage) | Volumes with I/O limits and snapshots; Atlas for Ceph, NFS or ZFS | [Atlas](../atlas-storage.md) |
+| Keystone (identity) | PAM, OIDC, SAML, LDAP, RBAC, project-scoped API keys; Keystone v3 shim | See [LDAP](../ldap-auth.md), [scoped API keys](../guides/scoped-api-keys.md), [OpenStack API](../cloud-openstack-api.md). |
+| Nova (compute) | `machina-daemon` + `machina-agent` on libvirt/KVM; the controller schedules; Nova v2.1 shim | Flavors are instance types. Live migration, HA failover and DRS are built in. |
+| Neutron (networking) | Native eBPF VM edge and network policy, VPC objects, NAT, Elastic IPs; Neutron v2.0 shim | VPC peering, internet-gateway and blackhole routes and network ACLs are enforced on the hosts, across hosts over the WireGuard overlay: see [cloud-fabric.md](../cloud-fabric.md). No VXLAN/OVN tenant overlay. |
+| Glance (images) | Images and templates, Golden Forge builds (virt-builder, Packer); Glance v2 shim | [Volumes and images](../guides/volumes-and-images.md) |
+| Cinder (block storage) | Volumes with I/O limits and snapshots; Atlas for Ceph, NFS or ZFS; Cinder v3 shim | [Atlas](../atlas-storage.md) |
 | Heat (orchestration) | Stacks with dry run, approval and drift repair | [Fleet Cloud features](../fleet-cloud-features.md#stacks-you-describe). Templates are not HOT. |
 | Octavia (load balancing) | Native layer-4 balancer on the host, no amphora VM | `controller/src/engine/load_balancer.rs`; also reachable through the ELBv2 actions. |
 | Horizon (dashboard) | The web UI, with browser consoles | No separate console proxy. |
@@ -40,19 +42,23 @@ automation move to Machina's REST API or its [EC2-compatible API](../cloud-ec2-a
 
 1. Inventory what you use. Anything on the "gaps" list below that you depend on decides whether Machina fits.
 2. Stand up Machina next to OpenStack on spare hosts: `./machinactl deploy`, then add hosts ([Quickstart](../QUICKSTART.md)).
-3. Re-create the shapes (projects, instance types, security groups, networks) through the web UI, the REST API, or Terraform's
-   `aws` provider against the [EC2 endpoint](../cloud-ec2-clients.md).
-4. Move each guest as a disk image: export it from OpenStack (`openstack image save`, or create an image from the volume) in
-   qcow2 or raw, bring it in as a Machina image or volume, and launch from it. Machina has **no OpenStack importer**, and this
-   disk-image path has not been run end to end on a real OpenStack cloud.
+3. Re-create the shapes (projects, instance types, security groups, networks) through the web UI, the REST API, Terraform's
+   `aws` provider against the [EC2 endpoint](../cloud-ec2-clients.md), or `openstack` / Terraform `openstack` against the
+   [compatibility API](../cloud-openstack-api.md) (`OS_AUTH_URL=http://HOST:5093/v3`).
+4. Move each guest: use **Platform → Migration → OpenStack** (first-party importer: inventory Glance/Nova/Cinder, download
+   disks, register templates — API `/api/v1/openstack/…`, claim C75), or export a disk image (`openstack image save`) and
+   land it with Import VM / `POST /api/v1/import/disk`. Transiva/h2kvm remains available for multi-hypervisor waves.
 5. Cut traffic over (DNS or load balancer), then drain the old hosts and add them to Machina.
+
+Live smoke helper: `scripts/openstack/mock-import-smoke.sh` (daemon cookie proxy or `MACHINA_CONTROLLER_URL`).
 
 ## Gaps
 
-- Thousands of tenants, and Neutron-grade SDN breadth (provider networks, VXLAN/OVN, BGP, QoS policies) are out of scope.
-- No Nova, Neutron, Cinder or Keystone API, so tools such as `python-openstackclient` or Terraform's `openstack` provider do not work.
-- The OpenStack ecosystem (Trove, Sahara, Manila and so on) has no counterpart.
+- Hyperscale multi-tenancy (thousands of hard-isolated tenants) and Neutron SDN breadth that needs OVN/VXLAN/BGP as in
+  upstream Neutron remain out of scope; Machina expands networking on its eBPF + VPC fabric instead.
+- The OpenStack compatibility API covers the smoke set in [cloud-openstack-api.md](../cloud-openstack-api.md), not every
+  microversion or extension. Ecosystem projects (Trove, Sahara, Manila, …) have no counterpart.
 - What has been run on a real host and what is unit-tested only is recorded in [claims.md](../claims.md).
 
-Choose OpenStack when you run thousands of tenants, need its SDN breadth, or depend on its ecosystem. Machina targets fleets you
+Choose OpenStack when you run thousands of tenants, need OVN-grade SDN, or depend on its ecosystem. Machina targets fleets you
 own: a lab, a branch, a sovereign region, a VMware exit.

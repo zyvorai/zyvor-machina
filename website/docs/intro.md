@@ -41,7 +41,8 @@ See [Architecture](core-concepts/architecture.md) for how they connect.
 | MariaDB/Galera and RabbitMQ | Embedded SQLite or PostgreSQL, optional NATS |
 | Nova, Neutron or Keystone clients | [The EC2-compatible API](core-concepts/ec2-api.md) and Machina's REST API |
 
-Moving off OpenStack? Read [Replacing OpenStack](getting-started/from-openstack.md), which includes what Machina does not cover.
+Moving off OpenStack? Read [Replacing OpenStack](getting-started/from-openstack.md) for the service map, the
+[OpenStack-compatible API](core-concepts/openstack-api.md), the first-party importer, and the precise remaining gaps.
 
 ## Where to start
 

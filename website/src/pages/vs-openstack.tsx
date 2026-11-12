@@ -17,8 +17,10 @@ const ROWS: {topic: string; machina: string; openstack: string}[] = [
   {topic: 'Install', machina: './machinactl deploy on one host; deploy-remote.sh for the next', openstack: 'Kolla-Ansible or OpenStack-Ansible deployment project'},
   {topic: 'Smallest useful footprint', machina: 'A single KVM host', openstack: 'A multi-node control plane'},
   {topic: 'Self-service primitives', machina: 'Flavors, images, volumes, security groups, keypairs, stacks, load balancers in Fleet Cloud', openstack: 'Nova, Glance, Cinder, Neutron, Heat, Octavia'},
+  {topic: 'OpenStack wire API', machina: 'Keystone/Nova/Glance/Cinder/Neutron compatibility façade on :5093 (smoke set); EC2 Query + native REST remain first-class', openstack: 'Native Keystone catalog of every service'},
+  {topic: 'Importer', machina: 'First-party OpenStack importer (Platform → Migration → OpenStack) + Transiva/h2kvm', openstack: 'N/A (source platform)'},
   {topic: 'Load balancer data plane', machina: 'Maglev XDP service LB + iptables member rules; no amphora VM', openstack: 'Amphora VMs (Octavia)'},
-  {topic: 'Network datapath and security', machina: 'Native eBPF (XDP, TC, cgroup, BPF-LSM): CNI, DDoS shield, VM isolation, lease-gated enforcement', openstack: 'Neutron agents with OVS/OVN; security groups via iptables or OVS flows'},
+  {topic: 'Network datapath and security', machina: 'Native eBPF (XDP, TC, cgroup, BPF-LSM): CNI, DDoS shield, VM isolation, lease-gated enforcement; VPC peering/IGW/ACL fabric', openstack: 'Neutron agents with OVS/OVN; security groups via iptables or OVS flows'},
   {topic: 'Browser consoles', machina: 'noVNC, SPICE, serial and SSH built into the daemon', openstack: 'noVNC/SPICE proxy services'},
   {topic: 'HA failover and DRS', machina: 'Built into the controller', openstack: 'Separate projects: Masakari (instance HA), Watcher (rebalancing)'},
   {topic: 'AI operations', machina: 'Zyra AI: diagnostics, incidents, rightsizing, approvals', openstack: 'Not included'},
@@ -51,8 +53,11 @@ export default function VsOpenStack(): ReactNode {
           <Heading as="h2">Service by service</Heading>
           <img src={useBaseUrl('/readme-replace-openstack.jpg')} alt="Each OpenStack service and what replaces it in Machina" className={styles.card} loading="lazy" />
           <p>
-            Machina is not a drop-in: there is no Nova or Neutron API, so tools move to Machina's REST API or its
-            EC2-compatible API, and guests move as disk images. There is no OpenStack importer.{' '}
+            Machina is not a full drop-in of every OpenStack extension. Prefer the native REST API or the{' '}
+            <Link to="/docs/core-concepts/ec2-api">EC2-compatible API</Link> for new automation. A{' '}
+            <Link to="/docs/core-concepts/openstack-api">Keystone / Nova / Glance / Cinder / Neutron façade</Link> on
+            the controller also lets <code>openstack</code> CLI drive Fleet Cloud. Guests move via the first-party
+            importer (Platform → Migration → OpenStack) or as disk images.{' '}
             <Link to="/docs/getting-started/from-openstack">Read the migration guide →</Link>
           </p>
         </Reveal>
@@ -95,7 +100,7 @@ export default function VsOpenStack(): ReactNode {
               <Heading as="h3">Choose OpenStack when</Heading>
               <ul>
                 <li>You run thousands of tenants with hard multi-tenant isolation at hyperscale.</li>
-                <li>You need Neutron-grade SDN breadth (many ML2 drivers, complex overlays).</li>
+                <li>You need OVN / VXLAN / BGP-as-Neutron breadth (many ML2 drivers, complex overlays).</li>
                 <li>You depend on its ecosystem of distributions, vendors and integrations.</li>
                 <li>You already staff a team that operates it well.</li>
               </ul>
@@ -108,8 +113,9 @@ export default function VsOpenStack(): ReactNode {
             <div>
               <Heading as="h3">Moving off VMware or OpenStack?</Heading>
               <p>
-                h2kvm and Transiva convert guests into KVM, and GuestKit checks them offline before cutover. Machina
-                imports the result as ordinary libvirt domains.
+                For OpenStack: use Platform → Migration → OpenStack, or export disks and Import VM. For VMware and other
+                hypervisors: Transiva + h2kvm convert guests, GuestKit checks them offline, and Machina imports ordinary
+                libvirt domains.
               </p>
             </div>
             <div className={styles.calloutCtas}>

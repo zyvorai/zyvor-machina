@@ -72,8 +72,14 @@ Clients: the [TypeScript SDK](https://github.com/zyvorai/zyvor-machina/blob/main
 
 ## VPC forwarding
 
-Peering, route and network-ACL endpoints under `/api/v1/cloud/…` report `forwarding_active`; see
-[VPC forwarding](../core-concepts/vpc-forwarding.md).
+Peering (including `DELETE /api/v1/cloud/peerings/{id}`), route and network-ACL endpoints under `/api/v1/cloud/…`
+report `forwarding_active`; see [VPC forwarding](../core-concepts/vpc-forwarding.md).
+
+## OpenStack-compatible API
+
+On the controller (`:5093`, not the daemon): Keystone `/v3`, Nova `/v2.1`, Glance `/v2`, Cinder `/v3`, Neutron `/v2.0`.
+Importer and VM QoS live under `/api/v1/openstack/…` and `/api/v1/vm-qos/…` (reachable through the daemon proxy).
+See [OpenStack-compatible API](../core-concepts/openstack-api.md).
 
 ## Migration gateway
 

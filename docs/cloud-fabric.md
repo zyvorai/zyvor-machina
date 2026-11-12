@@ -2,7 +2,8 @@
 
 Fleet Cloud / EC2 VPC routes are reconciled into the hosts. This page is the engineering reference; the operator
 view is `website/docs/core-concepts/vpc-forwarding.md`. Status: **unit-tested; run on two real hosts with
-netns traffic** (claim C52); gateway egress, IPv6 and real guest VMs not yet run.
+netns traffic** (claim C52); gateway egress, IPv6 and real guest VMs not yet run. Peering **delete** and native
+`igw`/`nat`/`transit` route targets: claim **C76** (API live-checked 2026-11-12).
 
 ## Components
 
@@ -37,7 +38,11 @@ netns traffic** (claim C52); gateway egress, IPv6 and real guest VMs not yet run
 them, accept (expect `forwarding_active:false`), add the route (expect `true`), check `nft list ruleset` for
 `machina_cloud_acl`, delete the route. Use `zz-*` names.
 
-## Not covered
+## Not covered / remaining
 
-IGW egress with real guests, ACL filtering of real guest flows, IPv6, transit routing, and peering delete in the
-native API.
+- IGW egress and ACL filtering with **real guest VMs** (C52 verified on netns; guest qualification still open).
+- IPv6 dual-stack in the agent fabric path.
+- Transit routing dataplane beyond storing `target=transit` routes.
+
+**Done:** native `DELETE /api/v1/cloud/peerings/{id}` and EC2 `DeleteVpcPeeringConnection` (refuses while routes
+still select the peering); native route targets `igw` / `nat` / `transit` accepted for parity with EC2.

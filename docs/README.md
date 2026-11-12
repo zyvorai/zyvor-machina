@@ -24,9 +24,11 @@ eBPF datapath (`machina-bpfd`) and a React web UI. The public site with the same
 | Get tasks done quickly | [users/cookbook.md](users/cookbook.md) |
 | Decide whether to adopt it | [buyers/why-machina.md](buyers/why-machina.md), [alternatives](buyers/machina-vs-alternatives.md), [security](buyers/security-and-compliance.md), [30-day evaluation](buyers/evaluation-guide.md) |
 | Check what is proven | [claims.md](claims.md) |
-| Replace OpenStack | [migration/from-openstack.md](migration/from-openstack.md): service map, concept map, gaps |
+| Replace OpenStack | [migration/from-openstack.md](migration/from-openstack.md): service map, concept map, importer, gaps |
+| Use `openstack` CLI / Terraform openstack | [cloud-openstack-api.md](cloud-openstack-api.md) (Keystone/Nova/Glance/Cinder/Neutron façade + importer) |
 | Choose SQLite or PostgreSQL | [guides/database.md](guides/database.md) |
-| Use `aws`, boto3 or Terraform | [cloud-ec2-api.md](cloud-ec2-api.md), [cloud-ec2-clients.md](cloud-ec2-clients.md), [cloud-ec2-semantics.md](cloud-ec2-semantics.md) |
+| Use `aws`, boto3 or Terraform aws | [cloud-ec2-api.md](cloud-ec2-api.md), [cloud-ec2-clients.md](cloud-ec2-clients.md), [cloud-ec2-semantics.md](cloud-ec2-semantics.md) |
+| VPC peering / IGW / ACLs | [cloud-fabric.md](cloud-fabric.md) |
 
 ## Operate
 

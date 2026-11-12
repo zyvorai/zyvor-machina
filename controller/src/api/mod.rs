@@ -40,6 +40,9 @@ mod host_cockpit;
 mod host_os;
 mod hosts;
 mod ec2;
+mod openstack;
+mod openstack_import;
+mod vm_qos;
 mod elastic_ips;
 mod keypairs;
 pub(crate) mod metric_stats;
@@ -1817,6 +1820,30 @@ pub fn router(state: AppState) -> Router {
         .route("/api/v1/transiva/migrations/preview", post(transiva::preview))
         .route("/api/v1/transiva/migrations/submit", post(transiva::submit))
         .route("/api/v1/transiva/migrations/batch", post(transiva::batch))
+        .route(
+            "/api/v1/openstack/connections",
+            get(openstack_import::list_connections).post(openstack_import::create_connection),
+        )
+        .route(
+            "/api/v1/openstack/connections/{id}",
+            delete(openstack_import::delete_connection),
+        )
+        .route(
+            "/api/v1/openstack/connections/{id}/inventory",
+            get(openstack_import::list_inventory).post(openstack_import::sync_inventory),
+        )
+        .route(
+            "/api/v1/openstack/connections/{id}/imports",
+            post(openstack_import::submit_import),
+        )
+        .route(
+            "/api/v1/openstack/imports",
+            get(openstack_import::list_import_jobs),
+        )
+        .route(
+            "/api/v1/openstack/imports/{id}",
+            get(openstack_import::get_import_job),
+        )
         .route("/api/v1/fence/events", get(fence::list_fence_events))
         .route("/api/v1/audit", get(audit::list_audit_logs))
         .route("/api/v1/tasks/failures", get(task_failures::summary))
@@ -1969,6 +1996,18 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/api/v1/volume-snapshots/{id}",
             delete(volumes::delete_volume_snapshot),
+        )
+        .route(
+            "/api/v1/vm-qos/policies",
+            get(vm_qos::list_policies).post(vm_qos::create_policy),
+        )
+        .route(
+            "/api/v1/vm-qos/policies/{id}",
+            delete(vm_qos::delete_policy),
+        )
+        .route(
+            "/api/v1/vm-qos/policies/{id}/bind",
+            post(vm_qos::bind_policy),
         )
         .route(
             "/api/v1/security-groups",
@@ -2293,6 +2332,7 @@ pub fn router(state: AppState) -> Router {
         .route("/autoscaling/", post(ec2::query))
         .route("/elbv2", post(ec2::query))
         .route("/elbv2/", post(ec2::query))
+        .merge(openstack::public_router())
         .route("/api/v1/auth/oidc/login", get(oidc::oidc_login))
         .route("/api/v1/auth/oidc/redirect", get(oidc::oidc_login_redirect))
         .route("/api/v1/auth/oidc/callback", get(oidc::oidc_callback))
@@ -2300,6 +2340,8 @@ pub fn router(state: AppState) -> Router {
             rate_limiter,
             rate_limit_middleware,
         ));
+
+    let openstack_api = openstack::protected_router(state.clone());
 
     Router::new()
         .route("/api/v1/health", get(health::health))
@@ -2311,6 +2353,7 @@ pub fn router(state: AppState) -> Router {
         .route("/dist/images/{name}", get(dist::serve_image))
         .route("/dist/{name}", get(dist::serve))
         .merge(rate_limited_public)
+        .merge(openstack_api)
         .merge(console::ws_routes())
         .merge(protected)
         .with_state(state)

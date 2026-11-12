@@ -29,7 +29,7 @@ environment variables from their env files.
 | `MACHINA_AUDIT_RETENTION_DAYS` | `365` | Days of `audit_logs` kept; clamped to 7-3650, `0` keeps everything |
 | `MACHINA_BPF_REQUIRED` | unset (set `true` by the packaged bpfd unit) | bpfd refuses to start without its embedded eBPF object |
 | `MACHINA_TRANSIVA_URL`, `MACHINA_TRANSIVA_API_KEY`, `MACHINA_TRANSIVA_TIMEOUT_SECS` | `http://127.0.0.1:5070`, unset, `60` | [Transiva migration gateway](transiva-api.md) |
-| `MACHINA_PUBLIC_URL` | `http://127.0.0.1:5093` | Public controller URL |
+| `MACHINA_PUBLIC_URL` | `http://127.0.0.1:5093` | Public controller URL (Keystone catalog, enrollment links, metal media) |
 | `MACHINA_WEB_URL` | `http://127.0.0.1:5173` | Web UI URL used in links |
 | `MACHINA_DAEMON_URL` | — | How the controller reaches the daemon |
 | `MACHINA_FENCE_COMMAND` | unset | Fallback fence command run by the agent (`{hostname}` is substituted) |
