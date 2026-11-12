@@ -1,3 +1,6 @@
+// Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+
 //! Native-app SSO support (issue #224).
 //!
 //! A native client (the Mac app) starts OIDC login with `native=1`, a fixed

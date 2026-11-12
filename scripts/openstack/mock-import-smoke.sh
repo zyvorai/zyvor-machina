@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
 # SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+
 #
 # Live smoke for OpenStack shim + importer + VM QoS via the daemon→controller proxy.
 # Unit-level mock import: cargo test -p machina-controller openstack -- --nocapture
