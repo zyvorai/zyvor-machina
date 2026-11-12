@@ -1,14 +1,14 @@
 # Changelog
 
-## Unreleased
+## v0.4.1 — 2026-11-12
 
-- **OpenStack leftovers.** VM QoS bind pushes rates into bpfd VM-edge; native `igw`/`nat` feed
-  `internet_routes` and `transit` hub-chains via `target_id`; Neutron `/v2.0/qos/policies`; Nova
-  pause/unpause/suspend/resume; Cinder volume import via `os-volume_upload_image`.
-- **Cloud façade dump.** Neutron ports CRUD; Cinder `os-extend` + create-from-snapshot; Nova
-  resize/createImage/remote-console/os-interface/server-group delete; Keystone project create;
-  thin Octavia L4 (`/v2.0/lbaas/*`); Fleet Cloud QoS page + `cloud.ts` peering/routes/NAT clients;
-  snapshot → volume UI.
+OpenStack leftovers and cloud façade coverage on top of v0.4.0 (#238, #239).
+
+- **VM QoS → edge.** Bind pushes `egress_mbps`/`ingress_mbps`/`pps` into bpfd; Fleet Cloud `/fleet-cloud/qos`.
+- **Fabric.** Native `igw`/`nat` → `internet_routes`; `transit` hub-chains via `target_id`.
+- **OpenStack façade.** Neutron ports CRUD + QoS; Cinder extend/from-snapshot + volume import;
+  Nova resize/createImage/remote-console/os-interface/pause; Keystone project create; thin Octavia L4.
+- **Fleet Cloud UI.** `cloud.ts` peering/routes/NAT clients; snapshot → volume.
 
 ## v0.4.0 — 2026-11-12
 
