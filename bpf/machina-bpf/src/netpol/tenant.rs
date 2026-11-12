@@ -481,6 +481,7 @@ mod tests {
             project: (!project.is_empty()).then(|| project.into()),
             labels: BTreeMap::new(),
             addresses: vec![ip.into()],
+            ..Default::default()
         }
     }
 

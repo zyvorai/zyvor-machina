@@ -40,8 +40,10 @@ pub async fn start() -> String {
         .route("/v3/auth/tokens", post(issue_token))
         .route("/compute/servers/detail", get(servers))
         .route("/image/v2/images", get(images_list))
+        .route("/image/v2/images/{id}", get(image_show))
         .route("/image/v2/images/{id}/file", get(image_file))
         .route("/volume/volumes/detail", get(volumes))
+        .route("/volume/volumes/{id}/action", post(volume_action))
         .with_state(state);
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -106,6 +108,24 @@ async fn images_list(State(st): State<MockState>, headers: HeaderMap) -> Result<
     })))
 }
 
+async fn image_show(
+    State(st): State<MockState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<Value>, StatusCode> {
+    check_token(&st, &headers)?;
+    let images = st.images.lock().unwrap();
+    if !images.contains_key(&id) {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    Ok(Json(json!({
+        "id": id,
+        "name": "from-volume",
+        "status": "active",
+        "disk_format": "qcow2"
+    })))
+}
+
 async fn image_file(
     State(st): State<MockState>,
     headers: HeaderMap,
@@ -124,6 +144,33 @@ async fn volumes(State(st): State<MockState>, headers: HeaderMap) -> Result<Json
     check_token(&st, &headers)?;
     Ok(Json(json!({
         "volumes": [{"id": "vol-1", "name": "data", "status": "available", "size": 1}]
+    })))
+}
+
+async fn volume_action(
+    State(st): State<MockState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(body): Json<Value>,
+) -> Result<Json<Value>, StatusCode> {
+    check_token(&st, &headers)?;
+    if id != "vol-1" {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    if body.get("os-volume_upload_image").is_none() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let image_id = "img-from-vol".to_string();
+    st.images
+        .lock()
+        .unwrap()
+        .insert(image_id.clone(), b"QFI\xfbvolume-export".to_vec());
+    Ok(Json(json!({
+        "os-volume_upload_image": {
+            "image_id": image_id,
+            "image_name": body["os-volume_upload_image"]["image_name"],
+            "status": "uploading"
+        }
     })))
 }
 

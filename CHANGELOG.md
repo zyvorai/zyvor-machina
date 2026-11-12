@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **OpenStack leftovers.** VM QoS bind pushes rates into bpfd VM-edge; native `igw`/`nat` feed
+  `internet_routes` and `transit` hub-chains via `target_id`; Neutron `/v2.0/qos/policies`; Nova
+  pause/unpause/suspend/resume; Cinder volume import via `os-volume_upload_image`.
+
 ## v0.4.0 — 2026-11-12
 
 OpenStack compatibility and importer, cloud-fabric leftovers, and Neutron-ish QoS. Live-checked on lab host
@@ -12,7 +18,7 @@ OpenStack compatibility and importer, cloud-fabric leftovers, and Neutron-ish Qo
   Platform → Migration → OpenStack tab; in-process mock + `scripts/openstack/mock-import-smoke.sh`. Unit mock import
   passed; not yet run against a production OpenStack cloud.
 - **Cloud fabric leftovers.** Native peering delete and EC2 `DeleteVpcPeeringConnection`; native route targets
-  `igw` / `nat` / `transit`.
+  `igw` / `nat` / `transit` (CHECK expanded in **095**).
 - **VM QoS policies.** Controller catalog binding `egress_mbps` / `ingress_mbps` / `pps` for the VM-edge datapath
   (migration 094).
 - **Docs and site.** README, vs-OpenStack page, migration guide, `docs/cloud-openstack-api.md`, website OpenStack API

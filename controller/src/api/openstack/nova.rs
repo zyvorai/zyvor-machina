@@ -415,8 +415,16 @@ pub async fn server_action(
         let _ = crate::api::vms::reboot_vm(State(state), user, Path(id), None).await?;
         return Ok(axum::http::StatusCode::ACCEPTED);
     }
+    if body.get("pause").is_some() || body.get("suspend").is_some() {
+        let _ = crate::api::vms::pause_vm(State(state), user, Path(id)).await?;
+        return Ok(axum::http::StatusCode::ACCEPTED);
+    }
+    if body.get("unpause").is_some() || body.get("resume").is_some() {
+        let _ = crate::api::vms::resume_vm(State(state), user, Path(id)).await?;
+        return Ok(axum::http::StatusCode::ACCEPTED);
+    }
     Err(OsError::not_implemented(
-        "supported actions: os-start, os-stop, reboot",
+        "supported actions: os-start, os-stop, reboot, pause, unpause, suspend, resume",
     ))
 }
 

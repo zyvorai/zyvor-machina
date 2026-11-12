@@ -21,10 +21,10 @@ provider matrix, import from a production OpenStack cloud. Claims **C74–C76**.
 | Service | Base | Covered |
 | --- | --- | --- |
 | Keystone v3 | `/v3` | Token issue/validate, catalog, projects, users |
-| Nova v2.1 | `/v2.1` | Flavors, servers CRUD/power, keypairs, server groups (anti-affinity) |
+| Nova v2.1 | `/v2.1` | Flavors, servers CRUD/power (start/stop/reboot/pause/suspend), keypairs, server groups (anti-affinity) |
 | Glance v2 | `/v2` | Image list/show/create/delete ← templates |
 | Cinder v3 | `/v3` | Volumes, attach/detach, snapshots |
-| Neutron v2.0 | `/v2.0` | Networks (= VPCs), subnets, ports (read), security groups, floating IPs |
+| Neutron v2.0 | `/v2.0` | Networks (= VPCs), subnets, ports (read), security groups, floating IPs, QoS policies |
 
 Set `MACHINA_PUBLIC_URL` so the catalog URLs match the host clients reach (default `http://127.0.0.1:5093`).
 
@@ -51,24 +51,25 @@ Opaque tokens live in `os_tokens` (~24 h) and are sent as `X-Auth-Token`.
 ## First-party importer
 
 Connect Machina to a **source** OpenStack (Keystone URL + credentials), sync Glance/Nova/Cinder inventory, and import
-Glance images as Fleet Cloud templates.
+Glance images (or Cinder volumes via upload-to-image) as Fleet Cloud templates.
 
 - **UI:** Platform → Migration → **OpenStack**
 - **API:** `/api/v1/openstack/connections`, `…/inventory`, `…/imports` (through the daemon proxy or `:5093`)
-- **Land path:** stage on host → `POST /api/v1/import/disk` → template with `source_disk`
+- **Land path:** host stage with `X-Auth-Token` → template with `source_disk`
 - **Smoke:** `scripts/openstack/mock-import-smoke.sh` (list endpoints); unit mock download in
   `cargo test -p machina-controller openstack`
 
 ## VM QoS
 
-Neutron-style rate limits are controller objects that bind to the VM-edge datapath:
+Neutron-style rate limits bind into the VM-edge datapath (`egress_mbps` / `ingress_mbps` / `pps`) and also appear as
+`/v2.0/qos/policies` on the façade.
 
-`GET|POST /api/v1/vm-qos/policies`, `DELETE …/{id}`, `POST …/{id}/bind` with `egress_mbps` / `ingress_mbps` / `pps`.
+`GET|POST /api/v1/vm-qos/policies`, `DELETE …/{id}`, `POST …/{id}/bind`.
 
 ## Limits
 
 - Smoke set only — unsupported actions return OpenStack JSON errors, never silent success.
-- No OVN/VXLAN tenant overlay, full Neutron BGP/L3 HA, Heat HOT, Magnum/Trove/Manila, or amphora Octavia.
+- No OVN/VXLAN tenant overlay, provider/flat uplink networks, full Neutron BGP/L3 HA, Heat HOT, Magnum/Trove/Manila, or amphora Octavia.
 - Glance create registers a host disk path; it does not stream image bytes through the Glance HTTP body.
 - Server groups: anti-affinity only.
 

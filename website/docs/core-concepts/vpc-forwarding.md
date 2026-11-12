@@ -25,7 +25,8 @@ IPv6, and ACLs against real guest VMs.** See the claims ledger (`docs/claims.md`
 | **Internet Gateway** route | Source subnets may forward to the destination through the host uplink (the IPv4 default route unless one is named) |
 | **Blackhole** route | An explicit drop that wins over any forward rule |
 | **Network ACL** | An ordered, stateless nftables chain with an implicit deny at the end |
-| **NAT gateway** | Unchanged: the existing host masquerade for a `0.0.0.0/0` route |
+| **NAT gateway** | Unchanged: the existing host masquerade for a `0.0.0.0/0` route; native `target=nat` admits the forward like IGW |
+| **Transit** (`target=transit`, hub VPC `target_id`) | One-sided peer/local forwarding toward the hub VPC, same host path as peering |
 
 ## How a peering becomes traffic
 

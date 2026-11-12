@@ -769,7 +769,24 @@ pub async fn create_route(
             }
         }
         // Parity with EC2 route targets already applied by cloud_fabric.
-        "igw" | "nat" | "transit" => {}
+        "igw" | "nat" => {}
+        "transit" => {
+            let hub = body
+                .target_id
+                .ok_or_else(|| invalid("transit target_id (hub VPC) required"))?;
+            let exists: bool = crate::db::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM cloud_vpcs WHERE id=?)",
+            )
+            .bind(hub)
+            .fetch_one(&mut *tx)
+            .await?;
+            if !exists {
+                return Err(invalid("transit hub VPC not found"));
+            }
+            if hub == id {
+                return Err(invalid("transit hub cannot be this VPC"));
+            }
+        }
         _ => {
             return Err(invalid(
                 "supported targets: local, blackhole, peering, igw, nat, transit",
@@ -851,6 +868,19 @@ pub async fn plan(
         list_routes(State(state.clone()), Extension(actor.clone()), Path(id)).await?;
     let Json(peerings) = list_peerings(State(state), Extension(actor), Path(id)).await?;
     Ok(Json(
-        json!({"vpc":vpc,"subnets":subnets,"routes":routes,"peerings":peerings,"forwarding_active":false,"backend":"host-local-isolated","warnings":["Subnets are separate libvirt isolated networks. Cross-subnet routes and peerings are plans only.","Internet/NAT/transit gateways, private endpoints and IPv6 are not implemented by this backend.","IPAM reservations do not configure guest addresses; use the reserved address in guest configuration."]}),
+        json!({
+            "vpc": vpc,
+            "subnets": subnets,
+            "routes": routes,
+            "peerings": peerings,
+            "forwarding_active": false,
+            "backend": "host-local-isolated",
+            "warnings": [
+                "Subnets are separate libvirt isolated networks until cloud_fabric applies routes on the host.",
+                "Peering, igw, nat and transit (hub VPC target_id) routes converge via cloud.fabric.sync; forwarding_active is set on the create/accept response when the host applied them.",
+                "IPv6 dual-stack fabric, provider/flat uplink networks and real-guest IGW qualification are still open.",
+                "IPAM reservations do not configure guest addresses; use the reserved address in guest configuration."
+            ]
+        }),
     ))
 }
