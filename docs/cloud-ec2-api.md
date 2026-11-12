@@ -112,7 +112,7 @@ Status of each action (judged by reading its handler; **none of this has been ru
 
 An action that is not in these tables answers `UnsupportedOperation` on `ec2` and `InvalidAction` on the other services.
 
-### ec2 actions (204: 7 fixed, 31 mixed, 152 real, 11 recorded, 3 refused)
+### ec2 actions (205: 7 fixed, 31 mixed, 153 real, 11 recorded, 3 refused)
 
 Reached with scope `ec2`, `POST /ec2`.
 
@@ -121,7 +121,7 @@ Reached with scope `ec2`, `POST /ec2`.
 | Action | Status | Note | |
 |---|---|---|---|
 | `AbortExperiment` | real |  | M |
-| `AcceptVpcPeeringConnection` | real | an accepted peering is `active`; it forwards once a route table selects it (`forwardingActive=true`), across hosts over the machina-wg overlay |  |
+| `AcceptVpcPeeringConnection` | real | an accepted peering is `active`; it forwards once a route table selects it (`forwardingActive=true`), across hosts over the machina-wg overlay; delete refuses while routes still select the peering |  |
 | `AllocateAddress` | real |  |  |
 | `AllocateSubnetAddress` | recorded | reserved in the subnet's address pool; not configured in the guest | M |
 | `AssignPrivateIpAddresses` | recorded | reserved in the subnet's address pool; not configured in the guest |  |
@@ -168,7 +168,7 @@ Reached with scope `ec2`, `POST /ec2`.
 | `CreateVolume` | mixed | size is real; type, IOPS, throughput recorded; `Encrypted`, `KmsKeyId`, `MultiAttachEnabled` refused |  |
 | `CreateVpc` | real | needs Machina's `ProjectId` and `AvailabilityZone` or `HostId` |  |
 | `CreateVpcEndpoint` | refused |  |  |
-| `CreateVpcPeeringConnection` | real | an accepted peering is `active`; it forwards once a route table selects it (`forwardingActive=true`), across hosts over the machina-wg overlay |  |
+| `CreateVpcPeeringConnection` | real | an accepted peering is `active`; it forwards once a route table selects it (`forwardingActive=true`), across hosts over the machina-wg overlay; delete refuses while routes still select the peering |  |
 | `CreateWebhook` | real |  | M |
 | `DeleteAlarms` | real | also answered by the `monitoring` service, in CloudWatch's shape |  |
 | `DeleteBackupSchedule` | real |  | M |
@@ -195,6 +195,7 @@ Reached with scope `ec2`, `POST /ec2`.
 | `DeleteVmSchedule` | real |  | M |
 | `DeleteVolume` | real |  |  |
 | `DeleteVpc` | real |  |  |
+| `DeleteVpcPeeringConnection` | real | an accepted peering is `active`; it forwards once a route table selects it (`forwardingActive=true`), across hosts over the machina-wg overlay; delete refuses while routes still select the peering |  |
 | `DeleteWebhook` | real |  | M |
 | `DeregisterImage` | real |  |  |
 | `DeregisterInstancesFromLoadBalancer` | real |  | M |
@@ -263,7 +264,7 @@ Reached with scope `ec2`, `POST /ec2`.
 | `DescribeVolumesModifications` | real |  |  |
 | `DescribeVpcAttribute` | real |  |  |
 | `DescribeVpcEndpoints` | fixed | always empty (what Terraform reads while refreshing a VPC) |  |
-| `DescribeVpcPeeringConnections` | real | an accepted peering is `active`; it forwards once a route table selects it (`forwardingActive=true`), across hosts over the machina-wg overlay |  |
+| `DescribeVpcPeeringConnections` | real | an accepted peering is `active`; it forwards once a route table selects it (`forwardingActive=true`), across hosts over the machina-wg overlay; delete refuses while routes still select the peering |  |
 | `DescribeVpcs` | real |  |  |
 | `DescribeWebhooks` | real |  | M |
 | `DetachInternetGateway` | real | one per VPC; a route to an attached gateway forwards through the host uplink (`forwardingActive=true`); a route to a detached gateway shows `blackhole` |  |

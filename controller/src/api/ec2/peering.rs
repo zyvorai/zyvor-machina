@@ -100,6 +100,15 @@ pub async fn accept_vpc_peering_connection(state: &AppState, actor: &AuthUser, p
     Ok(format!("<vpcPeeringConnectionId>{}</vpcPeeringConnectionId><status><code>active</code></status><forwardingActive>{}</forwardingActive>", pcx(id), forwarding))
 }
 
+pub async fn delete_vpc_peering_connection(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
+    require_operator(actor)?;
+    let id = peering_uuid(state, &need(p, "VpcPeeringConnectionId")?).await?;
+    let _ = crate::api::cloud::network::delete_peering(State(state.clone()), Extension(actor.clone()), Path(id))
+        .await
+        .map_err(api_err)?;
+    Ok("<return>true</return>".into())
+}
+
 pub async fn allocate_subnet_address(state: &AppState, actor: &AuthUser, p: &Params) -> Result<String, Ec2Error> {
     require_operator(actor)?;
     let subnet = resolve(state, Kind::Subnet, &need(p, "SubnetId")?, "InvalidSubnetID.NotFound").await?;

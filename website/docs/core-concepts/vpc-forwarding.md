@@ -70,12 +70,21 @@ for the first peering route and torn down after the last one. The EC2 compatibil
 shows `active` with `forwardingActive=true` once a route exists, and `CreateRoute`/`ReplaceRoute` return
 `forwardingActive` for the call.
 
+## Peering delete and route targets
+
+- **Delete:** `DELETE /api/v1/cloud/peerings/{id}` and EC2 `DeleteVpcPeeringConnection` refuse while any route still
+  selects the peering, then converge both VPCs.
+- **Native route targets** accept `igw`, `nat`, and `transit` for parity with EC2 `CreateRoute` (transit is stored for
+  hub chaining; dataplane coverage is still expanding — see the engineering note in the repository
+  [`docs/cloud-fabric.md`](https://github.com/zyvorai/zyvor-machina/blob/main/docs/cloud-fabric.md)).
+
 ## Limits
 
-- IPv4 forwarding only.
+- IPv4 forwarding only in the ACL path (dual-stack validation is still open).
 - A peering across hosts needs the WireGuard overlay (UDP 51871 between hosts and `wireguard-tools` on every host).
   Peering activates the overlay by itself and tears it back down when the last peering route goes.
-- No transit routing through a peer, no overlapping CIDRs, no cross-region peering.
-- The native API has no peering delete yet, so a VPC that has a peering cannot be deleted through it.
+- No overlapping CIDRs, no cross-region peering.
+- Internet Gateway egress and ACLs against **real guest VMs** are not yet qualification-complete (netns traffic is).
 
-Related: [Fleet Cloud](fleet-cloud.md), [EC2-compatible API](ec2-api.md), [VM network policy](../networking/security-enforcement.md).
+Related: [Fleet Cloud](fleet-cloud.md), [EC2-compatible API](ec2-api.md),
+[OpenStack-compatible API](openstack-api.md), [VM network policy](../networking/security-enforcement.md).

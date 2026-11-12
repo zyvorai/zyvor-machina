@@ -671,6 +671,49 @@ pub async fn list_peerings(
     Ok(Json(crate::db::query_as("SELECT id,requester_id,accepter_id,status FROM cloud_peerings WHERE requester_id=? OR accepter_id=? LIMIT 500").bind(id).bind(id).fetch_all(&mut *conn).await?))
 }
 
+/// Delete a peering. Refuses while routes still select it; then converges both VPCs.
+pub async fn delete_peering(
+    State(state): State<AppState>,
+    Extension(actor): Extension<AuthUser>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Value>, ApiError> {
+    let mut tx = crate::db::begin_write(&state.pool).await?;
+    let peer: Option<Peering> = crate::db::query_as(
+        "SELECT id, requester_id, accepter_id, status FROM cloud_peerings WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let peer = peer.ok_or_else(|| ApiError::not_found("peering not found"))?;
+    vpc(&mut tx, &actor, peer.requester_id, true).await?;
+    let routes: i64 = crate::db::query_scalar(
+        "SELECT (SELECT COUNT(*) FROM cloud_routes WHERE target = 'peering' AND target_id = ?) \
+         + (SELECT COUNT(*) FROM ec2_routes WHERE target_kind = 'peering' AND target_id = ?)",
+    )
+    .bind(id)
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await?;
+    if routes > 0 {
+        return Err(ApiError::conflict(
+            "peering still has routes",
+            "delete the route-table entries that select this peering first",
+        ));
+    }
+    crate::db::query("DELETE FROM cloud_peerings WHERE id = ?")
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    audit(&mut tx, &actor, "cloud.peering.delete", id).await?;
+    tx.commit().await?;
+    let a = crate::engine::cloud_fabric::converge_vpc(&state.pool, peer.requester_id).await;
+    let b = crate::engine::cloud_fabric::converge_vpc(&state.pool, peer.accepter_id).await;
+    Ok(Json(json!({
+        "deleted": true,
+        "apply_error": a.err().or(b.err()).map(|e| format!("{e:#}")),
+    })))
+}
+
 #[derive(Deserialize, Serialize, sqlx::FromRow)]
 #[serde(deny_unknown_fields)]
 pub struct RouteBody {
@@ -725,9 +768,11 @@ pub async fn create_route(
                 return Err(invalid("destination must fit remote VPC"));
             }
         }
+        // Parity with EC2 route targets already applied by cloud_fabric.
+        "igw" | "nat" | "transit" => {}
         _ => {
             return Err(invalid(
-                "supported targets: local, blackhole, accepted peering",
+                "supported targets: local, blackhole, peering, igw, nat, transit",
             ))
         }
     }

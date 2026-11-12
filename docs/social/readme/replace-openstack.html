@@ -35,9 +35,9 @@
     <div class="rw"><div class="o">EC2 clients<small>boto3, awscli, Terraform</small></div><div class="ar">&rarr;</div><div class="m"><b>EC2-compatible endpoint</b> on the controller</div></div>
   </div>
   <div class="gaps">
-    <div><b>NOT A DROP-IN</b>No Nova or Neutron API. Clients move to the Machina or EC2 API; guests move as disk images.</div>
-    <div><b>SCALE</b>Built for fleets you own, not thousands of tenants or deep SDN breadth.</div>
-    <div><b>PROOF</b>Each feature's status (run on a real host or unit-tested only) is in docs/claims.md.</div>
+    <div><b>COMPATIBILITY</b>Keystone/Nova/Glance/Cinder/Neutron façade on :5093; prefer native REST or EC2 for new automation.</div>
+    <div><b>SCALE</b>Built for fleets you own — not thousands of tenants or OVN/VXLAN/BGP-as-Neutron.</div>
+    <div><b>PROOF</b>Each feature's status (live host vs unit-only) is in docs/claims.md (C74–C76 for OpenStack).</div>
   </div>
   <div class="foot"><b>github.com/zyvorai/zyvor-machina</b><span class="r">OpenStack is a trademark of the Open Infrastructure Foundation</span></div>
 </div>

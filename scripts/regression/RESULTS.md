@@ -2,6 +2,24 @@
 
 Rolling notes from deployed-host sweeps. Update as new loops complete.
 
+## 2026-11-12 — OpenStack façade + importer + fabric leftovers (`212.8.248.187`)
+
+Fresh platform install on the lab host (daemon `:5092`, controller SQLite `:5093`, agent). Sources synced without the 38G `macos/` tree; `make release` + `npm run build` on-host; `install.sh --skip-build` + `install-platform.sh --bind 0.0.0.0`.
+
+| Check | Result |
+|-------|--------|
+| Daemon / controller health (tunnel `:15092` / `:15093`) | PASS |
+| `cargo test -p machina-controller openstack` (4 tests incl. mock import) | PASS |
+| Keystone token + catalog (curl + `python-openstackclient`) | PASS — keystone/nova/glance/cinderv3/neutron |
+| OSC `image list` / curl Glance/Nova/Cinder/Neutron list | PASS (24 Glance images; empty flavors/networks on fresh DB) |
+| `scripts/openstack/mock-import-smoke.sh` (daemon cookie + direct JWT) | PASS |
+| `POST /api/v1/openstack/connections` + `POST /api/v1/vm-qos/policies` | PASS |
+| `DELETE /api/v1/cloud/peerings/{id}` unknown id | PASS (404 `peering not found`) |
+| `make regression-fleetcloud` | **Not run** this pass (cold host; OpenStack/importer/QoS path covered above) |
+| Real OpenStack cloud import / OSC server CRUD matrix | **Not run** |
+
+Claims touched: C74–C76.
+
 ## 2026-11-03 — Zyra decision tools on the demo host (`80.79.5.173`, `feat/zyra-ai-decision-features` `7803cf35`)
 
 Controller, daemon and agent running (agent with mutual TLS from a throwaway CA). The host has no `chrome-e2e-vm`

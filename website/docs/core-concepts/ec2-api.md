@@ -38,5 +38,8 @@ print([i["InstanceId"] for r in ec2.describe_instances()["Reservations"] for i i
 The endpoints live on the controller (port 5093, plain http, loopback only by default), not the daemon. A key carries the role of the admin who created it. The region is
 signed but not checked.
 
+Prefer EC2 for AWS-shaped automation. If your tools already speak OpenStack, use the
+[OpenStack-compatible API](openstack-api.md) on the same controller instead.
+
 **Status:** implemented and unit-tested; not every action has been exercised with a stock client.
 [Per-action status table](https://github.com/zyvorai/zyvor-machina/blob/main/docs/cloud-ec2-api.md) · [Clients and Terraform](https://github.com/zyvorai/zyvor-machina/blob/main/docs/cloud-ec2-clients.md) · [Semantics](https://github.com/zyvorai/zyvor-machina/blob/main/docs/cloud-ec2-semantics.md)

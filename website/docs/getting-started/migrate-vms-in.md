@@ -38,9 +38,15 @@ e1000e NIC, UEFI). After deploy, use the RDP console from the VM page.
 Plan the batch as a [migration wave](./migration-waves.md): Machina starts the VMs a few at a time through Transiva, follows each
 job and keeps a cutover checklist. For a one-off list, Transiva's own batch export (`transiva-export -batch vms.txt`) also works.
 
+## OpenStack without Transiva
+
+When the source is OpenStack itself, Machina also has a **first-party importer**: Platform → Migration → **OpenStack**
+connects to Keystone, syncs Glance/Nova/Cinder inventory, and imports Glance images as Fleet Cloud templates. Details:
+[Replacing OpenStack](./from-openstack.md) and [OpenStack-compatible API](../core-concepts/openstack-api.md).
+
 ## What to know
 
-- Transiva and h2kvm are separate products with their own licences; see the [claims ledger](https://github.com/zyvorai/zyvor-machina/blob/main/docs/claims.md) (C54 for the Machina-side Transiva API, C56 for scope) for what is verified in this repository.
+- Transiva and h2kvm are separate products with their own licences; see the [claims ledger](https://github.com/zyvorai/zyvor-machina/blob/main/docs/claims.md) (C54 for the Machina-side Transiva API, C56 for scope; C74–C76 for the OpenStack façade and importer) for what is verified in this repository.
 - Machina has no live replication from the source: a VM is down or quiesced during final sync and cutover.
 - Machina can also take KubeVirt VMs the other way; see the KubeVirt migration guide in the repository docs.
 

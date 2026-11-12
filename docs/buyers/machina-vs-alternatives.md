@@ -5,7 +5,7 @@ can show; check each vendor's current documentation and pricing before you decid
 
 | You are choosing between | Machina fits when | The other fits when |
 |---|---|---|
-| **OpenStack** | You want a cloud one person can install and upgrade, on hardware you own, with an EC2-style API | You run thousands of tenants, need Neutron-grade SDN breadth, or depend on its ecosystem (detailed table in the [README](../../README.md)) |
+| **OpenStack** | You want a cloud one person can install and upgrade, on hardware you own, with EC2 + an OpenStack-compatible façade and a first-party importer | You run thousands of tenants, need OVN/VXLAN/BGP-as-Neutron, or depend on its ecosystem (detailed table in the [README](../../README.md)) |
 | **A hypervisor with a management console** (VMware, Proxmox and similar) | You want open KVM/libvirt underneath, an EC2-compatible API, enforced security groups and scale-to-zero style features in one install | You need a vendor's certified hardware matrix, a particular partner ecosystem, or features we have not built |
 | **Azure Local** (Azure Stack HCI) | You want open KVM, no cloud account, a per-host price and eBPF network enforcement ([comparison](https://zyvorai.github.io/zyvor-machina/vs-azure-local)) | Azure is your control plane, or you need rack-aware clusters, SAN or disaggregated storage, Windows 11 multi-session desktops or SQL Server on site |
 | **Nutanix** | You already run Ceph or NFS and want the control plane, with eBPF segmentation and an EC2-style API | You want one vendor for compute, storage and built-in replication |
@@ -15,7 +15,9 @@ can show; check each vendor's current documentation and pricing before you decid
 ## Moving in from another platform
 Transiva reads vSphere, Hyper-V, Nutanix, Proxmox, AWS, Azure, GCP, OCI, OpenStack and Alibaba; h2kvm converts the disks and
 GuestKit repairs the guest offline before first boot ([guide](https://zyvorai.github.io/zyvor-machina/docs/getting-started/migrate-vms-in)).
-These are separate Zyvor products, not part of the Machina install.
+These are separate Zyvor products, not part of the Machina install. For OpenStack specifically, Machina also ships a
+[first-party importer](https://zyvorai.github.io/zyvor-machina/docs/getting-started/from-openstack) (Platform → Migration →
+OpenStack) and an [OpenStack-compatible API](https://zyvorai.github.io/zyvor-machina/docs/core-concepts/openstack-api).
 
 ## What Machina does not do today
 A witness or quorum arbiter for rack loss, iSCSI/Fibre Channel targets, a desktop connection broker and Windows multi-session,

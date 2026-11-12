@@ -101,16 +101,19 @@ CPU scaling, and the explicit routing/peering limitations.
 ![Nine OpenStack services collapse into four Machina services](docs/social/anim/openstack-vs-machina.svg)
 
 Machina covers the private-cloud primitives most OpenStack deployments use: identity, compute, networking, images, volumes,
-orchestration, load balancing, a dashboard, HA and alarms. It is **not a drop-in**: there is no Nova or Neutron API, so tools
-move to Machina's REST API or its [EC2-compatible API](#ec2-compatible-api), and guests move as disk images.
+orchestration, load balancing, a dashboard, HA and alarms. It is **not a full drop-in** of every OpenStack extension: native
+clients should prefer Machina's REST API or its [EC2-compatible API](#ec2-compatible-api). A
+[Keystone / Nova / Glance / Cinder / Neutron compatibility façade](docs/cloud-openstack-api.md) on the controller also lets
+`openstack` CLI and Terraform's `openstack` provider drive the same Fleet Cloud resources. Guests move as disk images or through
+the [first-party OpenStack importer](docs/migration/from-openstack.md#moving-a-workload) (Platform → Migration → OpenStack).
 
 | OpenStack | Machina |
 |---|---|
-| Keystone | PAM, OIDC, SAML, LDAP, RBAC, project-scoped API keys |
-| Nova, Placement | `machina-daemon` and `machina-agent` on libvirt/KVM; the controller schedules, with live migration, HA and DRS |
-| Neutron | Native eBPF VM edge and network policy, VPC objects, NAT, Elastic IPs, WireGuard overlay between hosts |
-| Glance | Images and templates, Golden Forge builds |
-| Cinder | Volumes with I/O limits and snapshots; Atlas for Ceph, NFS or ZFS |
+| Keystone | PAM, OIDC, SAML, LDAP, RBAC, project-scoped API keys; Keystone v3 shim |
+| Nova, Placement | `machina-daemon` and `machina-agent` on libvirt/KVM; the controller schedules, with live migration, HA and DRS; Nova v2.1 shim |
+| Neutron | Native eBPF VM edge and network policy, VPC objects, NAT, Elastic IPs, WireGuard overlay; Neutron v2.0 shim |
+| Glance | Images and templates, Golden Forge builds; Glance v2 shim |
+| Cinder | Volumes with I/O limits and snapshots; Atlas for Ceph, NFS or ZFS; Cinder v3 shim |
 | Heat | Stacks with dry run, approval and drift repair |
 | Octavia | Native layer-4 balancer on the host, no amphora VM |
 | Horizon | The web UI, with browser consoles |
@@ -118,9 +121,11 @@ move to Machina's REST API or its [EC2-compatible API](#ec2-compatible-api), and
 | Ceilometer, Aodh | Metrics history, alarms with scaling actions, Prometheus and OTLP |
 | MariaDB, RabbitMQ | SQLite or PostgreSQL; in-memory task bus, NATS optional |
 
-**Gaps, stated plainly:** thousands of tenants and Neutron-grade SDN breadth are out of scope; the OpenStack client tools and
-ecosystem projects do not work against Machina; there is no OpenStack importer, and moving a guest as a disk image has not been run end to end on a real OpenStack
-cloud. Which features have run on a real host and which are unit-tested only: [claims.md](docs/claims.md). The full map, with how to move a workload: [Replacing OpenStack](docs/migration/from-openstack.md).
+**Gaps, stated plainly:** hyperscale multi-tenancy (thousands of hard-isolated tenants) and OVN/VXLAN/BGP-as-Neutron remain out
+of scope; Machina expands networking on its eBPF + VPC fabric instead. The OpenStack façade covers the smoke set in
+[cloud-openstack-api.md](docs/cloud-openstack-api.md), not every microversion or ecosystem project (Trove, Manila, …). Import
+from a **real** OpenStack cloud has not been run end to end yet (mock + live API smoke: [claims.md](docs/claims.md) C74–C76).
+The full map: [Replacing OpenStack](docs/migration/from-openstack.md).
 
 ### Machina vs OpenStack, side by side
 
@@ -133,6 +138,8 @@ cloud. Which features have run on a real host and which are unit-tested only: [c
 | Install | `./machinactl deploy` | Kolla-Ansible / OpenStack-Ansible project |
 | Smallest useful footprint | A single KVM host | A multi-node control plane |
 | Flavors, images, volumes, SGs, stacks, LBs | Yes, in [Fleet Cloud](docs/customer/pages/fleet-cloud/fleet-cloud.md) | Yes, across six projects |
+| OpenStack client tools | [Keystone/Nova/Glance/Cinder/Neutron façade](docs/cloud-openstack-api.md) (smoke set) + native REST / EC2 | Native OpenStack APIs |
+| Leave OpenStack | First-party [importer](docs/migration/from-openstack.md#moving-a-workload) + disk import + Transiva | N/A |
 | Load balancer data plane | On the host, no amphora VM: iptables rules for Fleet Cloud, eBPF Maglev for Kubernetes services | Amphora VMs (Octavia) |
 | Network datapath | Native eBPF, lease-gated enforcement | Neutron agents + OVS/OVN |
 | Browser consoles | Built into the daemon | noVNC/SPICE proxy services |
@@ -145,7 +152,7 @@ cloud. Which features have run on a real host and which are unit-tested only: [c
 | Resilience testing | [Game days](docs/fleet-cloud-features.md#game-days): leased network, disk and crash faults with health-probe abort and a report | Not included; a separate chaos tool |
 | Spare capacity | [Preemptible instances](docs/fleet-cloud-features.md#preemptible-instances): saved to disk under memory pressure by priority and restored automatically | Not included; spot capacity deletes the instance |
 | Containers and Kubernetes | Podman, KubeVirt | Zun / Magnum (separate projects) |
-| **Choose OpenStack when** | | You run thousands of tenants, need Neutron-grade SDN breadth, or depend on its ecosystem |
+| **Choose OpenStack when** | | You run thousands of tenants, need OVN/VXLAN/BGP-as-Neutron, or depend on its ecosystem |
 
 Machina targets the fleets you own: a lab, a branch, a sovereign region, a VMware exit. It deliberately trades OpenStack's hyperscale multi-tenancy for a cloud one person can install, understand and upgrade.
 
