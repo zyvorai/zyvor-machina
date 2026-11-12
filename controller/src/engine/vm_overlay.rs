@@ -444,6 +444,7 @@ mod tests {
             project: None,
             labels: BTreeMap::new(),
             addresses: addrs.iter().map(|a| a.to_string()).collect(),
+            ..Default::default()
         }
     }
 
