@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { ArrowLeft, Camera, Loader2 } from 'lucide-react'
 import {
+  createVolumeFromSnapshot,
   deleteVolumeSnapshot,
   listAllVolumeSnapshots,
   type NativeVolumeSnapshotWithVolume,
@@ -22,8 +23,6 @@ import { useBreadcrumbName } from '../contexts/BreadcrumbNameContext'
 // no longer depends on a wired external cloud. There's no
 // the old external-cloud gate component wrapping it any more either: the daemon's
 // external-cloud-client integration has since been fully removed.
-// No native "restore to new volume" yet (create-from-snapshot has no native equivalent --
-// see api/nativeVolumes.ts), so that action is dropped rather than faked.
 export default function FleetCloudVolumeSnapshotDetailPage() {
   return <FleetCloudVolumeSnapshotDetailContent />
 }
@@ -34,6 +33,7 @@ function FleetCloudVolumeSnapshotDetailContent() {
   const [snapshot, setSnapshot] = useState<NativeVolumeSnapshotWithVolume | null>(null)
   const [loading, setLoading] = useState(true)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [creatingVolume, setCreatingVolume] = useState(false)
   useBreadcrumbName(snapshot?.name)
   const loadSeq = useRef(0)
 
@@ -90,8 +90,34 @@ function FleetCloudVolumeSnapshotDetailContent() {
           <Link to={`/fleet-cloud/volumes/${snapshot.volume_id}`} className="text-[var(--accent)] hover:underline">{snapshot.volume_name}</Link>
         </dd></div>
       </dl>
-      <button type="button" className="px-3 py-1.5 rounded-lg border border-red-500/50 text-red-600 text-sm"
-        onClick={() => setConfirmDelete(true)}>Delete snapshot</button>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="btn-primary text-sm disabled:opacity-50"
+          disabled={creatingVolume}
+          onClick={() => {
+            void (async () => {
+              setCreatingVolume(true)
+              try {
+                const vol = await createVolumeFromSnapshot(
+                  snapshot.id,
+                  `${snapshot.name || 'snap'}-vol`,
+                )
+                toast.success('Volume created from snapshot')
+                window.location.href = `/fleet-cloud/volumes/${vol.id}`
+              } catch (e: unknown) {
+                toast.error(formatUserError(e))
+              } finally {
+                setCreatingVolume(false)
+              }
+            })()
+          }}
+        >
+          {creatingVolume ? <Loader2 className="w-4 h-4 inline animate-spin" /> : null} Create volume
+        </button>
+        <button type="button" className="px-3 py-1.5 rounded-lg border border-red-500/50 text-red-600 text-sm"
+          onClick={() => setConfirmDelete(true)}>Delete snapshot</button>
+      </div>
       <ConfirmDialog
         open={confirmDelete}
         title="Delete snapshot"

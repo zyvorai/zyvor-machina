@@ -13,10 +13,11 @@ mod ids;
 mod keystone;
 mod neutron;
 mod nova;
+mod octavia;
 
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use serde_json::json;
 
@@ -119,7 +120,10 @@ pub fn public_router() -> Router<AppState> {
 fn protected_routes() -> Router<AppState> {
     Router::new()
         .route("/v3/auth/catalog", get(catalog::auth_catalog))
-        .route("/v3/projects", get(keystone::list_projects))
+        .route(
+            "/v3/projects",
+            get(keystone::list_projects).post(keystone::create_project),
+        )
         .route("/v3/users", get(keystone::list_users))
         .route(
             "/v2.1/flavors",
@@ -141,6 +145,18 @@ fn protected_routes() -> Router<AppState> {
         )
         .route("/v2.1/servers/{id}/action", post(nova::server_action))
         .route(
+            "/v2.1/servers/{id}/remote-consoles",
+            post(nova::get_remote_console),
+        )
+        .route(
+            "/v2.1/servers/{id}/os-interface",
+            get(nova::list_os_interfaces).post(nova::attach_os_interface),
+        )
+        .route(
+            "/v2.1/servers/{id}/os-interface/{port_id}",
+            delete(nova::detach_os_interface),
+        )
+        .route(
             "/v2.1/os-keypairs",
             get(nova::list_keypairs).post(nova::create_keypair),
         )
@@ -151,6 +167,10 @@ fn protected_routes() -> Router<AppState> {
         .route(
             "/v2.1/os-server-groups",
             get(nova::list_server_groups).post(nova::create_server_group),
+        )
+        .route(
+            "/v2.1/os-server-groups/{name}",
+            delete(nova::delete_server_group),
         )
         .route(
             "/v2/images",
@@ -213,8 +233,16 @@ fn protected_routes() -> Router<AppState> {
             "/v2.0/subnets/{id}",
             get(neutron::get_subnet).delete(neutron::delete_subnet),
         )
-        .route("/v2.0/ports", get(neutron::list_ports))
-        .route("/v2.0/ports/{id}", get(neutron::get_port))
+        .route(
+            "/v2.0/ports",
+            get(neutron::list_ports).post(neutron::create_port),
+        )
+        .route(
+            "/v2.0/ports/{id}",
+            get(neutron::get_port)
+                .put(neutron::update_port)
+                .delete(neutron::delete_port),
+        )
         .route(
             "/v2.0/security-groups",
             get(neutron::list_security_groups).post(neutron::create_security_group),
@@ -252,6 +280,22 @@ fn protected_routes() -> Router<AppState> {
         .route(
             "/v2.0/qos/policies/{id}/bandwidth_limit_rules",
             post(neutron::create_qos_policy_bandwidth_rule),
+        )
+        .route(
+            "/v2.0/lbaas/loadbalancers",
+            get(octavia::list_loadbalancers).post(octavia::create_loadbalancer),
+        )
+        .route(
+            "/v2.0/lbaas/loadbalancers/{id}",
+            get(octavia::get_loadbalancer).delete(octavia::delete_loadbalancer),
+        )
+        .route(
+            "/v2.0/lbaas/pools/{id}/members",
+            get(octavia::list_members).post(octavia::create_member),
+        )
+        .route(
+            "/v2.0/lbaas/pools/{pool_id}/members/{member_id}",
+            delete(octavia::delete_member),
         )
 }
 

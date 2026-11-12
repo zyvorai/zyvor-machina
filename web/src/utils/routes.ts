@@ -51,6 +51,7 @@ import {
   CalendarClock,
   BellRing,
   Search,
+  Gauge,
 } from 'lucide-react'
 
 interface NavItem {
@@ -305,6 +306,7 @@ export const navGroups: NavGroup[] = [
           { to: '/fleet-cloud/server-groups', icon: React.createElement(Boxes, { className: 'w-4 h-4' }), label: 'Server Groups' },
           { to: '/fleet-cloud/keypairs', icon: React.createElement(Key, { className: 'w-4 h-4' }), label: 'Keypairs' },
           { to: '/fleet-cloud/flavors', icon: React.createElement(Cpu, { className: 'w-4 h-4' }), label: 'Flavors' },
+          { to: '/fleet-cloud/qos', icon: React.createElement(Gauge, { className: 'w-4 h-4' }), label: 'VM QoS' },
           { to: '/fleet-cloud/autopilot', icon: React.createElement(Activity, { className: 'w-4 h-4' }), label: 'Autopilot' },
           { to: '/fleet-cloud/chaos', icon: React.createElement(Zap, { className: 'w-4 h-4' }), label: 'Game days' },
           { to: '/fleet-cloud/preemptible', icon: React.createElement(Moon, { className: 'w-4 h-4' }), label: 'Preemptible' },
@@ -412,6 +414,7 @@ export const routeLabels: Record<string, string> = {
   '/fleet-cloud/identity': 'Identity',
   '/fleet-cloud/keypairs': 'Keypairs',
   '/fleet-cloud/flavors': 'Flavors',
+  '/fleet-cloud/qos': 'VM QoS',
   '/fleet-cloud/server-groups': 'Server Groups',
   '/audit': 'Audit Log',
   '/import': 'Import VM',

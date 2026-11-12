@@ -21,10 +21,11 @@ provider matrix, import from a production OpenStack cloud. Claims **C74–C76**.
 | Service | Base | Covered |
 | --- | --- | --- |
 | Keystone v3 | `/v3` | Token issue/validate, catalog, projects, users |
-| Nova v2.1 | `/v2.1` | Flavors, servers CRUD/power (start/stop/reboot/pause/suspend), keypairs, server groups (anti-affinity) |
+| Nova v2.1 | `/v2.1` | Flavors, servers CRUD/power/resize/createImage, remote-consoles, os-interface, keypairs, server groups |
 | Glance v2 | `/v2` | Image list/show/create/delete ← templates |
-| Cinder v3 | `/v3` | Volumes, attach/detach, snapshots |
-| Neutron v2.0 | `/v2.0` | Networks (= VPCs), subnets, ports (read), security groups, floating IPs, QoS policies |
+| Cinder v3 | `/v3` | Volumes, attach/detach/extend, create-from-snapshot, snapshots |
+| Neutron v2.0 | `/v2.0` | Networks (= VPCs), subnets, ports CRUD, security groups, floating IPs, QoS policies |
+| Octavia L4 | `/v2.0/lbaas` | Load balancers + members ← native iptables LB |
 
 Set `MACHINA_PUBLIC_URL` so the catalog URLs match the host clients reach (default `http://127.0.0.1:5093`).
 

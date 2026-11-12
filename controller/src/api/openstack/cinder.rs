@@ -101,6 +101,20 @@ pub async fn create_volume(
         .and_then(|v| v.as_str())
         .unwrap_or("volume")
         .to_string();
+    if let Some(snap) = vol.get("snapshot_id").and_then(|v| v.as_str()) {
+        let snap_id = Uuid::parse_str(snap).map_err(|_| OsError::bad_request("invalid snapshot_id"))?;
+        let Json(row) = crate::api::volumes::create_volume_from_snapshot(
+            State(state),
+            Extension(actor.user.clone()),
+            Path(snap_id),
+            Json(crate::api::volumes::VolumeFromSnapshotBody { name }),
+        )
+        .await?;
+        return Ok((
+            axum::http::StatusCode::ACCEPTED,
+            Json(json!({ "volume": volume_json(&row) })),
+        ));
+    }
     let size = vol
         .get("size")
         .and_then(|v| v.as_i64())
@@ -193,8 +207,24 @@ pub async fn volume_action(
         .await?;
         return Ok(axum::http::StatusCode::ACCEPTED);
     }
+    if let Some(ext) = body.get("os-extend") {
+        let new_size = ext
+            .get("new_size")
+            .and_then(|v| v.as_i64())
+            .ok_or_else(|| OsError::bad_request("os-extend.new_size required"))?;
+        let _ = crate::api::volumes::extend_volume(
+            State(state),
+            Extension(actor.user.clone()),
+            Path(id),
+            Json(crate::api::volumes::ExtendVolumeBody {
+                new_size_gib: new_size,
+            }),
+        )
+        .await?;
+        return Ok(axum::http::StatusCode::ACCEPTED);
+    }
     Err(OsError::not_implemented(
-        "supported volume actions: os-attach, os-detach",
+        "supported volume actions: os-attach, os-detach, os-extend",
     ))
 }
 

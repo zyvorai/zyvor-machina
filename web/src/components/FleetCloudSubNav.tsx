@@ -22,6 +22,7 @@ const PRIMARY: Tab[] = [
 const MORE: Tab[] = [
   { to: '/fleet-cloud/volume-snapshots', label: 'Snapshots' },
   { to: '/fleet-cloud/flavors', label: 'Flavors' },
+  { to: '/fleet-cloud/qos', label: 'VM QoS' },
   { to: '/fleet-cloud/server-groups', label: 'Groups' },
   { to: '/fleet-cloud/vpcs', label: 'VPCs & elastic compute' },
   { to: '/fleet-cloud/autopilot', label: 'Autopilot' },

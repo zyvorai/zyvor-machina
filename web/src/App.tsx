@@ -79,6 +79,7 @@ const FleetCloudPreemptible = lazyWithRetry(() => import('./pages/FleetCloudPree
 const FleetCloudNetworking = lazyWithRetry(() => import('./pages/FleetCloudNetworking'))
 const FleetCloudKeypairs = lazyWithRetry(() => import('./pages/FleetCloudKeypairs'))
 const FleetCloudFlavors = lazyWithRetry(() => import('./pages/FleetCloudFlavors'))
+const FleetCloudQos = lazyWithRetry(() => import('./pages/FleetCloudQos'))
 const FleetCloudServerGroups = lazyWithRetry(() => import('./pages/FleetCloudServerGroups'))
 const FleetCloudImageDetail = lazyWithRetry(() => import('./pages/FleetCloudImageDetail'))
 const FleetCloudVolumeDetail = lazyWithRetry(() => import('./pages/FleetCloudVolumeDetail'))
@@ -514,6 +515,7 @@ function AuthenticatedShellRoutes() {
                 <Route path="/fleet-cloud/keypairs" element={<FleetCloudKeypairs />} />
                 <Route path="/fleet-cloud/flavors" element={<FleetCloudFlavors />} />
                 <Route path="/fleet-cloud/flavors/:id" element={<FleetCloudFlavorDetail />} />
+                <Route path="/fleet-cloud/qos" element={<FleetCloudQos />} />
                 <Route path="/fleet-cloud/server-groups" element={<FleetCloudServerGroups />} />
                 <Route path="/fleet-cloud/server-groups/:id" element={<FleetCloudServerGroupDetail />} />
                 <Route path="/fleet-cloud/networks/:id" element={<FleetCloudNetworkDetail />} />

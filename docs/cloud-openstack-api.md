@@ -14,10 +14,11 @@ See claims **C74**. Full OSC server CRUD and Terraform OpenStack provider matrix
 | Service | Base path | Covered ops |
 |---------|-----------|-------------|
 | Keystone v3 | `/v3` | `POST /v3/auth/tokens`, catalog, projects, users, version discovery |
-| Nova v2.1 | `/v2.1` | flavors CRUD, servers CRUD/power (`os-start`/`os-stop`/`reboot`/`pause`/`unpause`/`suspend`/`resume`), keypairs, server groups (anti-affinity tags only) |
+| Nova v2.1 | `/v2.1` | flavors CRUD, servers CRUD/power (`os-start`/`os-stop`/`reboot`/`pause`/`unpause`/`suspend`/`resume`/`resize`/`createImage`), remote-consoles, os-interface, keypairs, server groups (anti-affinity) |
 | Glance v2 | `/v2` | images list/show/create/delete ← Fleet Cloud templates |
-| Cinder v3 | `/v3` (+ `/{project_id}/…`) | volumes CRUD, attach/detach actions, snapshots |
-| Neutron v2.0 | `/v2.0` | networks (= VPCs), subnets, ports (read-mostly), security groups + rules, floating IPs (= elastic IPs), QoS policies (= `/api/v1/vm-qos`) |
+| Cinder v3 | `/v3` (+ `/{project_id}/…`) | volumes CRUD, attach/detach/`os-extend`, create-from-snapshot, snapshots |
+| Neutron v2.0 | `/v2.0` | networks (= VPCs), subnets, ports CRUD, security groups + rules, floating IPs, QoS policies |
+| Octavia L4 | `/v2.0/lbaas` | loadbalancers + pool members ← native iptables LB (`machina_host_id` / `machina_vm_id`) |
 
 Public auth and version routes are rate-limited with `/ec2` and login. Token-gated service routes sit
 beside the rest of the controller API.

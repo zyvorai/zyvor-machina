@@ -310,6 +310,61 @@ pub async fn delete_subnet(
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
+fn port_json(p: &crate::api::networking::PortRow, project_id: Uuid) -> Value {
+    json!({
+        "id": p.id.to_string(),
+        "name": p.description,
+        "status": p.status,
+        "admin_state_up": true,
+        "network_id": p.network_id.to_string(),
+        "tenant_id": project_id.to_string(),
+        "project_id": project_id.to_string(),
+        "mac_address": p.mac_address.clone().unwrap_or_default(),
+        "fixed_ips": p.private_ip.as_ref().map(|ip| vec![json!({"ip_address": ip, "subnet_id": p.subnet_id})]).unwrap_or_default(),
+        "device_id": p.vm_id.map(|v| v.to_string()).unwrap_or_default(),
+        "device_owner": "",
+        "security_groups": p.security_group_id.map(|g| vec![g.to_string()]).unwrap_or_default(),
+    })
+}
+
+/// Neutron `network_id` is a Fleet Cloud VPC id; ports need the underlying libvirt network.
+async fn resolve_libvirt_network(
+    state: &AppState,
+    network_or_vpc: Uuid,
+    subnet_hint: Option<Uuid>,
+) -> Result<Uuid, OsError> {
+    if let Some(sid) = subnet_hint {
+        let net: Option<Uuid> =
+            crate::db::query_scalar("SELECT network_id FROM cloud_subnets WHERE id = ?")
+                .bind(sid)
+                .fetch_optional(&state.pool)
+                .await?;
+        if let Some(n) = net {
+            return Ok(n);
+        }
+    }
+    let from_vpc: Option<Uuid> = crate::db::query_scalar(
+        "SELECT network_id FROM cloud_subnets WHERE vpc_id = ? ORDER BY name LIMIT 1",
+    )
+    .bind(network_or_vpc)
+    .fetch_optional(&state.pool)
+    .await?;
+    if let Some(n) = from_vpc {
+        return Ok(n);
+    }
+    let exists: bool =
+        crate::db::query_scalar("SELECT EXISTS(SELECT 1 FROM networks WHERE id = ?)")
+            .bind(network_or_vpc)
+            .fetch_one(&state.pool)
+            .await?;
+    if exists {
+        return Ok(network_or_vpc);
+    }
+    Err(OsError::bad_request(
+        "network_id must be a VPC with a subnet (or a libvirt network id)",
+    ))
+}
+
 pub async fn list_ports(
     State(state): State<AppState>,
     Extension(actor): Extension<OsActor>,
@@ -325,23 +380,8 @@ pub async fn list_ports(
     )
     .await?;
     let ports: Vec<Value> = rows
-        .into_iter()
-        .map(|p| {
-            json!({
-                "id": p.id.to_string(),
-                "name": p.description,
-                "status": p.status,
-                "admin_state_up": true,
-                "network_id": p.network_id.to_string(),
-                "tenant_id": actor.project_id.to_string(),
-                "project_id": actor.project_id.to_string(),
-                "mac_address": p.mac_address.clone().unwrap_or_default(),
-                "fixed_ips": p.private_ip.as_ref().map(|ip| vec![json!({"ip_address": ip, "subnet_id": p.subnet_id})]).unwrap_or_default(),
-                "device_id": p.vm_id.map(|v| v.to_string()).unwrap_or_default(),
-                "device_owner": "",
-                "security_groups": p.security_group_id.map(|g| vec![g.to_string()]).unwrap_or_default(),
-            })
-        })
+        .iter()
+        .map(|p| port_json(p, actor.project_id))
         .collect();
     Ok(Json(json!({ "ports": ports })))
 }
@@ -356,22 +396,143 @@ pub async fn get_port(
     let Json(p) =
         crate::api::networking::get_port(State(state), Extension(actor.user.clone()), Path(id))
             .await?;
-    Ok(Json(json!({
-        "port": {
-            "id": p.id.to_string(),
-            "name": p.description,
-            "status": p.status,
-            "admin_state_up": true,
-            "network_id": p.network_id.to_string(),
-            "tenant_id": actor.project_id.to_string(),
-            "project_id": actor.project_id.to_string(),
-            "mac_address": p.mac_address.clone().unwrap_or_default(),
-            "fixed_ips": p.private_ip.as_ref().map(|ip| vec![json!({"ip_address": ip, "subnet_id": p.subnet_id})]).unwrap_or_default(),
-            "device_id": p.vm_id.map(|v| v.to_string()).unwrap_or_default(),
-            "device_owner": "",
-            "security_groups": p.security_group_id.map(|g| vec![g.to_string()]).unwrap_or_default(),
+    Ok(Json(json!({ "port": port_json(&p, actor.project_id) })))
+}
+
+pub async fn create_port(
+    State(state): State<AppState>,
+    Extension(actor): Extension<OsActor>,
+    Json(body): Json<Value>,
+) -> Result<(axum::http::StatusCode, Json<Value>), OsError> {
+    require_operator(&actor)?;
+    let port = body
+        .get("port")
+        .cloned()
+        .ok_or_else(|| OsError::bad_request("port object required"))?;
+    let network_id = port
+        .get("network_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| OsError::bad_request("network_id required"))?;
+    let network_id = parse_uuid(network_id)?;
+    let subnet_hint = port
+        .get("fixed_ips")
+        .and_then(|v| v.as_array())
+        .and_then(|a| a.first())
+        .and_then(|f| f.get("subnet_id"))
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok());
+    let private_ip = port
+        .get("fixed_ips")
+        .and_then(|v| v.as_array())
+        .and_then(|a| a.first())
+        .and_then(|f| f.get("ip_address"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let libvirt_net = resolve_libvirt_network(&state, network_id, subnet_hint).await?;
+    let device_id = port
+        .get("device_id")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .and_then(|s| Uuid::parse_str(s).ok());
+    let sg = port
+        .get("security_groups")
+        .and_then(|v| v.as_array())
+        .and_then(|a| a.first())
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok());
+    let Json(p) = crate::api::networking::create_port(
+        State(state),
+        Extension(actor.user.clone()),
+        Json(crate::api::networking::CreatePortBody {
+            network_id: libvirt_net,
+            vm_id: device_id,
+            security_group_id: sg,
+            project_id: Some(actor.project_id),
+            private_ip,
+            description: port
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+        }),
+    )
+    .await?;
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(json!({ "port": port_json(&p, actor.project_id) })),
+    ))
+}
+
+pub async fn update_port(
+    State(state): State<AppState>,
+    Extension(actor): Extension<OsActor>,
+    Path(id): Path<String>,
+    Json(body): Json<Value>,
+) -> Result<Json<Value>, OsError> {
+    require_operator(&actor)?;
+    let id = parse_uuid(&id)?;
+    let Json(existing) =
+        crate::api::networking::get_port(State(state.clone()), Extension(actor.user.clone()), Path(id))
+            .await?;
+    let port = body.get("port").cloned().unwrap_or(body);
+    if let Some(dev) = port.get("device_id").and_then(|v| v.as_str()) {
+        if dev.is_empty() {
+            // Detach: delete+recreate without vm is heavy; use detach_vm_nic when MAC known.
+            if let (Some(vm), Some(mac)) = (existing.vm_id, existing.mac_address.clone()) {
+                let _ = crate::api::vms::detach_vm_nic(
+                    State(state.clone()),
+                    Extension(actor.user.clone()),
+                    Path((vm, mac)),
+                )
+                .await?;
+                crate::db::query("UPDATE ports SET vm_id = NULL, status = 'DOWN' WHERE id = ?")
+                    .bind(id)
+                    .execute(&state.pool)
+                    .await?;
+            }
+        } else {
+            let vm = parse_uuid(dev)?;
+            let net_name: String = crate::db::query_scalar("SELECT name FROM networks WHERE id = ?")
+                .bind(existing.network_id)
+                .fetch_one(&state.pool)
+                .await?;
+            let _ = crate::api::vms::attach_vm_nic(
+                State(state.clone()),
+                Extension(actor.user.clone()),
+                Path(vm),
+                Json(crate::api::vms::AttachNicBody {
+                    network: net_name,
+                    model: "virtio".into(),
+                }),
+            )
+            .await?;
+            crate::db::query("UPDATE ports SET vm_id = ?, status = 'ACTIVE' WHERE id = ?")
+                .bind(vm)
+                .bind(id)
+                .execute(&state.pool)
+                .await?;
         }
-    })))
+    }
+    let Json(p) =
+        crate::api::networking::get_port(State(state), Extension(actor.user.clone()), Path(id))
+            .await?;
+    Ok(Json(json!({ "port": port_json(&p, actor.project_id) })))
+}
+
+pub async fn delete_port(
+    State(state): State<AppState>,
+    Extension(actor): Extension<OsActor>,
+    Path(id): Path<String>,
+) -> Result<axum::http::StatusCode, OsError> {
+    require_operator(&actor)?;
+    let id = parse_uuid(&id)?;
+    let _ = crate::api::networking::delete_port(
+        State(state),
+        Extension(actor.user.clone()),
+        Path(id),
+    )
+    .await?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
 pub async fn list_security_groups(
