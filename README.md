@@ -2,6 +2,8 @@
 
 # Machina
 
+[Client overview (PDF)](docs/Zyvor-Machina-Client-Overview.pdf)
+
 [![CI](https://github.com/zyvorai/zyvor-machina/actions/workflows/ci.yml/badge.svg)](https://github.com/zyvorai/zyvor-machina/actions/workflows/ci.yml)
 [![License: Zyvor Production v1.0](https://img.shields.io/badge/License-Zyvor%20Production%20v1.0-orange.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-daemon%20%C2%B7%20controller%20%C2%B7%20agent%20%C2%B7%20bpfd-000000?logo=rust)](Cargo.toml)
