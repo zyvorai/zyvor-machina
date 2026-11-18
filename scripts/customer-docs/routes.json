@@ -456,6 +456,11 @@
       "category": "Fleet Cloud"
     },
     {
+      "label": "VM QoS",
+      "path": "/fleet-cloud/qos",
+      "category": "Fleet Cloud"
+    },
+    {
       "label": "Volumes",
       "path": "/fleet-cloud/volumes",
       "category": "Fleet Cloud"

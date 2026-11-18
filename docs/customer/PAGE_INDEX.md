@@ -2,7 +2,7 @@
 
 Every primary navigable dashboard route.
 
-_Generated: 2026-10-03 · 106 routes_
+_Generated: 2026-11-18 · 118 routes_
 
 Regenerate: `node scripts/customer-docs/generate-page-index.mjs`
 
@@ -35,6 +35,7 @@ Regenerate: `node scripts/customer-docs/generate-page-index.mjs`
 | Disk Utility | `/platform/storage` | Disk Utility — Machina Platform page at `/platform/storage`. | [Open](pages/platform/platform-storage.md) |
 | Storage (Atlas) | `/platform/storage-atlas` | Storage (Atlas) — Machina Platform page at `/platform/storage-atlas`. | [Open](pages/platform/platform-storage-atlas.md) |
 | Storage Tiers | `/platform/storage-tiers` | Storage Tiers — Machina Platform page at `/platform/storage-tiers`. | [Open](pages/platform/platform-storage-tiers.md) |
+| vGPU Partitions | `/platform/vgpu` | vGPU Partitions — split a GPU into mediated-device partitions, give each to a VM, and see which VMs are pinned to a host by one. Page at `/platform/vgpu`. | [Open](pages/platform/platform-vgpu.md) |
 | Networks | `/platform/networks` | Networks — Machina Platform page at `/platform/networks`. | [Open](pages/platform/platform-networks.md) |
 | Images & ISOs | `/platform/content` | Images & ISOs — Machina Platform page at `/platform/content`. | [Open](pages/platform/platform-content.md) |
 | Templates | `/platform/templates` | Templates — Machina Platform page at `/platform/templates`. | [Open](pages/platform/platform-templates.md) |
@@ -52,6 +53,11 @@ Regenerate: `node scripts/customer-docs/generate-page-index.mjs`
 | Webhooks | `/platform/webhooks` | Webhooks — Machina Platform page at `/platform/webhooks`. | [Open](pages/platform/platform-webhooks.md) |
 | Backup & Restore | `/platform/backups` | Backup & Restore — Machina Platform page at `/platform/backups`. | [Open](pages/platform/platform-backups.md) |
 | Fleet Snapshots | `/platform/fleet-snapshots` | Fleet Snapshots — Machina Platform page at `/platform/fleet-snapshots`. | [Open](pages/platform/platform-fleet-snapshots.md) |
+| Backup Replication | `/platform/backup-replication` | Backup Replication — copy completed backups to an S3-compatible store at another site, see which copies are verified, and fetch one back onto a host. Page at `/platform/backup-replication`. | [Open](pages/platform/platform-backup-replication.md) |
+| Failure Domains | `/platform/failure-domains` | Failure Domains — racks defined by host site and rack labels, and whether HA could re-home each rack if it were lost. Page at `/platform/failure-domains`. | [Open](pages/platform/platform-failure-domains.md) |
+| Kubernetes Clusters | `/platform/k8s-clusters` | Kubernetes Clusters — create, scale, upgrade and delete k3s clusters across enrolled hosts (opt-in on the controller and each host). Page at `/platform/k8s-clusters`. | [Open](pages/platform/platform-k8s-clusters.md) |
+| Desktop Pools | `/platform/desktop-pools` | Desktop Pools — clone a template VM into numbered desktops, check one out per user and recycle it on release. Page at `/platform/desktop-pools`. | [Open](pages/platform/platform-desktop-pools.md) |
+| Migration Waves | `/platform/migration-waves` | Migration Waves — plan a batch of VMs for Transiva, start them a few at a time, follow each job and record cutover. Page at `/platform/migration-waves`. | [Open](pages/platform/platform-migration-waves.md) |
 | Disaster Recovery | `/platform/placement` | Disaster Recovery — Machina Platform page at `/platform/placement`. | [Open](pages/platform/platform-placement.md) |
 | High Availability | `/platform/ha` | High Availability — Machina Platform page at `/platform/ha`. | [Open](pages/platform/platform-ha.md) |
 | Upgrade Matrix | `/platform/upgrade` | Upgrade Matrix — Machina Platform page at `/platform/upgrade`. | [Open](pages/platform/platform-upgrade.md) |
@@ -90,6 +96,7 @@ Regenerate: `node scripts/customer-docs/generate-page-index.mjs`
 | Incident Commander | `/platform/zyra/incidents` | Incident Commander — Machina Platform / Security page at `/platform/zyra/incidents`. | [Open](pages/platform-security/platform-zyra-incidents.md) |
 | Approvals | `/platform/zyra/approvals` | Approvals — Machina Platform / Security page at `/platform/zyra/approvals`. | [Open](pages/platform-security/platform-zyra-approvals.md) |
 | Rightsizing | `/platform/zyra/rightsizing` | Rightsizing — Machina Platform / Security page at `/platform/zyra/rightsizing`. | [Open](pages/platform-security/platform-zyra-rightsizing.md) |
+| VM Network Policies | `/platform/zyra/security/network-policies` |  | [Open](pages/platform-security/platform-zyra-security-network-policies.md) |
 
 ## Infrastructure
 
@@ -124,17 +131,21 @@ Regenerate: `node scripts/customer-docs/generate-page-index.mjs`
 | Server Groups | `/fleet-cloud/server-groups` | Server Groups — Machina Fleet Cloud page at `/fleet-cloud/server-groups`. | [Open](pages/fleet-cloud/fleet-cloud-server-groups.md) |
 | Keypairs | `/fleet-cloud/keypairs` | Keypairs — Machina Fleet Cloud page at `/fleet-cloud/keypairs`. | [Open](pages/fleet-cloud/fleet-cloud-keypairs.md) |
 | Flavors | `/fleet-cloud/flavors` | Flavors — Machina Fleet Cloud page at `/fleet-cloud/flavors`. | [Open](pages/fleet-cloud/fleet-cloud-flavors.md) |
+| VM QoS | `/fleet-cloud/qos` | VM QoS — Machina Fleet Cloud page at `/fleet-cloud/qos`. | [Open](pages/fleet-cloud/fleet-cloud-qos.md) |
 | Volumes | `/fleet-cloud/volumes` | Volumes — Machina Fleet Cloud page at `/fleet-cloud/volumes`. | [Open](pages/fleet-cloud/fleet-cloud-volumes.md) |
 | Volume Snapshots | `/fleet-cloud/volume-snapshots` | Volume Snapshots — Machina Fleet Cloud page at `/fleet-cloud/volume-snapshots`. | [Open](pages/fleet-cloud/fleet-cloud-volume-snapshots.md) |
 | Images | `/fleet-cloud/images` | Images — Machina Fleet Cloud page at `/fleet-cloud/images`. | [Open](pages/fleet-cloud/fleet-cloud-images.md) |
-| VPCs & elastic compute | `/fleet-cloud/vpcs` | Isolated subnets and desired-capacity instance groups. | [Open](pages/fleet-cloud/fleet-cloud-vpcs.md) |
 | Networking | `/fleet-cloud/networking` | Networking — Machina Fleet Cloud page at `/fleet-cloud/networking`. | [Open](pages/fleet-cloud/fleet-cloud-networking.md) |
 | Security Groups | `/fleet-cloud/security-groups` | Security Groups — Machina Fleet Cloud page at `/fleet-cloud/security-groups`. | [Open](pages/fleet-cloud/fleet-cloud-security-groups.md) |
 | Floating IPs | `/fleet-cloud/floating-ips` | Floating IPs — Machina Fleet Cloud page at `/fleet-cloud/floating-ips`. | [Open](pages/fleet-cloud/fleet-cloud-floating-ips.md) |
 | Load Balancers | `/fleet-cloud/load-balancers` | Load Balancers — Machina Fleet Cloud page at `/fleet-cloud/load-balancers`. | [Open](pages/fleet-cloud/fleet-cloud-load-balancers.md) |
 | Network Topology | `/fleet-cloud/topology` | Network Topology — Machina Fleet Cloud page at `/fleet-cloud/topology`. | [Open](pages/fleet-cloud/fleet-cloud-topology.md) |
+| VPCs & elastic compute | `/fleet-cloud/vpcs` | Isolated subnets and desired-capacity instance groups. | [Open](pages/fleet-cloud/fleet-cloud-vpcs.md) |
 | Heat Orchestration | `/fleet-cloud/heat` | Heat Orchestration — Machina Fleet Cloud page at `/fleet-cloud/heat`. | [Open](pages/fleet-cloud/fleet-cloud-heat.md) |
 | Identity | `/fleet-cloud/identity` | Identity — Machina Fleet Cloud page at `/fleet-cloud/identity`. | [Open](pages/fleet-cloud/fleet-cloud-identity.md) |
+| Autopilot | `/fleet-cloud/autopilot` |  | [Open](pages/fleet-cloud/fleet-cloud-autopilot.md) |
+| Game days | `/fleet-cloud/chaos` |  | [Open](pages/fleet-cloud/fleet-cloud-chaos.md) |
+| Preemptible | `/fleet-cloud/preemptible` |  | [Open](pages/fleet-cloud/fleet-cloud-preemptible.md) |
 
 ## Monitoring
 

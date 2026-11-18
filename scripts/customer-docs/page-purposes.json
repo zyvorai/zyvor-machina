@@ -79,6 +79,7 @@
   "/fleet-cloud/server-groups": "Server Groups \u2014 Machina Fleet Cloud page at `/fleet-cloud/server-groups`.",
   "/fleet-cloud/keypairs": "Keypairs \u2014 Machina Fleet Cloud page at `/fleet-cloud/keypairs`.",
   "/fleet-cloud/flavors": "Flavors \u2014 Machina Fleet Cloud page at `/fleet-cloud/flavors`.",
+  "/fleet-cloud/qos": "VM QoS \u2014 Machina Fleet Cloud page at `/fleet-cloud/qos`.",
   "/fleet-cloud/volumes": "Volumes \u2014 Machina Fleet Cloud page at `/fleet-cloud/volumes`.",
   "/fleet-cloud/volume-snapshots": "Volume Snapshots \u2014 Machina Fleet Cloud page at `/fleet-cloud/volume-snapshots`.",
   "/fleet-cloud/images": "Images \u2014 Machina Fleet Cloud page at `/fleet-cloud/images`.",
