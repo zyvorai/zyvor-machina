@@ -24,6 +24,8 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 
 | Page | What it covers |
 |------|----------------|
+| [Autopilot](fleet-cloud/fleet-cloud-autopilot.md) | Autopilot is capacity management for Fleet Cloud: instance groups scale ahead of the daily or weekly rush, drain from their load balancer, and sleep instead of stopping; VMs are right-sized from their own history and hosts can be consolidated. |
+| [Game days](fleet-cloud/fleet-cloud-chaos.md) | Game days inject faults into your own VMs under a lease: network latency and loss, partitions, slow disks and crashes. Health probes abort the run and lift every fault when the service suffers, and each step gets a report. |
 | [Create Fleet Cloud instance](fleet-cloud/fleet-cloud-create.md) | Create Instance — Machina Fleet Cloud page at `/fleet-cloud/create`. |
 | [Flavors](fleet-cloud/fleet-cloud-flavors.md) | Flavors — Machina Fleet Cloud page at `/fleet-cloud/flavors`. |
 | [Floating IPs](fleet-cloud/fleet-cloud-floating-ips.md) | Floating IPs — Machina Fleet Cloud page at `/fleet-cloud/floating-ips`. |
@@ -33,13 +35,15 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 | [Fleet Cloud Instances](fleet-cloud/fleet-cloud-instances.md) | Instances — Machina Fleet Cloud page at `/fleet-cloud/instances`. |
 | [SSH keypairs](fleet-cloud/fleet-cloud-keypairs.md) | Keypairs — Machina Fleet Cloud page at `/fleet-cloud/keypairs`. |
 | [Load Balancers](fleet-cloud/fleet-cloud-load-balancers.md) | Load Balancers — Machina Fleet Cloud page at `/fleet-cloud/load-balancers`. |
-| [VPCs & elastic compute](fleet-cloud/fleet-cloud-vpcs.md) | Project-owned isolated subnets and elastic instance groups. |
 | [Networking](fleet-cloud/fleet-cloud-networking.md) | Networking — Machina Fleet Cloud page at `/fleet-cloud/networking`. |
+| [Preemptible](fleet-cloud/fleet-cloud-preemptible.md) | Preemptible instances are VMs that can wait. When a host runs short of memory, the lowest-priority preemptible VMs are saved to disk instead of stopped, and they come back by themselves, lowest priority first, when there is room again. |
+| [VM QoS](fleet-cloud/fleet-cloud-qos.md) | VM QoS — Machina Fleet Cloud page at `/fleet-cloud/qos`. |
 | [Security Groups](fleet-cloud/fleet-cloud-security-groups.md) | Security Groups — Machina Fleet Cloud page at `/fleet-cloud/security-groups`. |
 | [Server Groups](fleet-cloud/fleet-cloud-server-groups.md) | Server Groups — Machina Fleet Cloud page at `/fleet-cloud/server-groups`. |
 | [Network topology](fleet-cloud/fleet-cloud-topology.md) | Network Topology — Machina Fleet Cloud page at `/fleet-cloud/topology`. |
 | [Volume Snapshots](fleet-cloud/fleet-cloud-volume-snapshots.md) | Volume Snapshots — Machina Fleet Cloud page at `/fleet-cloud/volume-snapshots`. |
 | [Volumes](fleet-cloud/fleet-cloud-volumes.md) | Volumes — Machina Fleet Cloud page at `/fleet-cloud/volumes`. |
+| [VPCs and elastic compute](fleet-cloud/fleet-cloud-vpcs.md) |  |
 | [Fleet Cloud](fleet-cloud/fleet-cloud.md) | Overview — Machina Fleet Cloud page at `/fleet-cloud`. |
 
 ## Infrastructure
@@ -87,26 +91,31 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 | [Alert Rules](platform/platform-alert-rules.md) | Threshold alert rules on VM CPU and memory: notify (via Alerts / webhooks) when a metric crosses a bound. |
 | [API keys](platform/platform-api-keys.md) | API Keys — Machina Platform page at `/platform/api-keys`. |
 | [Applications](platform/platform-applications.md) | Applications — Machina Platform page at `/platform/applications`. |
+| [Backup Replication](platform/platform-backup-replication.md) | Backup Replication — copy completed backups to an S3-compatible store at another site, see which copies are verified, and fetch one back onto a host. Page at `/platform/backup-replication`. |
 | [Backup & Restore](platform/platform-backups.md) | Fleet backups: a timeline of backup runs, backup destinations (NFS, S3/MinIO or local), recurring schedules by project or tag, and one-off backups of a single VM. |
-| [Register Server](platform/platform-baremetal.md) | Bare Metal — Machina Platform page at `/platform/baremetal`. |
+| [Bare Metal](platform/platform-baremetal.md) | Bare Metal — Machina Platform page at `/platform/baremetal`. It takes physical servers |
 | [Blueprint Studio](platform/platform-blueprints.md) | Blueprints — Machina Platform page at `/platform/blueprints`. |
 | [Cloud-Init Studio](platform/platform-cloud-init.md) | Cloud-Init Studio — Machina Platform page at `/platform/cloud-init`. |
 | [Content Library](platform/platform-content.md) | Images & ISOs — Machina Platform page at `/platform/content`. |
 | [Advanced VM install](platform/platform-create-advanced.md) | Advanced Create — Machina Platform page at `/platform/create-advanced`. |
 | [Create VM from ISO](platform/platform-create-iso.md) | Create ISO — Machina Platform page at `/platform/create-iso`. |
 | [Datacenter](platform/platform-datacenter.md) | Datacenter View — Machina Platform page at `/platform/datacenter`. |
+| [Desktop Pools](platform/platform-desktop-pools.md) | Desktop Pools — clone a template VM into numbered desktops, check one out per user and recycle it on release. Page at `/platform/desktop-pools`. |
 | [Developer](platform/platform-developer.md) | Developer Hub — Machina Platform page at `/platform/developer`. |
 | [Host Enrollment](platform/platform-enroll.md) | Join new KVM hypervisors to the control plane. You generate a one-time join token here and run the install command on the new host; its `machina-agent` then registers with the controller. |
 | [Enterprise Features](platform/platform-enterprise.md) | Enterprise Features — Machina Platform page at `/platform/enterprise`. |
 | [Platform events](platform/platform-events.md) | Event Log — Machina Platform page at `/platform/events`. |
+| [Failure Domains](platform/platform-failure-domains.md) | Failure Domains — racks defined by host site and rack labels, and whether HA could re-home each rack if it were lost. Page at `/platform/failure-domains`. |
 | [Fleet snapshot schedules](platform/platform-fleet-snapshots.md) | Fleet Snapshots — Machina Platform page at `/platform/fleet-snapshots`. |
 | [GPU Command Center](platform/platform-gpu.md) | GPU Command Center — Machina Platform page at `/platform/gpu`. |
 | [High Availability](platform/platform-ha.md) | Fleet high availability: which hosts are healthy, fence events, and HA restarts of VMs from failed hosts. The controller fences a failed host before it restarts that host's VMs elsewhere, so a VM never runs twice. |
 | [Machine Finder](platform/platform-hosts-finder.md) | Machine Finder: opens the fleet VM list in its topology lens (/platform/vms?lens=topology) to find any VM by host, network or name. |
 | [Hosts](platform/platform-hosts.md) | Every hypervisor enrolled with the controller: online/offline state, agent heartbeat, capacity and the VMs it runs. This is where you start any host-level task in the fleet. |
+| [Kubernetes Clusters](platform/platform-k8s-clusters.md) | Kubernetes Clusters — create, scale, upgrade and delete k3s clusters across enrolled hosts (opt-in on the controller and each host). Page at `/platform/k8s-clusters`. |
 | [Launchpad (on Mission Control)](platform/platform-launchpad.md) | Launchpad tiles live on Mission Control (`/platform`) — there is no separate `/platform/launchpad` route. |
 | [Maintenance](platform/platform-maintenance.md) | Maintenance — Machina Platform page at `/platform/maintenance`. |
 | [Marketplace](platform/platform-marketplace.md) | Marketplace — Machina Platform page at `/platform/marketplace`. |
+| [Migration Waves](platform/platform-migration-waves.md) | Migration Waves — plan a batch of VMs for Transiva, start them a few at a time, follow each job and record cutover. Page at `/platform/migration-waves`. |
 | [Migration Assistant](platform/platform-migration.md) | Migration Radar: bring VMs into Machina from OVF/OVA, VMDK or cloud images. GuestKit checks disks offline before and after conversion. |
 | [Network canvas](platform/platform-network-canvas.md) | Network Canvas — Machina Platform page at `/platform/network-canvas`. |
 | [Networks](platform/platform-networks.md) | The fleet network pane: libvirt networks across hosts, overlay segments with east-west policy, and IPAM pools that hand out addresses from a segment CIDR. |
@@ -129,6 +138,7 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 | [Topology](platform/platform-topology.md) | Topology — Machina Platform page at `/platform/topology`. |
 | [Upgrade Matrix](platform/platform-upgrade.md) | Version compatibility between the controller and host agents (controller version, minimum and recommended agent) and a per-host Upgrade Agent action. |
 | [Users & Groups](platform/platform-users.md) | Users & Groups — Machina Platform page at `/platform/users`. |
+| [vGPU Partitions](platform/platform-vgpu.md) | vGPU Partitions — split a GPU into mediated-device partitions, give each to a VM, and see which VMs are pinned to a host by one. Page at `/platform/vgpu`. |
 | [AI VM Builder](platform/platform-vm-builder.md) | VM Builder — Machina Platform page at `/platform/vm-builder`. |
 | [Machine Finder](platform/platform-vms.md) | Fleet VM finder across enrolled hosts. |
 | [Webhooks](platform/platform-webhooks.md) | Webhooks — Machina Platform page at `/platform/webhooks`. |
@@ -145,8 +155,9 @@ Every route is also listed in the [complete page index](../PAGE_INDEX.md).
 | [Incident Commander](platform-security/platform-zyra-incidents.md) | Incident Commander — Machina Platform / Security page at `/platform/zyra/incidents`. |
 | [VM Rightsizing](platform-security/platform-zyra-rightsizing.md) | Rightsizing — Machina Platform / Security page at `/platform/zyra/rightsizing`. |
 | [Native eBPF](platform-security/platform-zyra-security-native-bpf.md) | Operate Machina's built-in eBPF datapath on a host. One root service, `machina-bpfd`, loads Machina's own kernel programs for flow visibility, policy enforcement, load balancing, DDoS protection, VM isolation and scheduling. This page is the console for it; there is no separate Cilium, Tetragon, Netra or PacketWolf agent to install. |
+| [VM Network Policies](platform-security/platform-zyra-security-network-policies.md) | VM network policies decide which VM may talk to which, in both directions, using the CiliumNetworkPolicy schema. They compile into the eBPF edge Machina attaches to each VM's network interface; Cilium does not need to be installed. |
 | [Machina Zyra OS](platform-security/platform-zyra.md) | Zyra AI assistant for Machina operations. |
 
 ---
 
-107 guides. Regenerate: `node scripts/customer-docs/generate-guide-index.mjs`.
+119 guides. Regenerate: `node scripts/customer-docs/generate-guide-index.mjs`.
