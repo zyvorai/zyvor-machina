@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<title>Zyvor Machina · Your metal. Your cloud.</title>
+<meta name="description" content="Machina: a private cloud on your own hardware. VMs, browser consoles, fleet HA and DRS, Fleet Cloud with an EC2-compatible API, a native eBPF datapath and approval-gated AI operations, on Linux and KVM. Source-available, with a native Mac app.">
+<link rel="canonical" href="https://zyvorai.github.io/zyvor-machina/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Zyvor Machina">
+<meta property="og:title" content="Zyvor Machina · Your metal. Your cloud.">
+<meta property="og:description" content="A private cloud on Linux and KVM: VMs, consoles, fleet HA, Fleet Cloud, eBPF networking and AI that asks first.">
+<meta property="og:url" content="https://zyvorai.github.io/zyvor-machina/">
+<meta property="og:image" content="https://zyvorai.github.io/zyvor-machina/social/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Zyvor Machina: Your metal. Your cloud. The window shows Mission Control from a Machina deployment.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Zyvor Machina · Your metal. Your cloud.">
+<meta name="twitter:description" content="A private cloud on Linux and KVM: VMs, consoles, fleet HA, Fleet Cloud, eBPF networking and AI that asks first.">
+<meta name="twitter:image" content="https://zyvorai.github.io/zyvor-machina/social/og.png">
+<meta name="twitter:image:alt" content="Zyvor Machina: Your metal. Your cloud. The window shows Mission Control from a Machina deployment.">
+<link rel="stylesheet" href="assets/landing.css">
+<style>:root{--accent-btn:#c2410c;--accent-ink:#c2410c;--accent-grad-a:#ff5a15;--accent-grad-b:#ffb084}@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--accent-ink:#ff8a4c}}:root[data-theme="dark"]{--accent-ink:#ff8a4c}</style>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Zyvor Machina","applicationCategory":"DeveloperApplication","operatingSystem":"Linux (KVM), macOS (client app)","softwareVersion":"0.4.1","downloadUrl":"https://github.com/zyvorai/zyvor-machina/releases","url":"https://zyvorai.github.io/zyvor-machina/","description":"Machina: a private cloud on your own hardware. VMs, browser consoles, fleet HA and DRS, Fleet Cloud with an EC2-compatible API, a native eBPF datapath and approval-gated AI operations, on Linux and KVM. Source-available, with a native Mac app.","image":"https://zyvorai.github.io/zyvor-machina/social/og.png","publisher":{"@type":"Organization","name":"Zyvor AI Labs Private Limited","url":"https://zyvor.dev"}}</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="nav">
+  <a class="brand" href="./" aria-label="Zyvor Machina home"><img src="favicon.svg" width="26" height="26" alt=""><span>Machina</span></a>
+  <nav aria-label="Primary"><ul><li><a href="#features">Features</a></li><li><a href="#specs">Specs</a></li><li><a href="#start">Get started</a></li><li><a href="#pricing">Pricing</a></li><li><a href="#faq">FAQ</a></li><li><a href="https://github.com/zyvorai/zyvor-machina/blob/main/docs/README.md">Docs</a></li></ul></nav>
+  <a class="btn small primary" href="#start">Get started</a>
+</header>
+<main id="main">
+<section class="hero" aria-labelledby="top">
+  <img class="icon" src="favicon.svg" width="96" height="96" alt="Machina app icon">
+  <p class="eyebrow">Zyvor · private cloud</p>
+  <h1 id="top">Machina</h1>
+  <p class="tagline">Your metal. Your cloud.</p>
+  <p class="promise"><strong>The private cloud you can install before lunch.</strong> VMs, browser consoles, fleet HA and DRS, an OpenStack-style self-service cloud, a native eBPF datapath and AI operations, from a handful of Rust services on plain Linux and KVM.</p>
+  <p class="cta"><a class="btn primary" href="#start">Get started</a><a class="textlink" href="#features">See the features</a></p>
+  <p class="fine">Linux and KVM · source-available · native Mac app with a free 30-day trial key: sales@zyvor.dev</p>
+  <figure class="shot hero-shot"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/img/hero-img-dark-1200.webp 1200w, assets/img/hero-img-dark-1800.webp 1800w" sizes="(min-width:1080px) 1040px, 100vw"><img src="assets/img/hero-img-light-1200.webp" srcset="assets/img/hero-img-light-1200.webp 1200w, assets/img/hero-img-light-1800.webp 1800w" sizes="(min-width:1080px) 1040px, 100vw" width="2880" height="1800" alt="Machina Mission Control: an Operational status headline with summaries of hosts, VMs and alerts." fetchpriority="high" decoding="async"></picture><figcaption>Mission Control on a small single-host deployment, not a mockup. Counts are those of a test host.</figcaption></figure>
+</section>
+
+<section class="band" aria-label="Overview">
+  <h2>A cloud one person can install.</h2>
+  <p>Machina trades OpenStack&#x27;s hyperscale multi-tenancy for a private cloud for the fleets you own: a lab, a branch, a sovereign region, a VMware exit.</p>
+</section>
+
+<div id="features">
+<h2 class="sr">Features</h2>
+<section class="feature" id="vms" aria-labelledby="h-vms"><div class="grid"><div class="copy"><p class="eyebrow">Virtual machines</p><h3 id="h-vms">Every VM operation, in one place.</h3><p>Create, clone, snapshot, back up and migrate. Cloud-init, GPU and PCI passthrough, networks and storage pools, from one dashboard, a REST API, a CLI and a Terraform provider over the same model.</p></div><figure class="shot"><picture><img src="assets/img/vms-light-1200.webp" srcset="assets/img/vms-light-1200.webp 1200w, assets/img/vms-light-1800.webp 1800w" sizes="(min-width:960px) 62vw, 100vw" width="3200" height="2000" alt="Machina Create a VM: a guided wizard with a live summary." loading="lazy" decoding="async"></picture><figcaption>Create a VM. Dark theme, real deployment.</figcaption></figure></div></section>
+<section class="feature flip" id="fleet-cloud" aria-labelledby="h-fleet-cloud"><div class="grid"><div class="copy"><p class="eyebrow">Fleet Cloud</p><h3 id="h-fleet-cloud">Self-service, like a public cloud.</h3><p>Flavors, images, instances, volumes, security groups, key pairs, floating IPs, projects and load balancers, with an EC2-compatible API so awscli, boto3 and Terraform&#x27;s aws provider work with an endpoint override. It is a compatibility layer over Machina&#x27;s own objects, not AWS.</p></div><figure class="shot"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/img/fleet-cloud-dark-1200.webp 1200w, assets/img/fleet-cloud-dark-1800.webp 1800w" sizes="(min-width:960px) 62vw, 100vw"><img src="assets/img/fleet-cloud-light-1200.webp" srcset="assets/img/fleet-cloud-light-1200.webp 1200w, assets/img/fleet-cloud-light-1800.webp 1800w" sizes="(min-width:960px) 62vw, 100vw" width="3200" height="2000" alt="Machina Fleet Cloud page: Native compute, with tiles for instances, images, create instance, volumes, flavors, floating IPs and volume snapshots." loading="lazy" decoding="async"></picture><figcaption>Fleet Cloud. Real deployment.</figcaption></figure></div></section>
+<section class="feature" id="zyra" aria-labelledby="h-zyra"><div class="grid"><div class="copy"><p class="eyebrow">Zyra AI</p><h3 id="h-zyra">An operator that asks first.</h3><p>Diagnostics across the fleet, incident correlation and natural-language operations, with an approval queue in front of every change. Bring your own LLM provider; keys are encrypted at rest.</p></div><figure class="shot"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/img/zyra-dark-1200.webp 1200w, assets/img/zyra-dark-1800.webp 1800w" sizes="(min-width:960px) 62vw, 100vw"><img src="assets/img/zyra-light-1200.webp" srcset="assets/img/zyra-light-1200.webp 1200w, assets/img/zyra-light-1800.webp 1800w" sizes="(min-width:960px) 62vw, 100vw" width="3200" height="2000" alt="Machina Zyra OS page: a remediation hub and fleet intelligence, security and knowledge tiles." loading="lazy" decoding="async"></picture><figcaption>Zyra AI. Real deployment.</figcaption></figure></div></section>
+<section class="feature flip" id="ebpf" aria-labelledby="h-ebpf"><div class="grid"><div class="copy"><p class="eyebrow">Networking and security</p><h3 id="h-ebpf">Networking in the kernel.</h3><p>Machina ships its own eBPF datapath, machina-bpfd, instead of bolting on a separate firewall agent: load balancing, a DDoS shield, VM isolation and flow visibility.</p></div><figure class="shot"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/img/ebpf-dark-1200.webp 1200w, assets/img/ebpf-dark-1800.webp 1800w" sizes="(min-width:960px) 62vw, 100vw"><img src="assets/img/ebpf-light-1200.webp" srcset="assets/img/ebpf-light-1200.webp 1200w, assets/img/ebpf-light-1800.webp 1800w" sizes="(min-width:960px) 62vw, 100vw" width="3200" height="2000" alt="Machina native eBPF page showing the machina-bpfd datapath loaded on a live host." loading="lazy" decoding="async"></picture><figcaption>Native eBPF on a live host.</figcaption></figure></div></section>
+</div>
+
+<section class="more" aria-labelledby="more-h">
+  <h2 id="more-h">Built in, not bolted on.</h2>
+  <div class="cards"><div class="card"><h3>Consoles in the browser</h3><p>noVNC, SPICE, serial and SSH are proxied by the daemon itself, behind the same RBAC and audit log as everything else.</p></div><div class="card"><h3>A fleet, not a host</h3><p>Add hypervisors with a gRPC agent over TLS. The controller keeps desired state, fails VMs over when a host dies, balances load with DRS and live-migrates between hosts.</p></div><div class="card"><h3>SQLite or PostgreSQL</h3><p>SQLite is built in for a lab or one or two hosts. Move to PostgreSQL for large fleets or several controllers.</p></div><div class="card"><h3>A way off OpenStack</h3><p>Keystone, Nova, Glance, Cinder and Neutron compatibility on the controller, and an importer. A smoke set, not a full drop-in.</p></div></div>
+</section>
+
+<section class="privacy" aria-labelledby="privacy-h">
+  <h2 id="privacy-h">Honest about what is proven.</h2>
+  <div class="cards"><div class="card"><h3>AI asks first</h3><p>Every change waits for a human approval. Every AI action is checked afterwards and can be rolled back.</p></div><div class="card"><h3>Gaps, stated plainly</h3><p>Hyperscale multi-tenancy and OVN, VXLAN or BGP as Neutron are out of scope.</p></div><div class="card"><h3>Proven and not proven</h3><p>What is proven on a real host and what is not is written down in docs/claims.md.</p></div></div>
+</section>
+
+<section class="specs" id="specs" aria-labelledby="specs-h">
+  <h2 id="specs-h">Specs and requirements.</h2>
+  <dl class="specs-grid"><div class="spec"><dt>Server</dt><dd>Linux with libvirt and KVM<small>Four Rust services: machina-daemon, machina-controller, machina-agent and machina-bpfd.</small></dd></div><div class="spec"><dt>Release</dt><dd>0.4.1<small>amd64 and arm64 packages (deb and rpm) and tarballs on the release page.</small></dd></div><div class="spec"><dt>Install</dt><dd>./machinactl deploy<small>Dependencies, build, install, start and verify.</small></dd></div><div class="spec"><dt>Database</dt><dd>SQLite or PostgreSQL<small>Embedded SQLite by default.</small></dd></div><div class="spec"><dt>Mac app</dt><dd>0.5.0<small>Native client for a Machina daemon and fleet controller. Apple silicon, macOS 15 or later, notarized.</small></dd></div><div class="spec"><dt>Licence</dt><dd>Zyvor Production License v1.0<small>Source-available. Free for non-production use.</small></dd></div></dl>
+  <div class="limit" role="note"><h3>Honest limits</h3><p>Bare-metal provisioning is verified on VMs and BMC emulators, <b>not yet on physical servers</b>. Import from a real OpenStack cloud has not been run end to end. The OpenStack compatibility layer covers a smoke set, not every microversion or ecosystem project. Hyperscale multi-tenancy is out of scope.</p></div>
+</section>
+
+<section class="steps" id="start" aria-labelledby="steps-h">
+  <h2 id="steps-h">Get started in three steps.</h2>
+  <ol><li><h3>Install the server</h3><p>On a Linux host with libvirt and KVM: <code>git clone https://github.com/zyvorai/zyvor-machina.git machina &amp;&amp; cd machina &amp;&amp; ./machinactl deploy</code>. Packages and tarballs are on the <a href="https://github.com/zyvorai/zyvor-machina/releases">release page</a>.</p></li><li><h3>Open the console</h3><p>A browser UI is served by the daemon on port 5092. Follow the <a href="https://github.com/zyvorai/zyvor-machina/blob/main/docs/QUICKSTART.md">Quickstart</a> to add a controller, a node, a VM and a backup.</p></li><li><h3>Optional: the Mac app</h3><p>Download <code>Machina-0.5.0.dmg</code> below, drag Machina to Applications and ask <a href="mailto:sales@zyvor.dev?subject=Machina%20trial%20key">sales@zyvor.dev</a> for a free 30-day trial key.</p></li></ol>
+  <div class="sha"><p>Machina for macOS 0.5.0 · SHA-256</p><pre><code id="sha">edc3a7a9404858eb6651755c753c046b71132c6325a241d4e7218064c0bfaa75</code></pre><p>Verify: <code>echo "edc3a7a9404858eb6651755c753c046b71132c6325a241d4e7218064c0bfaa75  Machina-0.5.0.dmg" | shasum -a 256 -c</code></p></div>
+<p class="cta"><a class="btn primary" href="https://github.com/zyvorai/zyvor-machina/releases/download/macos-v0.5.0/Machina-0.5.0.dmg">Download Machina-0.5.0.dmg</a><a class="textlink" href="https://github.com/zyvorai/zyvor-machina/releases/tag/macos-v0.5.0">Mac app release page</a><a class="textlink" href="https://github.com/zyvorai/zyvor-machina/blob/main/docs/QUICKSTART.md">Server quickstart</a></p>
+</section>
+
+<section class="pricing" id="pricing" aria-labelledby="pricing-h">
+  <div class="inner">
+  <h2 id="pricing-h" style="text-align:left">Licence and pricing.</h2>
+  <p class="lead">Machina is source-available under the Zyvor Production License v1.0 and free for non-production use. Production use needs an annual subscription: <b>₹29,699 per CPU socket per year including GST (about US$300)</b>. Plans, support levels and terms are in the <a href="https://github.com/zyvorai/zyvor-machina/blob/main/docs/SUBSCRIPTION-MODEL.md">subscription model</a>.</p>
+<p class="lead">The Mac app has a free 30-day trial key from <a href="mailto:sales@zyvor.dev?subject=Machina%20trial%20key">sales@zyvor.dev</a>. To keep using it afterwards, get a licence at <a href="https://zyvor.dev/buy">zyvor.dev/buy</a>.</p>
+<p class="cta"><a class="btn primary" href="https://zyvor.dev/buy" rel="noopener">zyvor.dev/buy</a><a class="btn ghost" href="https://zyvor.dev/schedule?utm_source=pages&amp;utm_medium=machina&amp;utm_campaign=landing" rel="noopener">Book a demo</a></p>
+<p class="fine">Terms: <a href="https://github.com/zyvorai/zyvor-machina/blob/main/LICENSE">LICENSE</a>.</p>
+  </div>
+</section>
+
+<section class="faq" id="faq" aria-labelledby="faq-h">
+  <h2 id="faq-h">Questions, answered.</h2>
+  <details><summary>Is Machina free?</summary><p>Non-production use is free under the Zyvor Production License v1.0: development, testing, evaluation, research, education and non-production labs. Production use needs a paid subscription.</p></details>
+<details><summary>What does it run on?</summary><p>Plain Linux with libvirt and KVM. The server release has amd64 and arm64 packages.</p></details>
+<details><summary>Is it a drop-in replacement for OpenStack?</summary><p>No. It covers the private-cloud primitives most OpenStack deployments use and has a compatibility layer for a smoke set of the Keystone, Nova, Glance, Cinder and Neutron APIs. Hyperscale multi-tenancy is out of scope.</p></details>
+<details><summary>Is the EC2 API real AWS?</summary><p>No. It is a compatibility layer over Machina's own objects. awscli, boto3 and Terraform's aws provider work with an endpoint override.</p></details>
+<details><summary>Does the AI change things by itself?</summary><p>No. Zyra puts an approval queue in front of every change, checks the result afterwards and lets you roll it back.</p></details>
+<details><summary>Will macOS warn me when I open the Mac app?</summary><p>No. The DMG is signed with a Developer ID and notarized by Apple, so it opens without a Gatekeeper warning. The SHA-256 is on this page and on the release page.</p></details>
+<details><summary>Which Macs run the Mac app?</summary><p>Apple silicon, macOS 15 or later.</p></details>
+<details><summary>Are the screenshots real?</summary><p>They are captures of the web console from Machina deployments, not mockups. Counts reflect small test hosts.</p></details>
+</section>
+</main>
+<footer class="footer">
+  <p><strong>Zyvor Machina</strong> · The Machina server source is in this repository; the Mac app source is private.</p>
+  <p class="links"><a href="https://github.com/zyvorai/zyvor-machina/blob/main/docs/README.md">Docs</a><a href="https://github.com/zyvorai/zyvor-machina/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/zyvorai/zyvor-machina/releases">Releases</a><a href="https://github.com/zyvorai/zyvor-machina">GitHub</a><a href="https://github.com/zyvorai/zyvor-machina/blob/main/LICENSE">LICENSE</a><a href="https://github.com/zyvorai/zyvor-machina/blob/main/SECURITY.md">SECURITY</a><a href="mailto:sales@zyvor.dev">sales@zyvor.dev</a></p>
+  <p>© 2026 Zyvor AI Labs Private Limited · <a href="https://zyvor.dev">zyvor.dev</a> · Zyvor Production License v1.0</p>
+</footer>
+</body>
+</html>
