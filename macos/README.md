@@ -19,6 +19,15 @@ Server `https://HOST:5092` and a PAM user. The first connect asks you to trust t
 - **Mac-native:** health-aware menu bar extra, actionable approval notifications (Touch ID gated), quiet hours, Settings window (cmd-,), Dock menu, Spotlight indexing of VMs, App Intents, `machina://` deep links, VM-per-window, Check for Updates, English and German strings, VoiceOver labels. Opt-in extras: a global hotkey for the palette (off by default), a morning digest notification (off by default, only while the app runs), `machina://vm/<name>` share links with Handoff (needs a signed build and the same iCloud account), and a floating read-only VM glance panel.
 - Most list pages are data-driven: adding one is a `ResourceSpec` in `FeatureRegistry.swift`.
 
+## Licence
+Machina for Mac is free for evaluation and other non-production use under the [Zyvor Production License v1.0](../LICENSE); production use needs a commercial licence. The app reads a licence key and shows its state, and that is all: **nothing is disabled with or without a key**, there is no network call and no hardware binding.
+
+- **Licence…** (Machina menu, the status line at the bottom of the main window, and the Licence tab in Settings): paste a key, **Verify and Save**, see licensee, edition, expiry and days left, or **Remove Key…**.
+- Keys look like `ZYV1.<payload>.<signature>` and are verified offline against the product's Ed25519 public key built into the app (`LicenceKey.swift`). The app holds no private key and cannot issue keys. A 30-day trial key is free: sales@zyvor.dev. To buy a licence: https://zyvor.dev/buy.
+- The key is stored in the macOS Keychain; if the Keychain refuses it, in `~/Library/Application Support/Machina/licence.key` (mode 0600).
+- Status line: no key says what the free licence covers, with the buy link and the trial address; `Trial: N days left`; `Licensed, N days left` (shown as a warning at 14 days or fewer); `Licence expired on DATE` with the buy link.
+- Tests: `macos/MachinaKit/Tests/MachinaKitTests/LicenceTests.swift` (valid trial and pro, expired, tampered, wrong product, persistence, status text per state). The vectors use a throwaway keypair, not the production key.
+
 ## Updates
 Check for Updates reads the highest `macos-v*` release. Install from the app verifies the DMG's SHA-256 against the release notes (when present), that the app inside has the same bundle id, a newer version, the same Developer ID team and passes `codesign` and Gatekeeper, then asks before replacing the running app. A dev (ad-hoc signed) build never auto-installs. The end-to-end flow has not been run yet and needs a Developer ID signed build to test.
 
@@ -50,9 +59,9 @@ macos/scripts/test.sh            # swiftc + Swift Testing, runs in seconds
 ```bash
 macos/scripts/release.sh                                   # local DMG, ad-hoc signed, not notarized
 # Developer ID + notarization, with a stored profile ...
-SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" NOTARY_PROFILE=machina-notary MACHINA_VERSION=0.4.0 macos/scripts/release.sh
+SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" NOTARY_PROFILE=machina-notary MACHINA_VERSION=0.5.0 macos/scripts/release.sh
 # ... or with an App Store Connect API key (Developer role or higher; leave the issuer out for an individual key)
-SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" MACHINA_VERSION=0.4.0 \
+SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" MACHINA_VERSION=0.5.0 \
   ASC_API_KEY=<key id> ASC_API_KEY_PATH=~/path/AuthKey_<key id>.p8 ASC_API_ISSUER=<issuer uuid> macos/scripts/release.sh
 ```
 The script signs the app, builds and signs the DMG, submits it to Apple, waits and staples the ticket. Verify with `xcrun stapler validate` and `spctl -a -vv -t open --context context:primary-signature <dmg>` (expect `source=Notarized Developer ID`). If signing fails with `errSecInternalComponent`, unlock the login keychain first.

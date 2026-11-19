@@ -75,4 +75,4 @@ The native SwiftUI client lives in `macos/` (see `macos/README.md`). It builds o
 
 ## The native Mac app
 
-`macos/` holds a SwiftUI client for the daemon and controller. Unlike the Rust workspace it builds on a Mac: `macos/scripts/bundle.sh debug` (swiftc, no SwiftPM) and `macos/scripts/test.sh`. Releases are Developer ID signed and notarized by `macos/scripts/release.sh` and published as `macos-v<version>` GitHub releases. See [macos/README.md](../macos/README.md) and the site page "Machina for Mac".
+`macos/` holds a SwiftUI client for the daemon and controller. Unlike the Rust workspace it builds on a Mac: `macos/scripts/bundle.sh debug` (swiftc, no SwiftPM) and `macos/scripts/test.sh`. Releases are Developer ID signed and notarized by `macos/scripts/release.sh` and published as `macos-v<version>` GitHub releases. The app reads a ZYV1 licence key (including the free 30-day trial key) offline and never disables a feature; see the Licence section of [macos/README.md](../macos/README.md). See also the site page "Machina for Mac".

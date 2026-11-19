@@ -98,6 +98,7 @@ struct SettingsView: View {
 
             QuickAccessSettingsForm().tabItem { Label("Quick access", systemImage: "bolt") }
             AIOperatorSettingsForm().tabItem { Label("AI operator", systemImage: "sparkles") }
+            LicenceSettingsForm().tabItem { Label("Licence", systemImage: "key") }
         }
         .formStyle(.grouped).frame(width: 520, height: 440).onAppear(perform: reload)
     }

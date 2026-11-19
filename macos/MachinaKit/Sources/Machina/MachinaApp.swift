@@ -55,6 +55,7 @@ struct MachinaApp: App {
         .commands { UpdateCommands() }
         .commands { QuickAccessCommands(model: model) }
         .commands { AIOperatorCommands(model: model) }
+        .commands { LicenceCommands() }
         // One VM per window: opened from the sidebar's context menu.
         WindowGroup("VM", id: "vm-window", for: String.self) { $name in
             VMWindow(name: name ?? "").environment(model)
@@ -65,6 +66,7 @@ struct MachinaApp: App {
             // Glyph follows fleet health: rack when clear, circle/triangle with open alerts, offline hosts or approvals.
             Image(systemName: model.phase == .ready ? model.health.symbol : "server.rack")
         }
+        Window("Licence", id: "licence") { LicenceView() }.windowResizability(.contentSize)
         Settings { SettingsView().environment(model) }
     }
 }

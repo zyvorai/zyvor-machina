@@ -107,6 +107,7 @@ struct MainWindow: View {
             }
         }
         .onAppear { if model.selection == nil { model.selection = .fleet } }
+        .safeAreaInset(edge: .bottom, spacing: 0) { LicenceStatusBar() }
         .sheet(isPresented: $model.showPalette) { CommandPalette().environment(model) }
         .sheet(isPresented: $model.showBulk) { BulkActionsSheet().environment(model) }
         .sheet(isPresented: $model.showShortcuts) { ShortcutsSheet() }

@@ -1,5 +1,9 @@
 # Changelog
 
+## Machina for Mac 0.5.0 (unreleased)
+
+- **Licence keys.** Machina for Mac reads a `ZYV1` licence key, including the free 30-day trial key (sales@zyvor.dev). Paste it under Machina > Licence…, in the status line at the bottom of the main window, or in Settings > Licence. The key is verified offline against a public key built into the app and stored in the Keychain (0600 file fallback). Soft enforcement only: no feature is disabled with or without a key, no network call, no hardware binding. The app contains the verifier and public key only. To buy a licence: https://zyvor.dev/buy. See `macos/README.md`.
+
 ## v0.4.1 — 2026-11-12
 
 OpenStack leftovers and cloud façade coverage on top of v0.4.0 (#238, #239).
