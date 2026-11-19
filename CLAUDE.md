@@ -52,13 +52,9 @@ make && sudo make deploy     # manual equivalent
 ./scripts/deploy-remote.sh user@host --remote-build   # build on remote Linux host
 ```
 
-### macOS app (macOS only)
-```bash
-macos/scripts/bundle.sh debug   # build macos/build/Machina.app (swiftc, no SwiftPM)
-macos/scripts/test.sh           # unit tests (swiftc + Swift Testing; `swift test` stalls on some volumes)
-macos/scripts/release.sh        # signed, notarized DMG (see macos/README.md "Releasing")
-```
-Native SwiftUI client over the daemon REST/WS API and the controller proxy (`macos/README.md`). Keep Swift sources flat in `Sources/MachinaKit` and `Sources/Machina` (the scripts glob them). Mac app releases are tagged `macos-v<version>` and never marked Latest (the `v*` tags are the platform's).
+### macOS app
+
+The Mac app is distributed as a notarized download. Its source is in a private repository.
 
 ### Dev mode (no install, Linux only)
 ```bash
