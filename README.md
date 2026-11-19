@@ -1,6 +1,12 @@
 <div align="center">
 
+<img src="social/og.png" width="840" alt="Zyvor Machina: your metal, your cloud. Mission Control from a Machina deployment." />
+
 # Machina
+
+### Your metal. Your cloud.
+
+**[Website](https://zyvorai.github.io/zyvor-machina/)** &nbsp;·&nbsp; [Quickstart](docs/QUICKSTART.md) &nbsp;·&nbsp; [Mac app, 30-day trial](https://github.com/zyvorai/zyvor-machina/releases/tag/macos-v0.5.0) &nbsp;·&nbsp; [zyvor.dev/buy](https://zyvor.dev/buy)
 
 [Client overview (PDF)](docs/Zyvor-Machina-Client-Overview.pdf)
 
@@ -14,17 +20,26 @@
 [![30-day PoC](https://img.shields.io/badge/30--day_PoC-000000?style=for-the-badge)](https://zyvor.dev/poc?utm_source=github&utm_medium=machina&utm_campaign=readme_hero)
 [![Quickstart](https://img.shields.io/badge/Quickstart_in_one_command-2997ff?style=for-the-badge)](#quickstart)
 
-![Machina: run your own cloud on your own hardware](docs/ux/readme-hero.jpg)
-
 ![Deploy Machina on one host with one command](docs/social/anim/deploy-single-host.svg)
-
-### Your metal. Your cloud. One control plane.
 
 **The private cloud you can install before lunch.** VMs, browser consoles, fleet HA/DRS, an OpenStack-style self-service cloud, a native eBPF datapath and AI operations, from a handful of Rust services on plain Linux + KVM.
 
 **One-command install** · **SQLite built in, PostgreSQL when you grow** · **EC2-compatible API** · **A way off OpenStack** · **Consoles built in** · **eBPF networking built in** · **AI that asks before it acts**
 
 </div>
+
+## Machina for Mac (30-day trial)
+
+| | |
+| --- | --- |
+| **Get it** | [Machina 0.5.0](https://github.com/zyvorai/zyvor-machina/releases/tag/macos-v0.5.0): `Machina-0.5.0.dmg` (SHA-256 `edc3a7a9404858eb6651755c753c046b71132c6325a241d4e7218064c0bfaa75`) |
+| **Free 30-day trial key** | **sales@zyvor.dev**; to keep using it afterwards, get a licence at [zyvor.dev/buy](https://zyvor.dev/buy) |
+| **Requirements** | Apple silicon, macOS 15 or later |
+| **Notarized** | Signed with a Developer ID and notarized by Apple |
+
+The Mac app is a native client for a Machina daemon and fleet controller. Its source is in a private repository; the server in this repository is source-available under the [Zyvor Production License v1.0](LICENSE).
+
+---
 
 ---
 
