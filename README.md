@@ -33,7 +33,7 @@
 | | |
 | --- | --- |
 | **Get it** | [Machina 0.5.0](https://github.com/zyvorai/zyvor-machina/releases/tag/macos-v0.5.0): `Machina-0.5.0.dmg` (SHA-256 `edc3a7a9404858eb6651755c753c046b71132c6325a241d4e7218064c0bfaa75`) |
-| **Free 30-day trial key** | **sales@zyvor.dev**; to keep using it afterwards, get a licence at [zyvor.dev/buy](https://zyvor.dev/buy) |
+| **Trial key** | The app runs without a key. For a free 30-day trial key, email **sales@zyvor.dev**; to keep using it afterwards, get a licence at [zyvor.dev/buy](https://zyvor.dev/buy) |
 | **Requirements** | Apple silicon, macOS 15 or later |
 | **Notarized** | Signed with a Developer ID and notarized by Apple |
 

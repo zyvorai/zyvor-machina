@@ -46,7 +46,7 @@
   <p class="tagline">Your metal. Your cloud.</p>
   <p class="promise"><strong>The private cloud you can install before lunch.</strong> VMs, browser consoles, fleet HA and DRS, an OpenStack-style self-service cloud, a native eBPF datapath and AI operations, from a handful of Rust services on plain Linux and KVM.</p>
   <p class="cta"><a class="btn primary" href="#start">Get started</a><a class="textlink" href="#features">See the features</a></p>
-  <p class="fine">Linux and KVM · source-available · native Mac app with a free 30-day trial key: sales@zyvor.dev</p>
+  <p class="fine">Linux and KVM · source-available · native Mac app runs without a key; for a free 30-day trial key, email sales@zyvor.dev</p>
   <figure class="shot hero-shot"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/img/hero-img-dark-1200.webp 1200w, assets/img/hero-img-dark-1800.webp 1800w" sizes="(min-width:1080px) 1040px, 100vw"><img src="assets/img/hero-img-light-1200.webp" srcset="assets/img/hero-img-light-1200.webp 1200w, assets/img/hero-img-light-1800.webp 1800w" sizes="(min-width:1080px) 1040px, 100vw" width="2880" height="1800" alt="Machina Mission Control: an Operational status headline with summaries of hosts, VMs and alerts." fetchpriority="high" decoding="async"></picture><figcaption>Mission Control on a small single-host deployment, not a mockup. Counts are those of a test host.</figcaption></figure>
 </section>
 
@@ -103,7 +103,7 @@
 <details><summary>Is it a drop-in replacement for OpenStack?</summary><p>No. It covers the private-cloud primitives most OpenStack deployments use and has a compatibility layer for a smoke set of the Keystone, Nova, Glance, Cinder and Neutron APIs. Hyperscale multi-tenancy is out of scope.</p></details>
 <details><summary>Is the EC2 API real AWS?</summary><p>No. It is a compatibility layer over Machina's own objects. awscli, boto3 and Terraform's aws provider work with an endpoint override.</p></details>
 <details><summary>Does the AI change things by itself?</summary><p>No. Zyra puts an approval queue in front of every change, checks the result afterwards and lets you roll it back.</p></details>
-<details><summary>Will macOS warn me when I open the Mac app?</summary><p>No. The DMG is signed with a Developer ID and notarized by Apple, so it opens without a Gatekeeper warning. The SHA-256 is on this page and on the release page.</p></details>
+<details><summary>Will macOS warn me when I open the Mac app?</summary><p>The DMG is signed with a Developer ID. Notarized by Apple; macOS shows its standard first-open confirmation for apps downloaded from the internet. The SHA-256 is on this page and on the release page.</p></details>
 <details><summary>Which Macs run the Mac app?</summary><p>Apple silicon, macOS 15 or later.</p></details>
 <details><summary>Are the screenshots real?</summary><p>They are captures of the web console from Machina deployments, not mockups. Counts reflect small test hosts.</p></details>
 </section>
