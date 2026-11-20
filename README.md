@@ -33,7 +33,7 @@
 | | |
 | --- | --- |
 | **Get it** | [Machina 0.5.0](https://github.com/zyvorai/zyvor-machina/releases/tag/macos-v0.5.0): `Machina-0.5.0.dmg` (SHA-256 `edc3a7a9404858eb6651755c753c046b71132c6325a241d4e7218064c0bfaa75`) |
-| **Trial key** | The app runs without a key. For a free 30-day trial key, email **sales@zyvor.dev**; to keep using it afterwards, get a licence at [zyvor.dev/buy](https://zyvor.dev/buy) (USD 40 per Mac per year, or INR 3,999 in India incl. 18% GST). The app checks the signed key (`ZYV1.`) offline. The 30-day trial applies to the paid production licence and support, not to the free software; nothing is disabled when it ends. |
+| **Trial key** | The app runs without a key. For a 30-day trial key, email **sales@zyvor.dev**; to keep using it afterwards, get a licence at [zyvor.dev/buy](https://zyvor.dev/buy) (USD 40 per Mac per year, or INR 3,999 in India incl. 18% GST). The app checks the signed key (`ZYV1.`) offline. The 30-day trial applies to the paid production licence and support, not to the free software; nothing is disabled when it ends. |
 | **Requirements** | Apple silicon, macOS 15 or later |
 | **Notarized** | Signed with a Developer ID and notarized by Apple |
 

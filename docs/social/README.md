@@ -12,5 +12,5 @@ The look follows the [Netra](https://github.com/zyvorai/netra) social cards in M
 (interactive blue `#0071e3`, ink `#1d1d1f`, violet accent).
 
 Every claim on the cards maps to code in this repository. Licence wording follows `LICENSE`:
-the Zyvor Production License v1.0, free for evaluation and non-production use, with a commercial
-subscription for production ([SUBSCRIPTION-MODEL.md](../SUBSCRIPTION-MODEL.md)).
+the Zyvor Production License v1.0, with a commercial
+subscription required for production ([SUBSCRIPTION-MODEL.md](../SUBSCRIPTION-MODEL.md)).

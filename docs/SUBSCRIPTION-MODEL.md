@@ -4,7 +4,6 @@ Machina is available under an annual **enterprise subscription** for production 
 
 | Plan | What you get | Coverage |
 |------|--------------|----------|
-| Community | Evaluation and non-production use, where the licence allows it | Community resources |
 | Professional | Entry edition, updates and upgrades | Business hours, next-business-day critical response |
 | Enterprise | Advanced edition, updates and upgrades | Priority business hours, four-business-hour critical response |
 | Premium | Contracted enterprise scope and critical escalation | 24x7 critical intake, one-hour initial response target |
@@ -18,6 +17,6 @@ Prices: INR incl. 18% GST in India; US dollars excl. tax elsewhere (VAT, GST or 
 - Annual prepaid subscription is the default, with a 12-month minimum. Multi-year prepay is available.
 - Minimums apply after any discounts.
 - Implementation, migration, training and managed operations are separate services.
-- At expiry, updates, downloads and support end. Open-source rights, where they apply, continue under the licence.
+- At expiry, updates, downloads and support end.
 - Response targets need a contracted scope and are not uptime guarantees.
 - Existing signed agreements keep their agreed terms.
