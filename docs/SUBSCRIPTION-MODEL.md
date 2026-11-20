@@ -9,9 +9,7 @@ Machina is available under an annual **enterprise subscription** for production 
 | Enterprise | Advanced edition, updates and upgrades | Priority business hours, four-business-hour critical response |
 | Premium | Contracted enterprise scope and critical escalation | 24x7 critical intake, one-hour initial response target |
 
-Priced per hypervisor core, with an annual minimum. 
-
-Rates are quoted by Zyvor: contact [sales@zyvor.dev](mailto:sales@zyvor.dev).
+Priced per CPU socket per year: **INR 29,699 per socket per year including 18% GST** (about USD 300, GST-free), with no minimum beyond one socket. Volume: 256-499 sockets -10%, 500-999 -15%, 1,000+ -20%; multi-year: 2 years -5%, 3 years -10%; volume and multi-year together are capped at 25%. Minimums apply after discounts. Quote or invoice: [sales@zyvor.dev](mailto:sales@zyvor.dev).
 
 ## Terms
 
