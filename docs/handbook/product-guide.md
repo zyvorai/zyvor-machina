@@ -26,7 +26,7 @@ Machina folds all of that into one daemon + one API + one UI:
 | Consoles need separate gateways | Built-in noVNC, SPICE, serial and SSH proxies |
 | No fleet observability | Prometheus, alerts, webhooks, PSI/cgroups, OTLP export |
 | KubeVirt migration is manual | YAML bundles + documented migration paths |
-| Vendor hypervisor lock-in | Open-source Rust daemon on your own metal |
+| Vendor hypervisor lock-in | Source-available Rust daemon (Zyvor Production License v1.0) on your own metal |
 
 ---
 
