@@ -407,7 +407,7 @@ Start with [Engineering onboarding](docs/ENGINEERING_ONBOARDING.md); architectur
 Machina is source-available under the **[Zyvor Production License v1.0](LICENSE)** (SPDX `LicenseRef-Zyvor-Production-1.0`).
 
 - **Free** for evaluation, development, testing, research, education, homelabs and all other non-production use.
-- **Production use** requires an annual enterprise subscription. Plans, support levels and terms: [SUBSCRIPTION-MODEL.md](docs/SUBSCRIPTION-MODEL.md) · [licensing model](docs/legal/LICENSING-MODEL.md).
+- **Production use** requires an annual enterprise subscription: INR 29,699 per CPU socket per year including 18% GST (about USD 300). Plans, support levels and terms: [SUBSCRIPTION-MODEL.md](docs/SUBSCRIPTION-MODEL.md) · [licensing model](docs/legal/LICENSING-MODEL.md).
 
 Contributions are welcome under the same license; see [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities privately per [SECURITY.md](SECURITY.md).
 
