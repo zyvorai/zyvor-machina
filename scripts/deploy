@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# ============================================================================
+# deploy — ✨🤖 one command to ship Machina to a remote host
+# ============================================================================
+#   ./scripts/deploy remote sus@185.165.240.5
+#   ./scripts/deploy remote sus 185.165.240.5 --quick
+#   ./scripts/deploy remote --quick              # reuse .deploy-last
+#   ./scripts/deploy check sus@host
+#   ./scripts/deploy status
+# ============================================================================
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=lib/deploy-common.sh
+source "$SCRIPT_DIR/lib/deploy-common.sh"
+
+usage() {
+    cat <<EOF
+Usage:
+  $(basename "$0") remote USER@HOST [flags...]
+  $(basename "$0") remote USER HOST [PASSWORD] [flags...]
+  $(basename "$0") check [USER@HOST | USER HOST]
+  $(basename "$0") status
+
+Flags (passed to deploy-remote.sh):
+  --quick           incremental make release web + install (--skip-build)
+  --install-only    copy existing target/release + web/dist to /usr/local (no cargo/npm, ~1–2 min)
+  --prune-sources   after install, delete deploy sources; keep target/ + web/dist/ on server
+  --sync-only       rsync only (no install)
+  --remote-build    compile on server (make release)
+  --remote-check    compile check on server (make check)
+  --bind ADDR       daemon bind address
+  --open-firewall      open firewalld port 5092 (and 5093 with --platform)
+  --disable-firewalld  stop/disable firewalld and ufw (default for remote IPv4)
+  --dry-run         show plan only
+  --cleanup         remove remote deploy tree after install
+
+Examples:
+  $(basename "$0") remote sus@185.165.240.5 --bind 0.0.0.0 --open-firewall
+  $(basename "$0") remote --quick
+  $(basename "$0") check sus@host
+
+State: $(machina_deploy_state_file "$REPO_DIR")
+EOF
+}
+
+cmd="${1:-}"
+shift || true
+
+case "$cmd" in
+    -h|--help|help|'')
+        usage
+        exit 0
+        ;;
+    status)
+        if machina_load_deploy_last "$REPO_DIR"; then
+            deploy_ui_banner "📊 Deploy status" "${VERSION:-?} @ ${COMMIT:-?}" "🤖"
+            deploy_ui_kv "🎯" "Host" "${HOST:-?}"
+            deploy_ui_kv "👤" "User" "${USER:-root}"
+            deploy_ui_kv "🕐" "Updated" "${UPDATED:-?}"
+            deploy_ui_kv "⚡" "Last mode" "${MODE:-?}"
+            if [ -n "${HOST:-}" ]; then
+                code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "https://${HOST}:5092/api/v1/health" 2>/dev/null || echo "000")
+                if [ "$code" = "200" ]; then
+                    deploy_ui_info "💚 Health → https://${HOST}:5092/api/v1/health ($code)"
+                else
+                    deploy_ui_warn "💔 Health → https://${HOST}:5092/api/v1/health ($code)"
+                fi
+            fi
+        else
+            deploy_ui_warn "No .deploy-last — run: $(basename "$0") remote USER@HOST"
+        fi
+        exit 0
+        ;;
+    check)
+        exec "$SCRIPT_DIR/deploy-remote.sh" check "$@"
+        ;;
+    remote)
+        exec "$SCRIPT_DIR/deploy-remote.sh" "$@"
+        ;;
+    *)
+        if [[ "$cmd" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$cmd" == *.* ]] || [[ "$cmd" == *@* ]]; then
+            exec "$SCRIPT_DIR/deploy-remote.sh" "$cmd" "$@"
+        fi
+        deploy_ui_error "Unknown subcommand: $cmd (try: remote, check, status)"
+        ;;
+esac

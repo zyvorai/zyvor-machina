@@ -1,0 +1,23 @@
+# Podman pod that continuously replicates the controller database. Start it with `scripts/ha/machina-ha.sh start`.
+# The controller itself keeps running as its normal systemd service; this pod only watches its database.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: machina-ha
+spec:
+  hostNetwork: true      # reaches S3/SFTP replicas without a CNI; Litestream opens no listening ports
+  containers:
+    - name: litestream
+      image: docker.io/litestream/litestream:0.3.13
+      args: ["replicate", "-config", "/etc/litestream.yml"]
+      env:
+        - name: MACHINA_HA_REPLICA_URL
+          value: "REPLICA_URL_PLACEHOLDER"
+      volumeMounts:
+        - { name: state, mountPath: /var/lib/machina }
+        - { name: config, mountPath: /etc/litestream.yml, readOnly: true }
+  volumes:
+    - name: state
+      hostPath: { path: /var/lib/machina, type: Directory }
+    - name: config
+      hostPath: { path: /etc/machina/litestream.yml, type: File }

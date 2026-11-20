@@ -1,0 +1,569 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><title>Feature Guide — Machina</title>
+<style>
+@page{size:A4;margin:15mm 16mm}*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:'Segoe UI',system-ui,sans-serif;color:#1f2937;line-height:1.58;font-size:10.5pt}
+.cover{height:262mm;margin:-15mm -16mm 0;background:linear-gradient(135deg,#7c2d12,#9a3412,#0d1b2a);color:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;page-break-after:always;position:relative}
+.cover .kicker{letter-spacing:5px;text-transform:uppercase;opacity:.72;margin-bottom:1.4em}
+.cover h1{font-size:3.2em;font-weight:800;letter-spacing:-2px}
+.cover h1 span{color:#fb923c}
+.cover .sub{font-size:1.3em;font-weight:300;opacity:.93;margin:1em 0;max-width:24em}
+.cover .badge{display:inline-block;background:rgba(96,165,250,.2);border:1px solid #fb923c;padding:8px 22px;border-radius:20px;margin-top:2em}
+.cover .foot{position:absolute;bottom:34px;font-size:.82em;opacity:.6}
+h2{page-break-before:always;margin:0 0 .35em;font-size:1.55em;font-weight:750;color:#12203a;border-bottom:2px solid #e5edfb;padding-bottom:.28em}
+h2:first-of-type{page-break-before:avoid}
+h3{margin:1.1em 0 .4em;font-size:1.12em;font-weight:700}
+p,li{margin:.4em 0}ul,ol{margin:.5em 0 .9em 1.4em}
+a{color:#2563eb;text-decoration:none}
+code{background:#eef2f7;padding:1px 6px;border-radius:4px;font-size:.86em;font-family:ui-monospace,Menlo,monospace}
+pre{background:#0f172a;color:#e2e8f0;padding:12px 15px;border-radius:9px;overflow-x:auto;margin:.8em 0}
+table{width:100%;border-collapse:collapse;margin:.8em 0 1.1em;font-size:9.5pt}
+th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left;vertical-align:top}th{background:#f1f5f9}
+hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
+</style></head><body>
+<section class="cover"><div class="kicker">ZyvorAI Labs · Customer Documentation</div>
+<h1>Mach<span>ina</span></h1>
+<div class="sub">Feature Guide</div>
+<div class="badge">2026-10-03</div>
+<div class="foot">zyvor.dev · Confidential — for licensed customers</div></section>
+<main><blockquote>
+<p><strong>Enterprise Linux hypervisor management platform.</strong></p>
+</blockquote>
+<p>Machina is a unified control plane for virtual machines running on libvirt / QEMU / KVM. It folds scattered virsh scripting, separate console gateways, and missing fleet observability into a single Rust daemon with a web dashboard, REST API, and the machinactl CLI. It is built for infrastructure teams and NOC operators who run VMs on their own metal and want cloud-grade lifecycle, consoles, security, and automation without vendor hypervisor lock-in.</p>
+<p><strong>100+</strong> web console pages · <strong>3</strong> ways to drive it: Web, REST, CLI · <strong>14</strong> workspace crates, one shared core · built-in eBPF datapath</p>
+<p><em>Version: October 2026 (updated 2026-10-03).</em></p>
+<p>This is the customer-facing onboarding guide — how to access the product, your first workflows, and how to use every feature. A print-ready PDF of the same content sits alongside this file.</p>
+<h2>Contents</h2>
+<ol start="0">
+<li><a href="#getting-started">Getting started — access &amp; first workflows</a></li>
+<li><a href="#1-vm-lifecycle-compute">VM Lifecycle &amp; Compute</a></li>
+<li><a href="#2-storage-disk-management">Storage &amp; Disk Management</a></li>
+<li><a href="#3-networking">Networking</a></li>
+<li><a href="#4-consoles-remote-access">Consoles &amp; Remote Access</a></li>
+<li><a href="#5-snapshots,-backup-recovery">Snapshots, Backup &amp; Recovery</a></li>
+<li><a href="#6-fleet,-ha-multi-host-control-plane">Fleet, HA &amp; Multi-Host Control Plane</a></li>
+<li><a href="#7-observability-operations">Observability &amp; Operations</a></li>
+<li><a href="#8-security,-compliance-soc">Security, Compliance &amp; SOC</a></li>
+<li><a href="#9-ai--automation-zyra-ai">AI &amp; Automation (Zyra AI)</a></li>
+<li><a href="#10-applications,-templates-provisioning">Applications, Templates &amp; Provisioning</a></li>
+<li><a href="#11-integrations-migration">Integrations &amp; Migration</a></li>
+<li><a href="#12-interfaces-administration">Interfaces &amp; Administration</a></li>
+</ol>
+<h2>Getting started</h2>
+<p><strong>How to access it</strong></p>
+<ul>
+<li><strong>Web:</strong> React dashboard at <code>https://&lt;host&gt;:5092</code> (self-signed TLS by default) — a classic single-host shell plus a multi-host platform shell under <code>/platform/*</code>.</li>
+<li><strong>CLI:</strong> <code>machinactl</code> operates and deploys a host (<code>machinactl deploy</code>, <code>backup</code>, <code>health</code>, <code>doctor</code>, <code>audit verify</code>); <code>machina-daemon</code> is the server process.</li>
+<li><strong>API:</strong> REST at base <code>/api/v1</code> with WebSocket streams under <code>/ws/v1</code>; the live OpenAPI contract is served at <code>/api-docs</code> (e.g. <code>curl -sk https://&lt;host&gt;:5092/api/v1/health</code>).</li>
+<li><strong>Login:</strong> Sign in on the web UI with a Linux host account via PAM — there is no separate Machina password; optional LDAP or OIDC SSO can front it.</li>
+<li><strong>Needs:</strong> A Linux host with libvirt / QEMU / KVM and <code>/dev/kvm</code> (Machina builds and runs on Linux only).</li>
+</ul>
+<p><strong>Your first workflows</strong></p>
+<ul>
+<li><strong>Deploy Machina onto a KVM host</strong><ol>
+<li>Run <code>./machinactl doctor</code> to confirm <code>/dev/kvm</code>, systemd, libvirtd, and tooling are present.</li>
+<li>Run <code>./machinactl deploy</code> (deps → build → install → start → verify).</li>
+<li>Confirm the API is up: <code>curl -sk https://127.0.0.1:5092/api/v1/health</code>.</li>
+<li>Browse to <code>https://&lt;host&gt;:5092</code> and sign in with a Linux host account (PAM).</li>
+</ol>
+</li>
+<li><strong>Create and boot your first VM</strong><ol>
+<li>Web → VMs → New, or Web → Platform → Create (virt-install or domain XML).</li>
+<li>Pick an image/template, CPU, memory, disk, and network; optionally attach cloud-init.</li>
+<li>Submit to create — <code>POST /api/v1/vms</code> under the hood.</li>
+<li>Start it from Web → VMs → <em>VM</em> → Start (<code>POST /api/v1/vms/{name}/start</code>).</li>
+</ol>
+</li>
+<li><strong>Open a browser console to a VM</strong><ol>
+<li>Web → VMs → select the VM.</li>
+<li>Choose a console: VNC or SPICE for graphical, Serial/Terminal for text.</li>
+<li>The daemon proxies the session over an authenticated WebSocket — no client install.</li>
+<li>For Windows guests use the built-in RDP tab; download a <code>.vv</code> file to hand off to virt-viewer if preferred.</li>
+</ol>
+</li>
+<li><strong>Lock down access</strong><ol>
+<li>Populate <code>/var/lib/machina/roles.json</code> (an empty file makes every user admin) or map OIDC groups to roles.</li>
+<li>Set a strong <code>MACHINA_JWT_SECRET</code> and choose PAM, LDAP or OIDC.</li>
+<li>Replace the self-signed certificate with a CA-signed one.</li>
+</ol>
+</li>
+<li><strong>Protect VMs with scheduled backups</strong><ol>
+<li>Enable the daily timer: <code>./machinactl backup enable</code>.</li>
+<li>Point backups off-box (backup directory or NFS target) and set retention.</li>
+<li>Run one immediately: <code>./machinactl backup now</code>; check with <code>./machinactl backup status</code>.</li>
+<li>Verify a backup&#39;s checksums via <code>POST /api/v1/backups/{id}/verify</code>.</li>
+</ol>
+</li>
+<li><strong>Wire up Prometheus / OTLP observability</strong><ol>
+<li>Point your scraper at the native <code>/prometheus</code> endpoint on the host.</li>
+<li>Or export metrics, logs, and traces over OTLP/HTTP to Grafana Alloy / an OTel Collector.</li>
+<li>Watch live activity at Web → Events (SSE/WebSocket streams).</li>
+<li>Configure alert rules and outbound webhooks at Web → Platform → Alert Rules / Webhooks.</li>
+</ol>
+</li>
+<li><strong>Migrate a VM to KubeVirt</strong><ol>
+<li>Export the VM as a KubeVirt bundle: <code>GET /api/v1/vms/{name}/kubevirt-bundle</code>.</li>
+<li>Apply it to a cluster: <code>POST /api/v1/vms/{name}/kubevirt/apply</code>.</li>
+<li>Upload disks and start it: <code>POST /api/v1/vms/{name}/kubevirt/upload</code> then <code>.../kubevirt/start</code>.</li>
+<li>Follow docs/kubevirt-migration.md for prechecks and the full path.</li>
+</ol>
+</li>
+</ul>
+<h2>1. VM Lifecycle &amp; Compute</h2>
+<p><em>Full create-to-delete control over every virtual machine, with live resource changes and zero-downtime moves.</em></p>
+<ul>
+<li><strong>Full VM lifecycle</strong> — Create, start, stop, shutdown, reboot, pause, resume, clone, rename, and delete virtual machines from any surface. — <em>Every day-to-day VM operation in one place instead of ad-hoc virsh commands.</em><ul>
+<li><strong>How:</strong> Web → VMs → select VM → lifecycle actions; API <code>POST /api/v1/vms/{name}/start</code> (<code>/stop</code>, <code>/reboot</code>, <code>/pause</code>, <code>/resume</code>, <code>/clone</code>).</li>
+</ul>
+</li>
+<li><strong>Dual creation backends</strong> — Build VMs either through virt-install or from native libvirt domain XML, chosen globally or per request. — <em>Convenience for quick provisioning and full control when you need exact XML.</em><ul>
+<li><strong>How:</strong> Web → VMs → New (virt-install) or Web → Platform → Create (domain XML); API <code>POST /api/v1/vms</code>.</li>
+</ul>
+</li>
+<li><strong>Golden image builder</strong> — Build reusable base images asynchronously as background jobs using virt-builder or mkosi. — <em>Standardized, ready-to-clone images without hand-crafting each VM.</em><ul>
+<li><strong>How:</strong> Web → Platform → Content → build image (virt-builder / mkosi) as a background job.</li>
+</ul>
+</li>
+<li><strong>Disk &amp; NIC hot-plug</strong> — Attach, detach, and resize disks and network cards on a running VM without a reboot. — <em>Adjust capacity live, avoiding downtime for storage and network changes.</em><ul>
+<li><strong>How:</strong> Web → VMs → <em>VM</em> → Hardware → attach/detach; API <code>POST /api/v1/vms/{name}/disk/attach</code>, <code>.../nic/attach</code>, <code>.../disk/resize/{target}</code>.</li>
+</ul>
+</li>
+<li><strong>Live CPU &amp; memory resize</strong> — Change vCPU count and RAM allocation on running guests, with CPU pinning and scheduler tuning. — <em>Right-size workloads on the fly as demand shifts.</em><ul>
+<li><strong>How:</strong> Web → VMs → <em>VM</em> → resize; API <code>POST /api/v1/vms/{name}/vcpus/{count}</code> and <code>.../memory/{mb}</code>.</li>
+</ul>
+</li>
+<li><strong>CPU &amp; memory tuning</strong> — Fine-grained cputune, memtune, per-vCPU pinning, and scheduler policy controls. — <em>Squeeze predictable performance out of shared hosts.</em><ul>
+<li><strong>How:</strong> Web → VMs → <em>VM</em> → CPU/Memory tuning (cputune / memtune / pinning).</li>
+</ul>
+</li>
+<li><strong>Live migration</strong> — Move running VMs between hosts with tunable max bandwidth and max downtime. — <em>Evacuate hosts for maintenance with no service interruption.</em><ul>
+<li><strong>How:</strong> Web → VMs → <em>VM</em> → Migrate, or Web → Platform → Migration; API <code>POST /api/v1/vms/{name}/migrate</code>.</li>
+</ul>
+</li>
+<li><strong>Online block jobs</strong> — Run block commit and pull operations, and abort jobs, on live disks. — <em>Consolidate or reshape disk chains without stopping the guest.</em><ul>
+<li><strong>How:</strong> Web → VMs → <em>VM</em> → Disks → block commit / pull / abort.</li>
+</ul>
+</li>
+<li><strong>Guest agent by default</strong> — Optionally inject the GuestKit QEMU guest agent into every new VM for cloud-init seeding and offline changes. — <em>In-guest coordination and reliable graceful shutdowns out of the box.</em><ul>
+<li><strong>How:</strong> Web → Settings → enable GuestKit guest-agent injection for new VMs.</li>
+</ul>
+</li>
+<li><strong>Autostart &amp; domain XML access</strong> — Toggle per-VM autostart and read the raw libvirt domain XML for any machine. — <em>Bring VMs back after reboots and inspect exactly what libvirt runs.</em><ul>
+<li><strong>How:</strong> Web → VMs → <em>VM</em> → toggle Autostart / view XML; API <code>POST /api/v1/vms/{name}/autostart/{enabled}</code>, <code>GET .../xml</code>.</li>
+</ul>
+</li>
+</ul>
+<h2>2. Storage &amp; Disk Management</h2>
+<p><em>Manage libvirt pools, volumes, and VM disks, with an optional dedicated storage control plane.</em></p>
+<ul>
+<li><strong>Storage pools</strong> — List, start, stop, refresh, and toggle autostart on libvirt storage pools. — <em>Keep backing storage online and current from the dashboard.</em><ul>
+<li><strong>How:</strong> Web → Storage → pools → start/stop/refresh/autostart; API <code>/api/v1/storage/pools</code>.</li>
+</ul>
+</li>
+<li><strong>Volume management</strong> — Create and delete storage volumes within any pool. — <em>Provision and reclaim VM disk space without touching the CLI.</em><ul>
+<li><strong>How:</strong> Web → Storage → select pool → Create / Delete volume.</li>
+</ul>
+</li>
+<li><strong>Disk images view</strong> — Browse disk images with per-VM disk resize and IO tuning. — <em>See and reshape what each VM actually consumes.</em><ul>
+<li><strong>How:</strong> Web → Disk Images → select image → resize / IO tuning.</li>
+</ul>
+</li>
+<li><strong>Atlas storage integration</strong> — Connect Atlas as a storage control plane spanning Ceph, NFS, and ZFS for VM disks, snapshots, and backups. — <em>Enterprise-grade shared storage under your fleet.</em><ul>
+<li><strong>How:</strong> Web → Platform → Atlas Storage → connect endpoint (see docs/atlas-storage.md).</li>
+</ul>
+</li>
+<li><strong>Storage tiers</strong> — Define and assign storage tiers so workloads land on the right class of disk. — <em>Match performance and cost to each workload automatically.</em><ul>
+<li><strong>How:</strong> Web → Platform → Storage Tiers → define/assign tiers.</li>
+</ul>
+</li>
+<li><strong>Disk utility &amp; ISO tools</strong> — Platform disk utility plus ISO creation for boot and install media. — <em>Handle installer media and disk chores in the console.</em><ul>
+<li><strong>How:</strong> Web → Platform → ISO Create (and disk utility) to build boot/install media.</li>
+</ul>
+</li>
+</ul>
+<h2>3. Networking</h2>
+<p><em>Virtual networks, host interfaces, filters, and a visual canvas for wiring the fleet together.</em></p>
+<ul>
+<li><strong>Virtual networks</strong> — Create, delete, start, stop, autostart, and edit the XML of libvirt virtual networks. — <em>Full software-defined networking for guests without virsh.</em><ul>
+<li><strong>How:</strong> Web → Networks → create / start / stop / edit XML; API <code>/api/v1/networks</code>.</li>
+</ul>
+</li>
+<li><strong>Host networking</strong> — Manage host interfaces, bridges, routing tables, LLDP neighbors, and sysctl tuning. — <em>See and shape the physical network the VMs sit on.</em><ul>
+<li><strong>How:</strong> Web → Host Networking → interfaces / bridges / routes / sysctl.</li>
+</ul>
+</li>
+<li><strong>Port forwarding &amp; firewall</strong> — Configure host port-forwarding rules and firewall entries. — <em>Expose guest services safely without external tooling.</em><ul>
+<li><strong>How:</strong> Web → Host Networking → port forwarding / firewall rules.</li>
+</ul>
+</li>
+<li><strong>Network filters (nwfilter)</strong> — Manage libvirt nwfilter rules that police guest traffic at the interface. — <em>Enforce per-VM traffic policy at the hypervisor edge.</em><ul>
+<li><strong>How:</strong> Web → NWFilters → create / edit nwfilter rules.</li>
+</ul>
+</li>
+<li><strong>Network canvas &amp; segments</strong> — Visually design network segments and overlays across the fleet on an interactive canvas. — <em>Plan and understand multi-host networking at a glance.</em><ul>
+<li><strong>How:</strong> Web → Platform → Network Canvas → design segments/overlays.</li>
+</ul>
+</li>
+<li><strong>Network overlay &amp; sync</strong> — Build overlay networks spanning hosts and keep network state synchronized across the fleet. — <em>Consistent connectivity for VMs wherever they run.</em><ul>
+<li><strong>How:</strong> Web → Platform → Networks → overlay / sync across hosts.</li>
+</ul>
+</li>
+<li><strong>Native eBPF datapath</strong> — <code>machina-bpfd</code> on every host loads Machina&#39;s own eBPF programs for per-VM flows, DNS and L7 visibility, byte accounting, packet capture and QoS, with no Cilium, Tetragon or other agent to install. — <em>Deep network visibility on every hypervisor out of the box.</em><ul>
+<li><strong>How:</strong> Web → Security Center → Native eBPF (22 tabs); API <code>/api/v1/bpf/*</code>; fleet view <code>/api/v1/zeus-security/native-dataplane</code>.</li>
+</ul>
+</li>
+<li><strong>Load balancing &amp; DDoS shield</strong> — XDP service load balancing (weighted, health-checked), QUIC connection-ID load balancing, and a per-source rate-limiting shield on the uplink. Fleet Cloud load balancers need no appliance VM. — <em>Front services and absorb floods at line rate on the host itself.</em><ul>
+<li><strong>How:</strong> Web → Native eBPF → Service LB / QUIC LB / Shield; Fleet Cloud → Load Balancers.</li>
+</ul>
+</li>
+<li><strong>Kubernetes CNI</strong> — <code>machina-cni</code> gives Kubernetes pods eBPF routing, NetworkPolicy (and compiled Cilium policies) and socket-level service load balancing. — <em>One datapath for VMs and containers.</em><ul>
+<li><strong>How:</strong> Install <code>machina-cni</code> on the node (see docs/ebpf/cni.md).</li>
+</ul>
+</li>
+</ul>
+<h2>4. Consoles &amp; Remote Access</h2>
+<p><em>Built-in VNC, SPICE, serial, SSH, and RDP proxies mean no separate console gateway.</em></p>
+<ul>
+<li><strong>noVNC graphical console</strong> — Browser-based VNC console served directly by the daemon over WebSocket. — <em>Reach any VM&#39;s screen from a browser, no client install.</em><ul>
+<li><strong>How:</strong> Web → VMs → <em>VM</em> → Console → VNC (streamed over <code>/ws/v1</code>).</li>
+</ul>
+</li>
+<li><strong>SPICE HTML5 console</strong> — SPICE remote desktop rendered in the browser via a built-in HTML5 client. — <em>Rich desktop access with clipboard and multi-monitor support.</em><ul>
+<li><strong>How:</strong> Web → VMs → <em>VM</em> → Console → SPICE.</li>
+</ul>
+</li>
+<li><strong>Serial &amp; terminal streams</strong> — Serial console and PTY terminal sessions streamed over authenticated WebSockets. — <em>Debug boot issues and drop into a shell from the UI.</em><ul>
+<li><strong>How:</strong> Web → VMs → <em>VM</em> → Console → Serial / Terminal.</li>
+</ul>
+</li>
+<li><strong>SSH terminal proxy</strong> — In-browser SSH terminal to VMs and ad-hoc hosts, with session TTLs. — <em>One authenticated path to shells across the fleet.</em><ul>
+<li><strong>How:</strong> Web → SSH (VM) or Web → Host SSH (ad-hoc host).</li>
+</ul>
+</li>
+<li><strong>Native RDP for Windows guests</strong> — A Windows guest is auto-detected, and RDP is exposed via a hypervisor NAT port-forward to the guest&#39;s port 3389 once the agent confirms Remote Desktop is actually listening. — <em>Windows desktops without a bolted-on gateway.</em><ul>
+<li><strong>How:</strong> Web → VMs → <em>VM</em> → Console → download the generated <code>.rdp</code> file and open it with Microsoft Remote Desktop (macOS) or <code>mstsc</code> (Windows).</li>
+</ul>
+</li>
+<li><strong>ConsoleHub session broker</strong> — Brokers console sessions with time-to-live limits, a cinema/wall multi-console view, and optional OIDC gating. — <em>Governed, auditable console access with a NOC-style live wall.</em><ul>
+<li><strong>How:</strong> Web → ConsoleHub (classic) or Web → Platform → ConsoleHub → cinema/wall view.</li>
+</ul>
+</li>
+<li><strong>Virt-viewer handoff</strong> — Download a .vv connection file to open a VM in a native virt-viewer client. — <em>Fall back to a desktop console client when preferred.</em><ul>
+<li><strong>How:</strong> Web → VMs → <em>VM</em> → download <code>.vv</code> and open in virt-viewer.</li>
+</ul>
+</li>
+</ul>
+<h2>5. Snapshots, Backup &amp; Recovery</h2>
+<p><em>Point-in-time snapshots plus scheduled, retention-managed backups and disaster-recovery workflows.</em></p>
+<ul>
+<li><strong>Per-VM snapshots</strong> — Create, list, revert, and delete libvirt snapshots for any VM. — <em>Instant rollback points before risky changes.</em><ul>
+<li><strong>How:</strong> Web → Snapshots (or VM → Snapshots); API <code>POST /api/v1/vms/{name}/snapshots</code>.</li>
+</ul>
+</li>
+<li><strong>Scheduled backups</strong> — Daily backup timer exporting VMs into a backup directory or NFS target with configurable retention and optional disk inclusion. — <em>Automated, off-box protection with no manual steps.</em><ul>
+<li><strong>How:</strong> CLI <code>machinactl backup enable</code>; schedule via API <code>POST /api/v1/backups/schedule</code>.</li>
+</ul>
+</li>
+<li><strong>Backup lifecycle controls</strong> — Enable, disable, run-now, and inspect backup status and logs from machinactl. — <em>Operate the whole backup pipeline from one command.</em><ul>
+<li><strong>How:</strong> CLI <code>machinactl backup now | disable | status | logs</code>.</li>
+</ul>
+</li>
+<li><strong>Fleet snapshots &amp; schedulers</strong> — Controller-driven fleet-wide snapshot and backup scheduling across many hosts. — <em>Consistent protection policy for the entire estate.</em><ul>
+<li><strong>How:</strong> Web → Platform → Fleet Snapshots → define fleet snapshot/backup schedules.</li>
+</ul>
+</li>
+<li><strong>Disaster recovery</strong> — Dedicated DR workflows and backup targets for coordinated recovery. — <em>A rehearsed path back when a host or site is lost.</em><ul>
+<li><strong>How:</strong> Web → Platform → Backups → DR targets / restore; API <code>POST /api/v1/backups/restore</code>.</li>
+</ul>
+</li>
+</ul>
+<h2>6. Fleet, HA &amp; Multi-Host Control Plane</h2>
+<p><em>An optional enterprise controller adds HA failover, resource scheduling, and desired-state reconciliation across many hosts.</em></p>
+<ul>
+<li><strong>Fleet view</strong> — Lightweight peer-based fleet status, metrics, alerts, and VM inventory in the daemon. — <em>See more than one host without the full controller.</em><ul>
+<li><strong>How:</strong> Web → Fleet → peer status / metrics / inventory.</li>
+</ul>
+</li>
+<li><strong>Multi-host controller</strong> — Optional control plane persisting state in embedded SQLite and driving hosts through per-host gRPC agents. — <em>Scale from one box to a managed estate.</em><ul>
+<li><strong>How:</strong> Deploy with <code>INSTALL_PLATFORM=1</code> (or deploy-remote <code>--platform</code>), then Web → Platform → Hosts.</li>
+</ul>
+</li>
+<li><strong>High availability &amp; fencing</strong> — HA engine with health watchdog and fencing that restarts VMs elsewhere when a host fails. — <em>Workloads survive host failures automatically.</em><ul>
+<li><strong>How:</strong> Web → Platform → HA → configure fencing / anti-affinity (see docs/controller-ha.md).</li>
+</ul>
+</li>
+<li><strong>DRS &amp; rebalancing</strong> — Distributed resource scheduling with placement, heatmaps, and fleet rebalancing. — <em>Keeps load spread evenly without manual juggling.</em><ul>
+<li><strong>How:</strong> Web → Platform → Placement → DRS recommendations / auto-balancing.</li>
+</ul>
+</li>
+<li><strong>Smart placement</strong> — Placement engine picks the best host for new or migrating VMs from live capacity. — <em>New VMs land where they fit, not where you guessed.</em><ul>
+<li><strong>How:</strong> Web → Platform → Placement → placement recommendations on create/migrate.</li>
+</ul>
+</li>
+<li><strong>Desired-state reconciliation</strong> — A reconcile engine continuously drives real state toward the declared intent. — <em>Drift self-heals instead of piling up.</em><ul>
+<li><strong>How:</strong> Runs automatically in the controller; observe drift/repair at Web → Platform → Tasks.</li>
+</ul>
+</li>
+<li><strong>Task bus</strong> — In-memory or NATS-backed task fan-out distributing work across the fleet. — <em>Reliable, scalable execution of fleet operations.</em><ul>
+<li><strong>How:</strong> Web → Platform → Tasks (list/cancel/retry); enable NATS fan-out in controller config.</li>
+</ul>
+</li>
+<li><strong>Fleet power &amp; maintenance</strong> — Coordinated power control, maintenance missions, and host maintenance mode. — <em>Drain and service hosts safely on a schedule.</em><ul>
+<li><strong>How:</strong> Web → Platform → Maintenance → drain / maintenance mode / schedules.</li>
+</ul>
+</li>
+<li><strong>Bare-metal enrollment</strong> — Enroll and validate new hosts, with bare-metal automation hooks. — <em>Grow the fleet without hand-provisioning each node.</em><ul>
+<li><strong>How:</strong> Web → Platform → Enroll (or Bare Metal) → issue an enrollment token, run agent <code>install.sh</code>.</li>
+</ul>
+</li>
+</ul>
+<h2>7. Observability &amp; Operations</h2>
+<p><em>Prometheus metrics, history, OTLP export, alerts, events, and scheduled operations keep the fleet visible and automated.</em></p>
+<ul>
+<li><strong>Live &amp; historical metrics</strong> — Per-VM and host metrics with a metrics-history ring buffer persisted to disk. — <em>Trend performance over time, not just this instant.</em><ul>
+<li><strong>How:</strong> Web → Dashboard / Platform → Observability; API <code>/api/v1/metrics</code>.</li>
+</ul>
+</li>
+<li><strong>Prometheus scrape</strong> — A native /prometheus endpoint plus remote-write ingest for existing monitoring stacks. — <em>Drop Machina into your Grafana dashboards immediately.</em><ul>
+<li><strong>How:</strong> Point your scraper at <code>https://&lt;host&gt;:5092/prometheus</code>.</li>
+</ul>
+</li>
+<li><strong>OTLP export</strong> — Export metrics, logs, and traces over OTLP/HTTP to Grafana Alloy or an OpenTelemetry Collector. — <em>Feed one open pipeline instead of a bespoke agent.</em><ul>
+<li><strong>How:</strong> Web → Settings → configure OTLP/HTTP endpoint (see docs/guides/observability.md).</li>
+</ul>
+</li>
+<li><strong>Alerts &amp; webhooks</strong> — Alert rules with an evaluator, notification channels, and outbound webhooks. — <em>Get told about problems where your team already looks.</em><ul>
+<li><strong>How:</strong> Web → Platform → Alert Rules and Web → Platform → Webhooks.</li>
+</ul>
+</li>
+<li><strong>Event streaming</strong> — Server-sent event and WebSocket streams of state changes and activity. — <em>Live dashboards and integrations react in real time.</em><ul>
+<li><strong>How:</strong> Web → Events; consume SSE/WebSocket streams under <code>/ws/v1</code>.</li>
+</ul>
+</li>
+<li><strong>Health &amp; doctor checks</strong> — Deep health checks and host-readiness doctor with clear exit codes, plus a problems endpoint. — <em>Know a deploy is healthy before users hit it.</em><ul>
+<li><strong>How:</strong> CLI <code>machinactl health</code> and <code>machinactl doctor</code>; API <code>GET /api/v1/health</code>.</li>
+</ul>
+</li>
+<li><strong>PSI &amp; cgroup pressure</strong> — Surfaces Linux pressure-stall and cgroup signals for hosts. — <em>Spot resource contention before it becomes an outage.</em><ul>
+<li><strong>How:</strong> Web → Platform → Observability → PSI / cgroup pressure panels.</li>
+</ul>
+</li>
+<li><strong>3D topology &amp; datacenter view</strong> — Interactive topology, datacenter, and infrastructure-graph views of hosts, VMs, and networks. — <em>Grasp the whole estate visually in seconds.</em><ul>
+<li><strong>How:</strong> Web → Platform → Topology / Datacenter view.</li>
+</ul>
+</li>
+<li><strong>Scheduled jobs &amp; operations</strong> — Schedule recurring operations and VM schedules with a jobs runner. — <em>Automate routine ops on a calendar, hands-off.</em><ul>
+<li><strong>How:</strong> Web → Jobs (classic) or Web → Platform → Scheduled Jobs → add recurring job.</li>
+</ul>
+</li>
+<li><strong>Reports &amp; recommendations</strong> — Generated reports plus rightsizing and optimization recommendations. — <em>Turn telemetry into concrete actions to take.</em><ul>
+<li><strong>How:</strong> Web → Platform → Reports and Web → Platform → Recommendations / Rightsizing.</li>
+</ul>
+</li>
+</ul>
+<h2>8. Security, Compliance &amp; SOC</h2>
+<p><em>A firewall control plane, network intelligence, SIEM/SOC tooling, and compliance frameworks harden the fleet.</em></p>
+<ul>
+<li><strong>Zeus firewall control plane</strong> — Fleet-wide firewall with profiles, drift detection, lockdown, GitOps sync, approvals, and change checkpoints. — <em>Consistent, reviewable network policy across every host.</em><ul>
+<li><strong>How:</strong> Web → Platform → Zeus firewall → profiles / lockdown / approvals.</li>
+</ul>
+</li>
+<li><strong>SOC &amp; SIEM</strong> — Security operations center with detection, event ingest, playbooks, and a SIEM pipeline. — <em>Detect and respond to threats without a separate SOC stack.</em><ul>
+<li><strong>How:</strong> Web → Platform → SOC → detections / event ingest / playbooks.</li>
+</ul>
+</li>
+<li><strong>Threat hunting &amp; attack surface</strong> — Threat-hunting workspace and attack-surface-management (ASM) discovery. — <em>Proactively find exposure before attackers do.</em><ul>
+<li><strong>How:</strong> Web → Platform → Threat Hunting → run hunts / ASM discovery.</li>
+</ul>
+</li>
+<li><strong>Compliance frameworks</strong> — Compliance evaluation against frameworks with remediation guidance and exportable PDF reports. — <em>Audit-ready evidence generated from live state.</em><ul>
+<li><strong>How:</strong> Web → Platform → Security Center → Compliance → evaluate / export PDF.</li>
+</ul>
+</li>
+<li><strong>Runtime enforcement &amp; policy</strong> — Policy engine plus runtime enforcement of security guardrails on running workloads. — <em>Rules that actually stop bad behavior, not just flag it.</em><ul>
+<li><strong>How:</strong> Web → Platform → Policy and Web → Platform → Runtime Enforcement.</li>
+</ul>
+</li>
+<li><strong>eBPF enforcement with a safety lease</strong> — Deny/allow policies, VM edge anti-spoofing, a QEMU sandbox, a BPF-LSM guard around QEMU and a node-isolation kill switch. Everything starts in observe/audit; enforce runs only under a lease that the kernel datapath itself expires, and nothing is persisted. — <em>Block real traffic without risking a permanent lockout.</em><ul>
+<li><strong>How:</strong> Web → Native eBPF → Overview (mode + lease), VM Edge, VMM guard, Node Isolation.</li>
+</ul>
+</li>
+<li><strong>Guest per-container policy</strong> — Per-container network allow rules and BPF-LSM restrictions (exec allowlist, W+X, devices, writable paths) enforced inside the guest by GuestKit, relayed through the QEMU guest agent. — <em>Least privilege for workloads inside your VMs, with no network path into the guest.</em><ul>
+<li><strong>How:</strong> Web → VMs → <em>VM</em> → Guest policy tab; API <code>/api/v1/vms/{name}/guest-policy</code> and <code>/guest-lsm</code>.</li>
+</ul>
+</li>
+<li><strong>Signed audit log</strong> — Tamper-evident audit log with optional line signing, syslog, and webhook shipping, verifiable via CLI. — <em>Prove who did what, and that the record wasn&#39;t altered.</em><ul>
+<li><strong>How:</strong> Web → Audit Log to review; verify integrity with CLI <code>machinactl audit verify</code>.</li>
+</ul>
+</li>
+<li><strong>Linux audit integration</strong> — Ingests Linux audit and SELinux AVC events with a health threshold. — <em>Host-level security signals folded into fleet health.</em><ul>
+<li><strong>How:</strong> Web → Audit Log → Linux audit / SELinux AVC events (ingested automatically).</li>
+</ul>
+</li>
+<li><strong>Encrypted secrets &amp; keys</strong> — Secrets management plus AES-256-GCM encryption of stored provider keys with a master key. — <em>Credentials stay protected at rest, not in plaintext.</em><ul>
+<li><strong>How:</strong> Web → Secrets → store/manage secrets (provider keys encrypted with a master key).</li>
+</ul>
+</li>
+</ul>
+<h2>9. AI &amp; Automation (Zyra AI)</h2>
+<p><em>A controller-side AI engine adds natural-language ops, autonomous remediation, cost intelligence, and predictive SRE.</em></p>
+<ul>
+<li><strong>Natural-language ops</strong> — Drive infrastructure with natural language through an intent router and NL-ops layer. — <em>Ask for what you want instead of memorizing APIs.</em><ul>
+<li><strong>How:</strong> Web → Platform → AI (Mission Control) → type an intent in natural language.</li>
+</ul>
+</li>
+<li><strong>Autopilot &amp; autonomous mode</strong> — Autopilot and autonomous engines that plan and execute multi-step operations, gated by approvals. — <em>Routine remediation runs itself, with a human veto.</em><ul>
+<li><strong>How:</strong> Web → Platform → AI → Autopilot → enable, review/approve planned actions.</li>
+</ul>
+</li>
+<li><strong>Incident commander &amp; root cause</strong> — Coordinates incident response with automated root-cause analysis and service-impact mapping. — <em>Faster diagnosis and a clear blast radius during outages.</em><ul>
+<li><strong>How:</strong> Web → Platform → Incident Commander → open incident / root-cause view.</li>
+</ul>
+</li>
+<li><strong>Predictive SRE</strong> — Predicts capacity and reliability issues and proposes SRE remediations before they bite. — <em>Fix tomorrow&#39;s problem today.</em><ul>
+<li><strong>How:</strong> Web → Platform → AI → Predictive SRE forecasts and proposed remediations.</li>
+</ul>
+</li>
+<li><strong>Cost &amp; FinOps intelligence</strong> — Cost attribution, budgets, exposure FinOps, and rightsizing recommendations. — <em>Understand and cut infrastructure spend with data.</em><ul>
+<li><strong>How:</strong> Web → Platform → Reports / Rightsizing → cost attribution &amp; budgets.</li>
+</ul>
+</li>
+<li><strong>Migration readiness</strong> — AI assessment of how ready a VM or workload is to migrate, with prechecks. — <em>Migrate with confidence, not surprises.</em><ul>
+<li><strong>How:</strong> Web → Platform → Migration → readiness assessment / prechecks.</li>
+</ul>
+</li>
+<li><strong>Digital twin &amp; infra memory</strong> — Maintains a digital twin and long-term infrastructure memory of the estate. — <em>Decisions grounded in the real, remembered environment.</em><ul>
+<li><strong>How:</strong> Web → Platform → AI → digital twin / infrastructure memory view.</li>
+</ul>
+</li>
+<li><strong>Knowledge &amp; runbooks</strong> — Searchable knowledge base, diagnosis, and generated runbooks for operations. — <em>Institutional know-how available on demand.</em><ul>
+<li><strong>How:</strong> Web → Platform → AI → Knowledge → search KB / generate runbook.</li>
+</ul>
+</li>
+<li><strong>Agent marketplace</strong> — Catalog of AI agents and pluggable LLM providers with configurable settings. — <em>Extend automation and choose your own model backend.</em><ul>
+<li><strong>How:</strong> Web → Platform → AI Providers / Marketplace → add agent or LLM provider.</li>
+</ul>
+</li>
+<li><strong>AI VM builder</strong> — Generate VM and blueprint definitions from high-level intent. — <em>Describe a machine and let the platform draft it.</em><ul>
+<li><strong>How:</strong> Web → Platform → VM Builder → describe intent, review generated spec.</li>
+</ul>
+</li>
+</ul>
+<h2>10. Applications, Templates &amp; Provisioning</h2>
+<p><em>A launchpad, marketplace, blueprints, and cloud-init studio turn raw VMs into repeatable, ready-to-run workloads.</em></p>
+<ul>
+<li><strong>Launchpad &amp; spaces</strong> — App launchpad organizing workloads into spaces with per-app detail views. — <em>Deploy and find applications like an app store, not a VM list.</em><ul>
+<li><strong>How:</strong> Web → Platform → Launchpad → browse spaces / open app detail.</li>
+</ul>
+</li>
+<li><strong>Marketplace</strong> — Built-in marketplace of deployable content and applications. — <em>One-click access to curated, ready workloads.</em><ul>
+<li><strong>How:</strong> Web → Platform → Marketplace → deploy an item.</li>
+</ul>
+</li>
+<li><strong>Templates &amp; catalog</strong> — Template catalog with git-backed sources, image fetch, and readiness checks. — <em>Standardized starting points kept fresh automatically.</em><ul>
+<li><strong>How:</strong> Web → Platform → Templates → add git source / fetch image / deploy.</li>
+</ul>
+</li>
+<li><strong>Blueprints</strong> — Declarative blueprints describing multi-resource stacks to stamp out. — <em>Reproduce whole environments consistently.</em><ul>
+<li><strong>How:</strong> Web → Platform → Blueprints → author and stamp out a stack.</li>
+</ul>
+</li>
+<li><strong>Cloud-init studio</strong> — Author and manage cloud-init configuration to seed guests at first boot. — <em>Zero-touch first-boot customization for every VM.</em><ul>
+<li><strong>How:</strong> Web → Platform → Cloud-Init Studio → author cloud-init, attach on deploy.</li>
+</ul>
+</li>
+<li><strong>Content library</strong> — Central content store for images, ISOs, and provisioning artifacts. — <em>One shared source of truth for boot media.</em><ul>
+<li><strong>How:</strong> Web → Platform → Content → upload/manage images and ISOs.</li>
+</ul>
+</li>
+<li><strong>GPU command center</strong> — Discover, assign, and manage GPUs across the fleet. — <em>Put accelerators where AI and graphics workloads need them.</em><ul>
+<li><strong>How:</strong> Web → Platform → GPU Command Center → discover / assign GPUs.</li>
+</ul>
+</li>
+<li><strong>USB &amp; PCI passthrough</strong> — Pass USB and PCI devices through to guests, gated by RBAC. — <em>Give VMs direct access to real hardware when required.</em><ul>
+<li><strong>How:</strong> Web → Devices → attach USB / PCI device to a VM (RBAC-gated).</li>
+</ul>
+</li>
+</ul>
+<h2>11. Integrations &amp; Migration</h2>
+<p><em>Move VMs to and from KubeVirt, and connect Machina to the wider Zyvor stack.</em></p>
+<ul>
+<li><strong>KubeVirt migration</strong> — Export a VM as a KubeVirt YAML bundle and apply, upload, and start it on a Kubernetes cluster. — <em>A documented, repeatable path from libvirt to KubeVirt.</em><ul>
+<li><strong>How:</strong> API <code>GET /api/v1/vms/{name}/kubevirt-bundle</code> then <code>.../kubevirt/apply</code>, <code>/upload</code>, <code>/start</code> (docs/kubevirt-migration.md).</li>
+</ul>
+</li>
+<li><strong>Fleet Cloud</strong> — Native instance, flavor, network, and load-balancer management, backed entirely by Machina&#39;s own controller APIs. — <em>A full cloud-operator UI with no external cloud to wire up.</em><ul>
+<li><strong>How:</strong> Web → Fleet Cloud → instances / networks / images / load balancers.</li>
+</ul>
+</li>
+<li><strong>Transiva / h2kvm</strong> — Multi-cloud and cross-hypervisor VM migration into KVM. — <em>Bring VMs home from other platforms.</em><ul>
+<li><strong>How:</strong> Web → Import VM (Transiva / h2kvm) to migrate a source VM into KVM.</li>
+</ul>
+</li>
+<li><strong>GuestKit offline assurance</strong> — Offline VM migration assurance and guest inspection tooling. — <em>Validate guests before and after a move.</em><ul>
+<li><strong>How:</strong> Web → Import VM → GuestKit offline inspection / assurance.</li>
+</ul>
+</li>
+<li><strong>Kubernetes &amp; Kata</strong> — View Kubernetes workloads and Kata containers alongside VMs, with KubeVirt VNC/console proxying. — <em>One console for both VMs and cluster workloads.</em><ul>
+<li><strong>How:</strong> Web → Kubernetes (Overview / Workloads) and Web → Kata Containers.</li>
+</ul>
+</li>
+<li><strong>Vessel (Podman / Docker)</strong> — List, create, and lifecycle local containers on the hypervisor host; Podman pod groups on <code>/containers/pods</code>. Live stats over WebSocket. — <em>Run sidecars and lab containers next to libvirt VMs without a separate tool.</em><ul>
+<li><strong>How:</strong> Web → Infrastructure → Containers; API <code>/api/v1/vessel/*</code>. Enable or point <code>[vessel].socket</code> in daemon config (on by default).</li>
+</ul>
+</li>
+<li><strong>VMware &amp; Proxmox awareness</strong> — Controller APIs to interoperate with VMware and Proxmox sources. — <em>Onboard estates from other hypervisors.</em><ul>
+<li><strong>How:</strong> Web → Platform → Settings → Apps &amp; Integrations → add VMware / Proxmox source.</li>
+</ul>
+</li>
+<li><strong>Zyvor platform stack</strong> — Plugs into Atlas (storage) and GuestKit (guest tooling); network enforcement and visibility are built in through native eBPF. — <em>Machina is the metal layer of a full private-cloud stack.</em><ul>
+<li><strong>How:</strong> CLI <code>machinactl integrations</code> shows KubeVirt/k8s/automation status; wire endpoints per integration.</li>
+</ul>
+</li>
+</ul>
+<h2>12. Interfaces &amp; Administration</h2>
+<p><em>Three ways to operate the platform, backed by PAM/LDAP/OIDC auth, RBAC, multi-tenancy, and one-command deploys.</em></p>
+<ul>
+<li><strong>Web dashboard</strong> — React 19 Liquid Glass UI with classic single-host and platform multi-host shells covering 100+ pages. — <em>A polished, complete console for the whole platform.</em><ul>
+<li><strong>How:</strong> Browse <code>https://&lt;host&gt;:5092</code> (classic shell; multi-host under <code>/platform/*</code>).</li>
+</ul>
+</li>
+<li><strong>REST + WebSocket API</strong> — Complete /api/v1 REST surface and /ws/v1 streams with a published OpenAPI contract at /api-docs. — <em>Automate anything and generate typed clients.</em><ul>
+<li><strong>How:</strong> Call base <code>/api/v1</code>; stream <code>/ws/v1</code>; browse the contract at <code>/api-docs</code>.</li>
+</ul>
+</li>
+<li><strong>machinactl CLI</strong> — One CLI for deps, build, install, deploy, upgrade, backup, verify, health, doctor, audit, and integrations status. — <em>Stand up and operate a host with single commands.</em><ul>
+<li><strong>How:</strong> Run <code>machinactl &lt;command&gt;</code> (e.g. <code>machinactl deploy</code>, <code>machinactl health</code>).</li>
+</ul>
+</li>
+<li><strong>PAM / LDAP / OIDC auth</strong> — Log in with Linux host accounts via PAM, with optional LDAP and OIDC SSO and Active Directory integration. — <em>Use the identity system you already run.</em><ul>
+<li><strong>How:</strong> Web → Login signs in via PAM by default; enable LDAP/OIDC in the daemon config (see docs/ldap-auth.md).</li>
+</ul>
+</li>
+<li><strong>RBAC roles</strong> — Admin, Operator, and ReadOnly roles mapped from a roles file, OIDC groups, or scoped API tokens. — <em>Least-privilege access for every operator.</em><ul>
+<li><strong>How:</strong> Map roles in <code>/var/lib/machina/roles.json</code> or via OIDC groups; manage at Web → Platform → Users.</li>
+</ul>
+</li>
+<li><strong>Scoped API tokens &amp; sessions</strong> — Issue prefixed, scope-limited API tokens and manage HttpOnly session cookies with admin revocation. — <em>Grant machines and people exactly the access they need.</em><ul>
+<li><strong>How:</strong> Web → Platform → API Keys to issue scoped tokens; Web → Admin Sessions to revoke sessions.</li>
+</ul>
+</li>
+<li><strong>Projects &amp; multi-tenancy</strong> — Organize resources into projects with users, groups, and per-project scoping. — <em>Cleanly separate teams and tenants on shared infrastructure.</em><ul>
+<li><strong>How:</strong> Web → Platform → Projects → create project, assign users/groups.</li>
+</ul>
+</li>
+<li><strong>Flexible deployment</strong> — Single-host machinactl, remote rsync deploy, multi-host controller/agent, or a daemon-only Helm chart. — <em>Install the way that fits your environment.</em><ul>
+<li><strong>How:</strong> CLI <code>machinactl deploy</code> (single host) or <code>scripts/deploy-remote.sh USER@HOST</code> (add <code>--platform</code> for the controller and agent).</li>
+</ul>
+</li>
+<li><strong>Support &amp; upgrade tooling</strong> — In-console support bundle, upgrade flows, and self-updating deploys with health verification. — <em>Maintain and troubleshoot the platform from inside it.</em><ul>
+<li><strong>How:</strong> Web → Platform → Support (bundle) / Upgrade; CLI <code>machinactl upgrade</code>.</li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<p><strong>Good to know:</strong> Machina builds and runs on Linux only (it depends on libvirt/QEMU/KVM headers and /dev/kvm) — the workspace does not compile on macOS, though the web UI alone does. HTTPS ships with a self-signed certificate that should be replaced with a CA-signed one for production. Security defaults matter: an empty roles.json grants every user admin, and the dev-only auth-bypass flags must never be set in production. The multi-host controller and agent tier is systemd-only (the Helm chart deploys just the daemon), and SAML is config-only today. Integrations such as KubeVirt and Atlas are disabled by default and require their own endpoints or credentials; Fleet Cloud is native and always on.</p>
+</blockquote>
+<hr>
+<p><em>Machina is developed by ZyvorAI Labs. Contact <strong><a href="mailto:info@zyvor.dev">info@zyvor.dev</a></strong> · Proprietary &amp; Confidential.</em></p>
+</main></body></html>

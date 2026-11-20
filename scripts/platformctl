@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# platformctl — thin CLI for machina-controller REST API (batches 12–22)
+set -euo pipefail
+
+BASE="${MACHINA_CONTROLLER_URL:-http://127.0.0.1:5093}"
+USER="${MACHINA_CONTROLLER_USER:-admin}"
+PASS="${MACHINA_CONTROLLER_PASS:-}"
+
+auth() {
+  if [[ -n "${MACHINA_PLATFORM_JWT:-}" ]]; then
+    echo "Authorization: Bearer ${MACHINA_PLATFORM_JWT}"
+  else
+    echo "Authorization: Basic $(printf '%s:%s' "$USER" "$PASS" | base64 | tr -d '\n')"
+  fi
+}
+
+api() {
+  local method=$1 path=$2
+  shift 2
+  curl -sfS -X "$method" -H "$(auth)" -H 'Content-Type: application/json' "$@" "${BASE}${path}"
+}
+
+usage() {
+  cat <<EOF
+Usage: platformctl <command> [args]
+
+Commands:
+  health                    Controller health
+  hosts                     List hosts
+  host validate <id>        Run host join validation
+  vms [?managed=true|false] List VMs (optional managed filter)
+  vm get <id>               Get VM
+  vm metrics <id>           Get VM metrics snapshot
+  vm adopt <id>             Adopt discovered (unmanaged) VM
+  content                   List content library images
+  content-approve <id>      Approve pending ISO/image
+  marketplace               List marketplace templates
+  tasks                     List tasks
+  task get <id>             Get task
+  events-stream             Probe SSE stream (3s)
+  support-bundle            Download support bundle JSON
+  upgrade-matrix            Agent upgrade compatibility matrix
+  cluster                   Cluster summary
+  developer                 Developer ecosystem overview (SDK + Terraform)
+  observability             SLO dashboard + trace summary
+  slo                       Alias for observability
+  operations                Operations runbooks overview
+  enterprise                Enterprise security hardening overview
+  vault-sync                Sync all Vault providers
+  mfa-compliance            MFA enrollment compliance report
+  fips                      FIPS crypto matrix
+  netpol <cmd>              Fleet VM network policies (apply/get/delete/test/selectors/
+                            endpoints/status/sync/enable/disable; `netpol help`)
+  flow <observe|top|stats>  Fleet packet flows (colorful; `flow help`)
+  label <vm> [k=v] [k-]     Show or edit VM labels
+
+Environment:
+  MACHINA_CONTROLLER_URL   (default http://127.0.0.1:5093)
+  MACHINA_CONTROLLER_USER  Basic auth user
+  MACHINA_CONTROLLER_PASS  Basic auth password
+  MACHINA_PLATFORM_JWT     Bearer token (overrides basic auth)
+EOF
+}
+
+cmd=${1:-}
+case "$cmd" in
+  health) api GET /api/v1/health | jq . ;;
+  hosts) api GET /api/v1/hosts | jq . ;;
+  host)
+    sub=${2:-}
+    case "$sub" in
+      validate) api GET "/api/v1/hosts/${3:?id}/validate" | jq . ;;
+      linux) api GET "/api/v1/hosts/${3:?id}/linux/observability" | jq . ;;
+      diagnose) api POST "/api/v1/hosts/${3:?id}/diagnose" -d "{\"query\":\"${4:-host disk pressure}\"}" | jq . ;;
+      *) echo "unknown host subcommand: $sub" >&2; exit 1 ;;
+    esac
+    ;;
+  desktop) api GET /api/v1/fleet/desktop | jq . ;;
+  fleet)
+    sub=${2:-}
+    case "$sub" in
+      linux-health) api GET /api/v1/fleet/linux-health | jq . ;;
+      activity) api GET /api/v1/fleet/activity | jq . ;;
+      backups) api GET /api/v1/fleet/backups | jq . ;;
+      finder) api GET /api/v1/fleet/finder | jq . ;;
+      network) api GET /api/v1/fleet/network | jq . ;;
+      storage) api GET /api/v1/fleet/storage | jq . ;;
+      console) api GET /api/v1/fleet/console | jq . ;;
+      updates) api GET /api/v1/fleet/updates | jq . ;;
+      keychain) api GET /api/v1/fleet/keychain | jq . ;;
+      users) api GET /api/v1/fleet/users | jq . ;;
+      shortcuts) api GET /api/v1/fleet/shortcuts | jq . ;;
+      spaces) api GET /api/v1/fleet/spaces | jq . ;;
+      general) api GET /api/v1/fleet/general | jq . ;;
+      diagnose) api POST /api/v1/ai/fleet/diagnose -d "{\"query\":\"${3:-fleet linux pressure}\"}" | jq . ;;
+      *) echo "unknown fleet subcommand: $sub" >&2; exit 1 ;;
+    esac
+    ;;
+  vms)
+    q="${2:-}"
+    if [[ "$q" == *managed=* ]]; then
+      api GET "/api/v1/vms?${q#?}" | jq .
+    else
+      api GET /api/v1/vms | jq .
+    fi
+    ;;
+  vm)
+    sub=${2:-}
+    case "$sub" in
+      get) api GET "/api/v1/vms/${3:?id}" | jq . ;;
+      metrics) api GET "/api/v1/vms/${3:?id}/metrics" | jq . ;;
+      health) api POST "/api/v1/vms/${3:?id}/health-check" | jq . ;;
+      adopt) api POST "/api/v1/vms/${3:?id}/adopt" | jq . ;;
+      *) echo "unknown vm subcommand: $sub" >&2; exit 1 ;;
+    esac
+    ;;
+  content) api GET /api/v1/content/images | jq . ;;
+  content-approve)
+    id=${2:?id}
+    api POST "/api/v1/content/images/${id}/approve" | jq .
+    ;;
+  marketplace) api GET /api/v1/templates/marketplace | jq . ;;
+  recommendations) api GET /api/v1/recommendations | jq . ;;
+  applications) api GET /api/v1/applications | jq . ;;
+  topology) api GET /api/v1/topology | jq . ;;
+  tasks) api GET /api/v1/tasks | jq . ;;
+  task)
+    sub=${2:-}
+    case "$sub" in
+      get) api GET "/api/v1/tasks/${3:?id}" | jq . ;;
+      *) echo "unknown task subcommand: $sub" >&2; exit 1 ;;
+    esac
+    ;;
+  events-stream)
+    curl -sfS -N --max-time 3 -H "$(auth)" "${BASE}/api/v1/events/stream" | head -c 64 || true
+    echo
+    ;;
+  support-bundle) api GET /api/v1/support/bundle | jq . ;;
+  upgrade-matrix) api GET /api/v1/upgrade/matrix | jq . ;;
+  cluster) api GET /api/v1/cluster | jq . ;;
+  developer) api GET /api/v1/developer/overview | jq . ;;
+  observability|slo) api GET /api/v1/observability/overview | jq . ;;
+  operations) api GET /api/v1/operations/overview | jq . ;;
+  enterprise) api GET /api/v1/enterprise/security/overview | jq . ;;
+  vault-sync) api POST /api/v1/enterprise/vault/sync-all -d '{}' | jq . ;;
+  mfa-compliance) api GET /api/v1/enterprise/mfa/compliance | jq . ;;
+  fips) api GET /api/v1/enterprise/fips/matrix | jq . ;;
+  netpol|flow|label)
+    # shellcheck source=lib/netpol-ctl.sh
+    source "$(dirname "${BASH_SOURCE[0]}")/lib/netpol-ctl.sh"
+    NP_BASE="${BASE}/api/v1"
+    NP_AUTH=(-H "$(auth)")
+    NP_FLEET=1
+    shift
+    case "$cmd" in
+      netpol) np_netpol_main "$@" ;;
+      flow) np_flow_main "$@" ;;
+      label) np_label_main "$@" ;;
+    esac
+    ;;
+  -h|--help|help|'') usage ;;
+  *) echo "unknown command: $cmd" >&2; usage; exit 1 ;;
+esac

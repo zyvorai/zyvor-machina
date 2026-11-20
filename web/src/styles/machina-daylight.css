@@ -1,0 +1,559 @@
+/* ============================================================================
+   machina-daylight.css — Zeus OS Tahoe Light / Magichromatic shell for Machina.
+
+   Palette: iPhone 17 finishes (Mist Blue, Sage, Lavender, White, Black)
+   + iPhone 17 Pro accents (Cosmic Orange, Deep Blue, Silver).
+   SoT: ../zeus-os/ui/src/index.css (html[data-theme='tahoe-light'])
+   Laws: docs/design/DAYLIGHT-CONTRACT.md
+   ========================================================================= */
+
+html.apple-light,
+html.light-theme,
+html[data-theme='tahoe-light'],
+html[data-ui-shell='tahoe-light'] {
+  color-scheme: light;
+
+  /* --- iPhone 17 named finishes ----------------------------------------- */
+  --iphone-sage-deep: hsl(145 32% 36%);
+  --iphone-lavender-deep: hsl(270 42% 48%);
+  --iphone-cosmic-orange: hsl(18 92% 48%);
+  --iphone-deep-blue: hsl(215 58% 32%);
+
+  /* Zeus Magichromatic HSL roles (as usable hex/hsl for Machina aliases) */
+  --background: 0 0% 100%;
+  --foreground: 240 2% 11%;         /* Apple shop #1d1d1f */
+  --card: 0 0% 100%;
+  --primary: 211 100% 45%;          /* apple.com #0071e3 */
+  --primary-foreground: 0 0% 100%;
+  --muted-foreground: 240 2% 44%;   /* Apple shop #6e6e73 */
+
+  /* --- Ground (Law 0) — mist-tinted paper, white working plane ----------- */
+  --surface-0: #ffffff;
+  --surface-1: hsl(205 32% 97%);
+  --surface-2: #ffffff;
+  --surface-3: #ffffff;
+  --surface-hover: hsl(210 40% 96% / 0.9);
+
+  --border: hsl(205 22% 84%);
+  --border-strong: hsl(200 28% 76%);
+
+  --shadow-1: 0 1px 2px hsl(210 24% 40% / 0.05);
+  --shadow-2: 0 2px 8px hsl(210 24% 40% / 0.06), 0 1px 2px hsl(210 24% 40% / 0.04);
+  --shadow-3: 0 12px 32px hsl(210 24% 40% / 0.1), 0 2px 6px hsl(210 24% 40% / 0.05);
+
+  /* --- Text (Apple shop .form-selector) --------------------------------- */
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-muted: #86868b;
+  --text-faint: hsl(220 8% 58%);
+  --text-on-accent: #ffffff;
+
+  /* --- Intent = apple.com blue (#0071e3) -------------------------------- */
+  --plasma: #0071e3;
+  --plasma-strong: #006edb;
+  --plasma-tint: color-mix(in srgb, #0071e3 12%, transparent);
+  --plasma-tint-2: color-mix(in srgb, #0071e3 20%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, #0071e3 26%, transparent);
+
+  /* Cosmic Orange = warn; Sage = good; Ember = fail */
+  --amber: var(--iphone-cosmic-orange);
+  --ember: hsl(4 72% 42%);
+  --verdant: var(--iphone-sage-deep);
+  --verdant-tint: hsl(145 32% 36% / 0.09);
+
+  --mark-nominal: hsl(220 10% 46%);
+  --mark-track: hsl(205 22% 84% / 0.65);
+
+  --tty-bg: #0b0d11;
+  --tty-fg: #c6ceda;
+  --tty-border: hsl(205 22% 84%);
+
+
+  /* --- Machina aliases -------------------------------------------------- */
+  --page-bg: var(--surface-0);
+  --apple-surface: var(--surface-2);
+  --apple-surface-elevated: var(--surface-3);
+  --apple-hairline: var(--border);
+  --apple-fill-secondary: var(--surface-hover);
+  --apple-fill-tertiary: hsl(200 40% 96% / 0.55);
+
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --accent-soft: color-mix(in srgb, #0071e3 12%, transparent);
+  --link: #0066cc;
+  --link-hover: #0071e3;
+
+  --glass-bg: hsl(200 55% 97% / 0.9);
+  --glass-bg-elevated: hsl(0 0% 100% / 0.96);
+  --glass-bg-strong: #ffffff;
+  --glass-border: var(--border);
+  --glass-border-strong: var(--border-strong);
+  --glass-shadow: var(--shadow-2);
+  --glass-highlight: hsl(0 0% 100% / 0.9);
+
+  --machina-status-ok: var(--verdant);
+  --machina-status-warn: var(--amber);
+  --machina-status-error: var(--ember);
+  --machina-status-info: var(--plasma);
+  --machina-status-neutral: var(--mark-nominal);
+  --machina-accent: var(--plasma);
+  --machina-accent-ai: var(--iphone-lavender-deep);
+  --machina-vm-running: var(--verdant);
+  --machina-vm-stopped: var(--mark-nominal);
+  --machina-vm-paused: var(--amber);
+  --machina-vm-creating: var(--plasma);
+  --machina-vm-failed: var(--ember);
+  --machina-vm-migrating: var(--iphone-deep-blue);
+  --machina-vm-unknown: var(--mark-nominal);
+
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro', Inter, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+}
+
+/* Magichromatic page wash — exact Zeus shell */
+html.apple-light,
+html.light-theme,
+html[data-theme='tahoe-light'],
+html.apple-light body,
+html.light-theme body,
+html[data-theme='tahoe-light'] body,
+.apple-light-shell,
+html.apple-light .mac-desktop-root,
+html.light-theme .mac-desktop-root,
+html[data-theme='tahoe-light'] .mac-desktop-root,
+html.apple-light .mac-desktop-main,
+html.light-theme .mac-desktop-main,
+html[data-theme='tahoe-light'] .mac-desktop-main,
+html.apple-light .tahoe-page-root,
+html.light-theme .tahoe-page-root,
+html[data-theme='tahoe-light'] .tahoe-page-root {
+  background-color: #ffffff !important;
+  background-image: none !important;
+  color: var(--text-primary);
+}
+
+html.apple-light ::selection,
+html.light-theme ::selection,
+html[data-theme='tahoe-light'] ::selection {
+  background: var(--plasma-tint-2);
+  color: var(--text-primary);
+}
+
+/* White working plane + shadow (Law 0) */
+html.apple-light .apple-surface,
+html.light-theme .apple-surface,
+html.apple-light .card,
+html.light-theme .card,
+html.apple-light .machina-clean .card,
+html.light-theme .machina-clean .card,
+html.apple-light .rounded-3xl.border.bg-\[var\(--apple-surface\)\],
+html.light-theme .rounded-3xl.border {
+  background: #ffffff !important;
+  border-color: hsl(200 35% 84%) !important;
+  box-shadow: 0 1px 0 hsl(200 50% 90% / 0.6) inset, var(--shadow-1);
+}
+
+html.apple-light .apple-surface-elevated,
+html.light-theme .apple-surface-elevated {
+  background: #ffffff !important;
+  border: 1px solid hsl(200 35% 84%) !important;
+  box-shadow: var(--shadow-3) !important;
+}
+
+/* btn-primary / btn-secondary intentionally NOT overridden here — this file
+   is documented legacy (DAYLIGHT-CONTRACT.md: "superseded when they
+   conflict"); the canonical apple.com blue #0071e3 lives in zeus-parity.css
+   / main.css. A former "Mist Blue" gradient override used to live here and,
+   despite being legacy, structurally beat those files' #0071e3 rules via
+   higher selector specificity (html.apple-light .btn-primary > .apple-light
+   .btn-primary) even though both are !important — removed rather than
+   re-fought with more specificity. */
+
+html.apple-light .apple-link,
+html.light-theme .apple-link {
+  color: hsl(200 78% 32%);
+}
+html.apple-light .apple-link:hover,
+html.light-theme .apple-link:hover {
+  color: hsl(200 78% 28%);
+}
+
+html.apple-light :focus-visible,
+html.light-theme :focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Platform sidebar — Zeus .zeus-sidebar wash */
+html.apple-light .platform-rail-active,
+html.light-theme .platform-rail-active {
+  background: color-mix(in srgb, #0071e3 10%, transparent) !important;
+  color: hsl(200 78% 32%) !important;
+  box-shadow: inset 3px 0 0 hsl(200 78% 40%);
+}
+
+html.apple-light .platform-detail-tabs-sticky,
+html.light-theme .platform-detail-tabs-sticky,
+html[data-theme='tahoe-light'] .platform-detail-tabs-sticky {
+  background: hsl(200 55% 98% / 0.92) !important;
+  border-bottom-color: hsl(200 40% 78% / 0.65) !important;
+}
+
+/* apple.com Support "paper" — flat white, no Magichromatic color mesh.
+   Was 3-4 saturated full-opacity radial-gradient color blooms (blue/
+   lavender/sage/orange) layered on every page; replaced with a single
+   subtle white->#f2f2f2 gradient matching support.apple.com's own hero
+   treatment, per direct visual reference. */
+html.apple-light .tahoe-mesh,
+html.light-theme .tahoe-mesh {
+  opacity: 0 !important;
+}
+
+html.apple-light .mac-desktop-root[data-wallpaper],
+html.light-theme .mac-desktop-root[data-wallpaper] {
+  background-color: #ffffff !important;
+  background-image: none !important;
+}
+
+/* Platform inherits light tokens (no carbon shell under Light) */
+html.apple-light .mac-desktop-root,
+html.light-theme .mac-desktop-root {
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-muted: #86868b;
+  --apple-surface: #ffffff;
+  --apple-surface-elevated: #ffffff;
+  --apple-hairline: hsl(205 22% 84%);
+  --glass-bg: hsl(200 55% 97% / 0.9);
+  --glass-bg-elevated: #ffffff;
+  --glass-bg-strong: #ffffff;
+  --glass-border: hsl(205 22% 84%);
+  --machina-accent-ai: var(--iphone-lavender-deep);
+  color: var(--text-primary);
+}
+
+/* Scoped to the dock chrome only — it was originally authored assuming a dark
+   background, so its .text-white needs to flip to ink in Light theme. This used
+   to also match `.mac-desktop-root .text-white` and a bare `[data-theme='tahoe-light']
+   .text-white`, but .mac-desktop-root wraps the entire app shell (PlatformLayout.tsx),
+   so those forced EVERY intentionally-white button/badge text app-wide (e.g. the
+   Create VM wizard's active-step pill: blue background, text-white) down to
+   near-black ink, making solid-accent buttons unreadable everywhere. */
+html.apple-light .mac-desktop-root .text-white\/90,
+html.light-theme .mac-desktop-root .text-white\/90,
+html.apple-light .mac-desktop-root .text-white\/75,
+html.light-theme .mac-desktop-root .text-white\/75,
+html.apple-light .mac-desktop-root .text-white\/55,
+html.light-theme .mac-desktop-root .text-white\/55,
+html.apple-light .mac-desktop-root .text-white\/50,
+html.light-theme .mac-desktop-root .text-white\/50,
+html.apple-light .mac-desktop-root .text-white\/40,
+html.light-theme .mac-desktop-root .text-white\/40,
+html.apple-light .mac-desktop-root .text-white\/35,
+html.light-theme .mac-desktop-root .text-white\/35,
+html[data-theme='tahoe-light'] .text-white\/90,
+html[data-theme='tahoe-light'] .text-white\/75,
+html[data-theme='tahoe-light'] .text-white\/55,
+html[data-theme='tahoe-light'] .text-white\/50,
+html[data-theme='tahoe-light'] .text-white\/40,
+html[data-theme='tahoe-light'] .text-white\/35 {
+  color: var(--text-secondary) !important;
+}
+
+html.apple-light .mac-desktop-root .text-slate-200,
+html.light-theme .mac-desktop-root .text-slate-200 {
+  color: var(--text-secondary) !important;
+}
+html.apple-light .mac-desktop-root .text-slate-400,
+html.light-theme .mac-desktop-root .text-slate-400 {
+  color: var(--text-muted) !important;
+}
+
+html.apple-light .mac-desktop-root .border-white\/\[0\.08\],
+html.light-theme .mac-desktop-root .border-white\/\[0\.08\],
+html.apple-light .mac-desktop-root .border-white\/10,
+html.light-theme .mac-desktop-root .border-white\/10,
+html.apple-light .mac-desktop-root .border-white\/\[0\.06\],
+html.light-theme .mac-desktop-root .border-white\/\[0\.06\] {
+  border-color: hsl(200 35% 84%) !important;
+}
+
+html.apple-light .mac-desktop-root .bg-white\/\[0\.03\],
+html.light-theme .mac-desktop-root .bg-white\/\[0\.03\],
+html.apple-light .mac-desktop-root .bg-white\/\[0\.04\],
+html.light-theme .mac-desktop-root .bg-white\/\[0\.04\],
+html.apple-light .mac-desktop-root .bg-white\/\[0\.06\],
+html.light-theme .mac-desktop-root .bg-white\/\[0\.06\],
+html.apple-light .mac-desktop-root .bg-\[var\(--glass-bg\)\],
+html.light-theme .mac-desktop-root .bg-\[var\(--glass-bg\)\] {
+  background-color: #ffffff !important;
+}
+
+/* Mission Control / home panels — Zeus command-deck panel look */
+html.apple-light .mission-control-root > section,
+html.light-theme .mission-control-root > section {
+  border-color: hsl(200 35% 84%);
+}
+
+html.apple-light .mission-control-page,
+html.light-theme .mission-control-page,
+html.apple-light .mission-control-root,
+html.light-theme .mission-control-root {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+html.apple-light .table-row-hover:hover,
+html.light-theme .table-row-hover:hover {
+  background: hsl(200 55% 96% / 0.85);
+  border-left: 2px solid hsl(200 78% 40%);
+}
+
+/* TTY remains a carbon island */
+html.apple-light [data-tty],
+html.light-theme [data-tty] {
+  background: var(--tty-bg) !important;
+  color: var(--tty-fg) !important;
+  border-color: var(--tty-border) !important;
+}
+
+/* Menubar / menu panel text — graphite on mist */
+html.apple-light .mac-menu-item,
+html.light-theme .mac-menu-item,
+html[data-theme='tahoe-light'] .mac-menu-item {
+  color: hsl(0 0% 11% / 0.9) !important;
+}
+
+html.apple-light .mac-menu-panel,
+html.light-theme .mac-menu-panel,
+html[data-theme='tahoe-light'] .mac-menu-panel {
+  background: #ffffff !important;
+  border-color: hsl(205 28% 84%) !important;
+  color: hsl(0 0% 11%) !important;
+}
+
+html.apple-light .mac-menu-item:hover,
+html.light-theme .mac-menu-item:hover,
+html.apple-light .mac-menu-item-active,
+html.light-theme .mac-menu-item-active,
+html[data-theme='tahoe-light'] .mac-menu-item:hover,
+html[data-theme='tahoe-light'] .mac-menu-item-active {
+  background: var(--accent-soft, rgba(0, 113, 227, 0.1)) !important;
+  color: var(--text-primary, hsl(0 0% 11%)) !important;
+}
+
+html.apple-light .mac-menu-row:hover,
+html.light-theme .mac-menu-row:hover,
+html[data-theme='tahoe-light'] .mac-menu-row:hover {
+  background: var(--surface-hover, rgba(0, 113, 227, 0.06)) !important;
+  color: var(--text-primary, hsl(0 0% 11%)) !important;
+}
+
+html.apple-light .mac-menu-row-active,
+html.light-theme .mac-menu-row-active,
+html[data-theme='tahoe-light'] .mac-menu-row-active {
+  background: var(--accent-soft, rgba(0, 113, 227, 0.1)) !important;
+  color: var(--text-primary, hsl(0 0% 11%)) !important;
+}
+
+/* ============================================================================
+   Platform + classic slate remaps — Law 0 white cards on mist paper
+   Covers Machine Finder / Fleet Cloud / leftover carbon admin panels
+   ========================================================================= */
+
+html.apple-light .mac-desktop-root .bg-slate-950\/30,
+html.light-theme .mac-desktop-root .bg-slate-950\/30,
+html.apple-light .mac-desktop-root .bg-slate-950\/40,
+html.light-theme .mac-desktop-root .bg-slate-950\/40,
+html.apple-light .mac-desktop-root .bg-slate-950\/50,
+html.light-theme .mac-desktop-root .bg-slate-950\/50,
+html.apple-light .mac-desktop-root .bg-slate-950\/60,
+html.light-theme .mac-desktop-root .bg-slate-950\/60,
+html.apple-light .mac-desktop-root .bg-slate-900\/30,
+html.light-theme .mac-desktop-root .bg-slate-900\/30,
+html.apple-light .mac-desktop-root .bg-slate-900\/40,
+html.light-theme .mac-desktop-root .bg-slate-900\/40,
+html.apple-light .mac-desktop-root .bg-slate-900\/50,
+html.light-theme .mac-desktop-root .bg-slate-900\/50,
+html.apple-light .mac-desktop-root .bg-slate-900\/60,
+html.light-theme .mac-desktop-root .bg-slate-900\/60,
+html.apple-light .mac-desktop-root .bg-slate-900\/80,
+html.light-theme .mac-desktop-root .bg-slate-900\/80,
+html.apple-light .mac-desktop-root .bg-slate-900\/95,
+html.light-theme .mac-desktop-root .bg-slate-900\/95,
+html.apple-light .mac-desktop-root .bg-slate-800\/40,
+html.light-theme .mac-desktop-root .bg-slate-800\/40,
+html.apple-light .mac-desktop-root .bg-slate-800\/50,
+html.light-theme .mac-desktop-root .bg-slate-800\/50,
+html.apple-light .liquid-glass-app .bg-slate-950\/30,
+html.light-theme .liquid-glass-app .bg-slate-950\/30,
+html.apple-light .liquid-glass-app .bg-slate-950\/40,
+html.light-theme .liquid-glass-app .bg-slate-950\/40,
+html.apple-light .liquid-glass-app .bg-slate-950\/50,
+html.light-theme .liquid-glass-app .bg-slate-950\/50,
+html.apple-light .liquid-glass-app .bg-slate-900\/30,
+html.light-theme .liquid-glass-app .bg-slate-900\/30,
+html.apple-light .liquid-glass-app .bg-slate-900\/40,
+html.light-theme .liquid-glass-app .bg-slate-900\/40,
+html.apple-light .liquid-glass-app .bg-slate-900\/50,
+html.light-theme .liquid-glass-app .bg-slate-900\/50,
+html.apple-light .liquid-glass-app .bg-slate-900\/60,
+html.light-theme .liquid-glass-app .bg-slate-900\/60,
+html.apple-light .liquid-glass-app .bg-slate-900,
+html.light-theme .liquid-glass-app .bg-slate-900,
+html.apple-light .liquid-glass-app .bg-slate-800\/40,
+html.light-theme .liquid-glass-app .bg-slate-800\/40,
+html.apple-light .liquid-glass-app .bg-slate-800\/50,
+html.light-theme .liquid-glass-app .bg-slate-800\/50 {
+  background-color: #ffffff !important;
+  background-image: none !important;
+}
+
+html.apple-light .mac-desktop-root .bg-slate-800,
+html.light-theme .mac-desktop-root .bg-slate-800,
+html.apple-light .liquid-glass-app .bg-slate-800,
+html.light-theme .liquid-glass-app .bg-slate-800 {
+  background-color: #ffffff !important;
+}
+
+html.apple-light .mac-desktop-root .border-slate-600,
+html.light-theme .mac-desktop-root .border-slate-600,
+html.apple-light .mac-desktop-root .border-slate-700,
+html.light-theme .mac-desktop-root .border-slate-700,
+html.apple-light .mac-desktop-root .border-slate-700\/50,
+html.light-theme .mac-desktop-root .border-slate-700\/50,
+html.apple-light .mac-desktop-root .border-slate-700\/60,
+html.light-theme .mac-desktop-root .border-slate-700\/60,
+html.apple-light .liquid-glass-app .border-slate-600,
+html.light-theme .liquid-glass-app .border-slate-600,
+html.apple-light .liquid-glass-app .border-slate-700,
+html.light-theme .liquid-glass-app .border-slate-700,
+html.apple-light .liquid-glass-app .border-slate-700\/50,
+html.light-theme .liquid-glass-app .border-slate-700\/50,
+html.apple-light .liquid-glass-app .border-slate-700\/60,
+html.light-theme .liquid-glass-app .border-slate-700\/60 {
+  border-color: #d2d2d7 !important;
+}
+
+/* Machine Finder / Mission Control work surfaces */
+html.apple-light .machine-finder-briefing,
+html.light-theme .machine-finder-briefing,
+html.apple-light .mc-host-fleet-card,
+html.light-theme .mc-host-fleet-card,
+html.apple-light .mc-geography,
+html.light-theme .mc-geography,
+html.apple-light .machine-finder-migrate-zone,
+html.light-theme .machine-finder-migrate-zone {
+  background: #ffffff !important;
+  border-color: #d2d2d7 !important;
+  box-shadow: 0 1px 0 hsl(200 40% 92% / 0.55) inset, var(--shadow-1);
+}
+
+html.apple-light .mc-hero-ribbon,
+html.light-theme .mc-hero-ribbon {
+  background: #ffffff !important;
+  box-shadow: inset 3px 0 0 hsl(200 78% 40% / 0.55);
+}
+
+/* Tahoe tiles / hero — no carbon under light */
+html.apple-light .tahoe-hero,
+html.light-theme .tahoe-hero {
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 1px 0 hsl(200 40% 92% / 0.6) inset, var(--shadow-1) !important;
+  border: 1px solid #d2d2d7;
+}
+
+html.apple-light .tahoe-remediate-strip,
+html.light-theme .tahoe-remediate-strip {
+  background: #ffffff !important;
+  border-color: #d2d2d7 !important;
+  backdrop-filter: none !important;
+  box-shadow: var(--shadow-1);
+  color: var(--text-primary);
+}
+
+html.apple-light .tahoe-stat-value,
+html.light-theme .tahoe-stat-value,
+html[data-theme='tahoe-light'] .tahoe-stat-value {
+  color: var(--text-primary) !important;
+}
+
+html.apple-light .tahoe-stat-label,
+html.light-theme .tahoe-stat-label,
+html[data-theme='tahoe-light'] .tahoe-stat-label,
+html.apple-light .tahoe-remediate-summary,
+html.light-theme .tahoe-remediate-summary,
+html.apple-light .tahoe-remediate-more,
+html.light-theme .tahoe-remediate-more {
+  color: var(--text-muted) !important;
+}
+
+html.apple-light .tahoe-remediate-chip,
+html.light-theme .tahoe-remediate-chip,
+html.apple-light .tahoe-btn-ghost,
+html.light-theme .tahoe-btn-ghost {
+  color: var(--text-secondary) !important;
+  background: hsl(200 55% 97% / 0.9) !important;
+  border-color: #d2d2d7 !important;
+}
+
+html.apple-light .tahoe-toolbar,
+html.light-theme .tahoe-toolbar,
+html[data-theme='tahoe-light'] .tahoe-toolbar {
+  background: hsl(200 55% 98% / 0.92) !important;
+  border-color: hsl(200 40% 78% / 0.65) !important;
+  color: var(--text-primary);
+}
+
+html.apple-light .tahoe-stat-violet .tahoe-stat-value,
+html.light-theme .tahoe-stat-violet .tahoe-stat-value {
+  color: var(--iphone-lavender-deep) !important;
+}
+
+html.apple-light .platform-finder-inspector,
+html.light-theme .platform-finder-inspector {
+  color: var(--text-primary) !important;
+}
+html.apple-light .platform-finder-inspector .platform-finder-inspector-label,
+html.light-theme .platform-finder-inspector .platform-finder-inspector-label,
+html.apple-light .platform-finder-inspector dt,
+html.light-theme .platform-finder-inspector dt {
+  color: var(--text-muted) !important;
+}
+
+/* Classic shell: slightly wider under Daylight so lists aren't squeezed */
+html.apple-light,
+html.light-theme,
+html[data-theme='tahoe-light'] {
+}
+
+html.apple-light .liquid-glass-app .text-slate-400,
+html.light-theme .liquid-glass-app .text-slate-400 {
+  color: var(--text-muted) !important;
+}
+
+html.apple-light .input-field,
+html.light-theme .input-field,
+html.apple-light .liquid-glass-app input:not([type='checkbox']):not([type='radio']),
+html.light-theme .liquid-glass-app input:not([type='checkbox']):not([type='radio']),
+html.apple-light .liquid-glass-app select,
+html.light-theme .liquid-glass-app select,
+html.apple-light .liquid-glass-app textarea:not(.term-body),
+html.light-theme .liquid-glass-app textarea:not(.term-body),
+html.apple-light .mac-desktop-root input:not([type='checkbox']):not([type='radio']),
+html.light-theme .mac-desktop-root input:not([type='checkbox']):not([type='radio']),
+html.apple-light .mac-desktop-root select,
+html.light-theme .mac-desktop-root select,
+html.apple-light .mac-desktop-root textarea:not(.term-body),
+html.light-theme .mac-desktop-root textarea:not(.term-body) {
+  background: #ffffff !important;
+  border-color: #d2d2d7 !important;
+  color: var(--text-primary) !important;
+}
+html.apple-light .input-field::placeholder,
+html.light-theme .input-field::placeholder,
+html.apple-light .input::placeholder,
+html.light-theme .input::placeholder {
+  color: var(--text-faint) !important;
+}

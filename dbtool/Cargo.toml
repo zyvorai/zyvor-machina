@@ -1,0 +1,18 @@
+[package]
+name = "machina-dbtool"
+version = "0.1.0"
+edition = "2021"
+license = "LicenseRef-Zyvor-Production-1.0"
+description = "Copy a Machina controller's SQLite database into PostgreSQL (and check the copy)"
+
+[[bin]]
+name = "machina-dbtool"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+futures-util = "0.3"
+clap = { version = "4", features = ["derive"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "postgres", "uuid", "migrate", "macros"] }
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4", "serde"] }

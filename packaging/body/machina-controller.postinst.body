@@ -1,0 +1,8 @@
+mkdir -p /var/lib/machina
+machina_bootstrap_platform_env
+machina_services machina-controller.service
+# The daemon (if installed) proxies to the controller; restart it so it picks up the synced credential.
+if have_systemd && [ -f /usr/lib/systemd/system/machina-daemon.service ] && [ "${MACHINA_NO_START:-0}" != 1 ]; then
+    systemctl try-restart machina-daemon.service >/dev/null 2>&1 || true
+fi
+exit 0

@@ -1,0 +1,38 @@
+{
+  "01-machina-cinema.mp4": {
+    "id": "j4GskWQLrQ8",
+    "url": "https://youtu.be/j4GskWQLrQ8",
+    "title": "Machina Cinema \u2014 full-screen VM like a player",
+    "clipId": "01"
+  },
+  "02-mission-control-live-wall.mp4": {
+    "id": "6SQVVYzfR1s",
+    "url": "https://youtu.be/6SQVVYzfR1s",
+    "title": "Machina Mission Control \u2014 Live Preview Wall",
+    "clipId": "02"
+  },
+  "03-machine-finder-gallery.mp4": {
+    "id": "5G_44qTfkBc",
+    "url": "https://youtu.be/5G_44qTfkBc",
+    "title": "Machina Machine Finder Gallery \u2192 Open Cinema",
+    "clipId": "03"
+  },
+  "04-studio-ops-shelf.mp4": {
+    "id": "nvkO5Xe-U-4",
+    "url": "https://youtu.be/nvkO5Xe-U-4",
+    "title": "Machina Studio + Ops Shelf \u2014 engineer console mode",
+    "clipId": "04"
+  },
+  "05-vm-detail-connect-cinema.mp4": {
+    "id": "PHGQaRcBY5I",
+    "url": "https://youtu.be/PHGQaRcBY5I",
+    "title": "Machina VM Detail \u2014 Connect hub to Cinema in one motion",
+    "clipId": "05"
+  },
+  "10-create-vm-cinema.mp4": {
+    "id": "E8iww-zWXos",
+    "url": "https://youtu.be/E8iww-zWXos",
+    "title": "Machina \u2014 Create Ubuntu VM and open Cinema",
+    "clipId": "10"
+  }
+}

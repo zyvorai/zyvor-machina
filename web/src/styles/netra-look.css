@@ -1,0 +1,1172 @@
+/* ============================================================================
+   netra-look.css — the final look layer. Loaded AFTER main.css (see main.tsx).
+
+   Brings Machina to the Netra dashboard's flat apple.com look: neutral hairlines,
+   flat cards, no ambient gradients in light, quiet toolbars and tables, tinted
+   secondary buttons. Contract: docs/design/APPLE-UX-CONTRACT.md.
+
+   Why a separate last layer instead of editing main/daylight/zeus-parity/apple-ux:
+   those four define the same tokens in different formats (e.g. --border is a full
+   colour in daylight but a bare HSL triplet in zeus-parity, on the same <html>) and
+   carry ~260 `!important`s. One layer that wins by source order, where every
+   override is visible in one file, is auditable; the superseded rules can be
+   deleted from the older files as a follow-up.
+
+   Rules of this file:
+   - New tokens are namespaced --nl-*. Tailwind v4 owns --radius-*, --ease-*,
+     --shadow-* (2xs..2xl) etc.; redefining them would silently restyle
+     `rounded-lg` everywhere.
+   - No global element resets (e.g. a :where() form-control base). Tailwind
+     utilities live in a cascade layer, so ANY unlayered rule here beats them even
+     at zero specificity and would clobber `h-8 px-2` on every input.
+   - Immersive chrome (.tty-surface, [data-tty], Mission Control carbon, console
+     views) is not touched.
+   - Only light and dark ("tahoe") are restyled. steel / aurora / rack keep their
+     own tokens.
+   ========================================================================= */
+
+:root {
+  --nl-radius-card: 18px;
+  --nl-radius-control: 12px;
+  --nl-hit-min: 44px;
+  --nl-ease: cubic-bezier(0.28, 0.11, 0.32, 1);
+  --nl-danger: #ff3b30;
+}
+
+/* ---- Light: neutral tokens ------------------------------------------------ */
+html[data-theme='tahoe-light'],
+html[data-ui-shell='tahoe-light'],
+#root[data-ui-shell='tahoe-light'],
+html.apple-light,
+html.light-theme {
+  --nl-hairline: rgba(0, 0, 0, 0.1);
+  --nl-fill: rgba(0, 0, 0, 0.04);
+  --nl-fill-hover: #f5f5f7;
+  --nl-bar-bg: rgba(251, 251, 253, 0.93);
+  /* Was hsl(220 8% 58%): ~2.9:1 on white/tint, used for placeholders and "—" empties. */
+  --text-faint: #7d7d83;
+
+  /* Consumer tokens with 800+ call sites: neutral instead of blue-grey tinted. */
+  --apple-hairline: var(--nl-hairline);
+  --hairline-1: var(--nl-hairline);
+  --apple-fill-tertiary: var(--nl-fill);
+  --surface-hover: var(--nl-fill-hover);
+  --surface-1: #ffffff;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-3: 0 12px 40px rgba(0, 0, 0, 0.14);
+  --focus-ring: 0 0 0 4px rgba(0, 113, 227, 0.3);
+
+  /* Status tokens are used as text on their own 10-18% tints (pills, badges), where the previous
+     values measured 2.97:1. Slightly deeper hues clear 4.5:1 and still read as green/orange/red. */
+  --verdant: hsl(145 40% 30%);
+  --amber: hsl(18 90% 40%);
+  --ember: hsl(4 72% 40%);
+
+  /* Text-safe accents: the bright hues are fills/strokes (~2:1 as text on white). */
+  --nl-accent-cyan-text: #0a6b99;
+  --nl-accent-green-text: #1e7b34;
+  --nl-accent-amber-text: #8b4b00;
+  --nl-accent-red-text: #b3261e;
+  --nl-accent-purple-text: #8a3fb5;
+  --nl-status-ok-bg: #e8f8ec;
+  --nl-status-ok-border: #b8ecc4;
+  --nl-status-warn-bg: #fff6ed;
+  --nl-status-warn-border: #ffd8ba;
+  --nl-status-warn-text: #8b3d00;
+  --nl-status-danger-bg: #fff1f0;
+  --nl-status-danger-border: #ffb4ab;
+}
+
+/* ---- Dark ("tahoe" only) -------------------------------------------------- */
+html[data-theme='tahoe'],
+html[data-ui-shell='default'],
+#root[data-ui-shell='default'] {
+  --nl-hairline: rgba(255, 255, 255, 0.12);
+  --nl-fill: rgba(255, 255, 255, 0.08);
+  --nl-fill-hover: #2c2c2e;
+  --nl-bar-bg: rgba(22, 22, 23, 0.92);
+  --nl-danger: #ff453a;
+  --text-faint: #8e8e93;
+  --nl-accent-cyan-text: #64d2ff;
+  --nl-accent-green-text: #30d158;
+  --nl-accent-amber-text: #ff9f0a;
+  --nl-accent-red-text: #ff6961;
+  --nl-accent-purple-text: #bf5af2;
+  --nl-status-ok-bg: rgba(48, 209, 88, 0.14);
+  --nl-status-ok-border: rgba(48, 209, 88, 0.35);
+  --nl-status-warn-bg: rgba(255, 159, 10, 0.12);
+  --nl-status-warn-border: rgba(255, 159, 10, 0.35);
+  --nl-status-warn-text: #ffd60a;
+  --nl-status-danger-bg: rgba(255, 69, 58, 0.14);
+  --nl-status-danger-border: rgba(255, 69, 58, 0.35);
+}
+
+/* ---- Light: no ambient gradients ----------------------------------------- */
+/* The Story hero's radial "mesh" is a dark-theme treatment (contract: color is
+   deviation, not decoration). */
+html[data-theme='tahoe-light'] .tahoe-mesh,
+html[data-theme='tahoe-light'] .tahoe-mesh-subtle,
+html.apple-light .tahoe-mesh,
+html.light-theme .tahoe-mesh {
+  display: none !important;
+}
+
+/* The Story hero (Dashboard / Mission Control / Fleet Cloud overview) paints its glow as a
+   radial gradient on `.apple-hero-band::before`, a pseudo-element, so it needs its own rule. */
+html[data-theme='tahoe-light'] .apple-hero-band::before,
+html.apple-light .apple-hero-band::before,
+html.light-theme .apple-hero-band::before {
+  display: none !important;
+}
+
+/* ---- Top bar: robust without backdrop-filter ------------------------------ */
+/* Content scrolling under the bar showed through at 72% and was unreadable where
+   the backdrop blur did not render. 86% keeps the translucency but stays legible. */
+.gnb-bar {
+  background: var(--nl-bar-bg, hsl(var(--card) / 0.86));
+  border-bottom-color: var(--nl-hairline, var(--apple-hairline));
+}
+
+/* ---- MacSegmentedControl: dark chrome carried onto the light theme -------- */
+/* Its unselected-option class is `text-[var(--text-muted)]` on a hardcoded `bg-black/30`
+   container: in light theme that composites to ~1.7:1. Neutral tint instead. */
+html[data-theme='tahoe-light'] .tahoe-segment,
+html.apple-light .tahoe-segment,
+html.light-theme .tahoe-segment {
+  background: var(--nl-fill) !important;
+  border-color: var(--nl-hairline) !important;
+}
+
+/* ---- Cards: 18px, neutral hairline, no card-in-card ----------------------- */
+.tahoe-glass-card {
+  border-radius: var(--nl-radius-card);
+}
+html[data-theme='tahoe-light'] .tahoe-glass-card {
+  border-color: var(--nl-hairline) !important;
+}
+/* A table wrapper inside a card is not a second card. */
+.tahoe-glass-card .tahoe-table-wrap,
+.tahoe-glass-card .tahoe-glass-card .tahoe-table-wrap {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* ---- Toolbar / search: one quiet pill, not a tinted pill around a white box - */
+html[data-theme='tahoe-light'] .tahoe-toolbar,
+html.apple-light .tahoe-toolbar,
+html.light-theme .tahoe-toolbar {
+  background: transparent !important;
+  border-color: var(--nl-hairline) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+.tahoe-toolbar .tahoe-search {
+  background: transparent !important;
+  box-shadow: none;
+}
+
+/* ---- Tables: header is text + a hairline, not a grey band ----------------- */
+.tahoe-table-wrap thead,
+.apple-table thead {
+  background: transparent !important;
+}
+.tahoe-table-wrap thead th,
+.apple-table thead th {
+  color: var(--text-muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--nl-hairline);
+}
+
+/* ---- Secondary button: tinted neutral (light) ----------------------------- */
+html[data-theme='tahoe-light'] .btn-secondary,
+html.apple-light .btn-secondary,
+html.light-theme .btn-secondary {
+  background: var(--nl-fill) !important;
+  border: 1px solid var(--nl-hairline) !important;
+}
+html[data-theme='tahoe-light'] .btn-secondary:hover:not(:disabled),
+html.apple-light .btn-secondary:hover:not(:disabled),
+html.light-theme .btn-secondary:hover:not(:disabled) {
+  background: var(--nl-fill-hover) !important;
+}
+
+/* ---- Field controls that opt in via the shared classes -------------------- */
+.input-field,
+.input {
+  min-height: var(--nl-hit-min);
+  border-radius: var(--nl-radius-control);
+}
+
+/* ---- Login: one centered composition ------------------------------------- */
+/* The page was two 100dvh scroll-snap chapters (white hero, then a parchment band with the
+   form). Netra's login is a single column: wordmark, title, tagline, then the card. The markup
+   is unchanged (Login.tsx and the e2e specs address #login-sign-in and the roles inside it);
+   only the chapter geometry is dissolved. The page stays light in every theme. */
+.login-store-page {
+  height: auto;
+  max-height: none;
+  min-height: 100dvh;
+  overflow: visible;
+  background: #ffffff;
+}
+.login-store-scroll {
+  overflow: visible;
+  scroll-snap-type: none;
+}
+.login-chapter {
+  min-height: 0;
+  scroll-snap-align: none;
+  padding-left: clamp(1.25rem, 5vw, 3rem);
+  padding-right: clamp(1.25rem, 5vw, 3rem);
+}
+.login-chapter-hero {
+  padding-top: clamp(3rem, 10vh, 6rem);
+  padding-bottom: clamp(1.5rem, 4vh, 2.5rem);
+  justify-content: flex-start;
+}
+.login-chapter-sign-in {
+  background: transparent;
+  padding-top: 0;
+  padding-bottom: clamp(3rem, 10vh, 6rem);
+  justify-content: flex-start;
+}
+.login-hero-title {
+  /* !important: main.css compacts every h1 to 1.25rem (<=768px) / 1.1rem (<=480px) with
+     `!important`, which left the login title at ~18px on phones. */
+  font-size: clamp(2.25rem, 9vw, 3.75rem) !important;
+}
+.login-chapter-note {
+  margin-top: 1.25rem;
+}
+.login-form-heading {
+  font-size: 1.25rem;
+}
+.login-card {
+  border-radius: var(--nl-radius-card);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.login-host-badge {
+  color: #6e6e73;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+.login-error {
+  background: #fff1f0;
+  border: 1px solid #ffd2cf;
+}
+.login-error-icon,
+.login-error-message {
+  color: #b3261e;
+}
+.login-error-title {
+  color: #8c1d18;
+}
+
+/* ---- Shell: flyout + links ------------------------------------------------ */
+/* The flyout hangs off a sticky bar, so page scroll cannot reach what falls below the fold:
+   cap it to the viewport and scroll inside it (long groups such as Ops list 18 entries). */
+.gnb-flyout {
+  max-height: calc(100vh - var(--gnb-bar-h, 45px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Links were ~30px tall; give them a 36px row so they are usable by touch. */
+.gnb-flyout-link {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 36px;
+}
+
+/* ---- Shell at phone width ------------------------------------------------- */
+/* Seven controls (Live, search, Control Center, Ask, New VM, avatar, sign out) could not fit in
+   390px, so "New VM" was cut off at the screen edge on every page. Icon-ise instead of removing:
+   the visible text stays in the DOM, so accessible names are unchanged. */
+@media (max-width: 640px) {
+  .gnb-live {
+    font-size: 0;
+    padding: 0 0.25rem;
+  }
+  .gnb-avatar {
+    display: none;
+  }
+  .gnb-new-vm {
+    font-size: 0;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    margin-left: 0;
+    justify-content: center;
+    border-radius: 999px;
+  }
+  .gnb-icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+  /* Sign out is also in the Machina menu, so the standalone icon is a duplicate here, and it is
+     the 16px that pushed the cluster past the screen edge. */
+  .gnb-icon-btn[aria-label='Sign out'] {
+    display: none;
+  }
+  .gnb-brand-mark {
+    min-width: 36px;
+    min-height: 36px;
+    display: grid;
+    place-items: center;
+  }
+  .gnb-right button[aria-label='Control Center'] {
+    min-width: 36px;
+    min-height: 36px;
+    justify-content: center;
+  }
+  .gnb-tasks {
+    max-width: 5.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* ---- Segmented control (view mode etc.) ----------------------------------- */
+.nl-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--nl-fill);
+  border: 1px solid var(--nl-hairline);
+}
+.nl-segmented > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 36px;
+  padding: 0 0.875rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  transition: background-color 0.2s var(--nl-ease), color 0.2s var(--nl-ease);
+}
+.nl-segmented > button:hover {
+  color: var(--text-primary);
+}
+.nl-segmented > button[aria-checked='true'] {
+  color: var(--text-primary);
+  background: var(--apple-surface-elevated, #fff);
+  box-shadow: var(--shadow-1);
+}
+.nl-segmented > button:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+/* ---- Keyboard focus: every button variant ---------------------------------- */
+/* Machina draws the focus ring as a box-shadow from a universal `:focus-visible` rule (and
+   deliberately sets `outline: none`). The .btn-* variants set `box-shadow: none !important`,
+   so a keyboard user tabbing onto them saw no indicator at all (found by the audit's tab-stop
+   probe on /create and /import). Give them the same ring, with the same token. */
+/* `html ` raises specificity to (0,2,1): zeus-parity sets `box-shadow: none !important` on
+   `html[data-theme='tahoe-light'] .btn-primary` (also 0,2,1), and among !important declarations
+   the higher specificity wins, then source order. */
+html .btn-primary:focus-visible,
+html .btn-secondary:focus-visible,
+html .btn-ghost:focus-visible,
+html .btn-destructive:focus-visible,
+html .tahoe-btn-primary:focus-visible,
+html .tahoe-btn-ghost:focus-visible,
+html .tahoe-btn-secondary:focus-visible {
+  box-shadow: var(--focus-ring) !important;
+}
+
+/* ---- Light theme: VM hero pills were written for a dark surface ------------- */
+/* Slate-200 text on a translucent-white pill is ~1.2:1 on the white light-theme page. */
+html[data-theme='tahoe-light'] .vm-detail-hero-pill,
+html.apple-light .vm-detail-hero-pill,
+html.light-theme .vm-detail-hero-pill {
+  color: var(--text-primary);
+  background: var(--nl-fill);
+  border-color: var(--nl-hairline);
+}
+html[data-theme='tahoe-light'] .vm-detail-hero-pill--ok,
+html.apple-light .vm-detail-hero-pill--ok,
+html.light-theme .vm-detail-hero-pill--ok {
+  color: var(--nl-accent-green-text);
+  background: var(--nl-status-ok-bg);
+  border-color: var(--nl-status-ok-border);
+}
+html[data-theme='tahoe-light'] .vm-detail-hero-pill--warn,
+html.apple-light .vm-detail-hero-pill--warn,
+html.light-theme .vm-detail-hero-pill--warn {
+  color: var(--nl-status-warn-text);
+  background: var(--nl-status-warn-bg);
+  border-color: var(--nl-status-warn-border);
+}
+html[data-theme='tahoe-light'] .vm-laptop-step--done .vm-laptop-step-label,
+html.apple-light .vm-laptop-step--done .vm-laptop-step-label,
+html.light-theme .vm-laptop-step--done .vm-laptop-step-label {
+  color: var(--text-primary);
+}
+
+/* ---- Light theme: Tailwind text shades written for dark surfaces ------------ */
+/* text-emerald-400, text-orange-400, ... are pale hues chosen for dark backgrounds (about 2:1 on
+   white), and 500/600 status text on a 10% tint sits at ~2.9:1. ~120 call sites use them, so the
+   remap is central: in the light theme they resolve to the text-safe tokens. Not applied inside
+   the dark islands (terminal, Mission Control), where the bright shades are correct. The
+   attribute forms match the bare utility and its opacity variants (text-emerald-400/80) but not
+   prefixed variants (hover:text-...), which are left alone. */
+html[data-theme='tahoe-light'] [class~='text-emerald-300']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-emerald-300/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-emerald-400']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-emerald-400/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-emerald-500']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-emerald-500/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-emerald-600']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-emerald-600/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-green-300']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-green-300/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-green-400']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-green-400/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-green-500']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-green-500/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-green-600']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-green-600/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *) {
+  color: var(--nl-accent-green-text);
+}
+html[data-theme='tahoe-light'] [class~='text-amber-300']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-amber-300/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-amber-400']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-amber-400/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-amber-500']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-amber-500/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-amber-600']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-amber-600/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-orange-300']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-orange-300/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-orange-400']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-orange-400/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-orange-500']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-orange-500/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-orange-600']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-orange-600/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-yellow-300']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-yellow-300/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-yellow-400']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-yellow-400/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-yellow-500']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-yellow-500/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-yellow-600']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-yellow-600/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *) {
+  color: var(--nl-accent-amber-text);
+}
+html[data-theme='tahoe-light'] [class~='text-red-300']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-red-300/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-red-400']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-red-400/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-red-500']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-red-500/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-rose-300']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-rose-300/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-rose-400']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-rose-400/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-rose-500']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-rose-500/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *) {
+  color: var(--nl-accent-red-text);
+}
+html[data-theme='tahoe-light'] [class~='text-purple-300']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-purple-300/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-purple-400']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-purple-400/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-violet-300']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-violet-300/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-violet-400']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-violet-400/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-fuchsia-300']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-fuchsia-300/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-fuchsia-400']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-fuchsia-400/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *) {
+  color: var(--nl-accent-purple-text);
+}
+html[data-theme='tahoe-light'] [class~='text-sky-300']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-sky-300/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-sky-400']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-sky-400/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-cyan-300']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-cyan-300/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class~='text-cyan-400']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *),
+html[data-theme='tahoe-light'] [class*='text-cyan-400/']:not(:where(.tty-surface, [data-tty], .mission-control-page, .mission-control-root) *) {
+  color: var(--nl-accent-cyan-text);
+}
+
+/* ---- Touch targets on phones ---------------------------------------------- */
+/* Desktop density is intentional. On phones the .btn-* size modifiers (.text-sm = 33px,
+   .text-xs = 28px) and 32px icon buttons fall short of a comfortable tap. `html ` outranks the
+   modifier rules (0,2,0). Only min sizes are set: changing `display` or `position` here would
+   beat Tailwind utilities (`hidden`, `absolute`), since unlayered rules win over its layer. */
+@media (max-width: 640px) {
+  html .btn-primary.text-sm,
+  html .btn-secondary.text-sm,
+  html .btn-ghost.text-sm,
+  html .btn-destructive.text-sm,
+  html .tahoe-btn-primary.text-sm {
+    min-height: 2.5rem;
+  }
+  html .btn-primary.text-xs,
+  html .btn-secondary.text-xs,
+  html .btn-ghost.text-xs,
+  html .btn-destructive.text-xs,
+  html .tahoe-btn-primary.text-xs {
+    min-height: 2.25rem;
+  }
+  button:has(> svg:only-child) {
+    min-width: 36px;
+    min-height: 36px;
+  }
+  /* Scroll hint: edge shadows appear only on the side that still has hidden columns. Uses
+     background-image only, so the card's own background colour is kept. */
+  .overflow-x-auto:has(> table) {
+    background-image:
+      linear-gradient(to right, var(--apple-surface, #fff) 30%, transparent),
+      linear-gradient(to left, var(--apple-surface, #fff) 30%, transparent),
+      radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.16), transparent),
+      radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.16), transparent);
+    background-position: 0 0, 100% 0, 0 0, 100% 0;
+    background-repeat: no-repeat;
+    background-size: 36px 100%, 36px 100%, 12px 100%, 12px 100%;
+    background-attachment: local, local, scroll, scroll;
+  }
+  /* Glyph-only buttons (arrows, expand icons) get a 36px minimum width too. */
+  main button {
+    min-width: 2.25rem;
+  }
+  /* Text inputs and selects keep a >=36px touch height on phones. */
+  main input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='hidden']),
+  main select {
+    min-height: 2.25rem;
+  }
+  /* Inline text links get a >=36px hit area without moving the layout: the padding is cancelled
+     by the negative margin. */
+  main .status-link,
+  main a.hover\:underline,
+  main button.hover\:underline {
+    padding-block: 0.75rem;
+    margin-block: -0.75rem;
+  }
+  /* Small text buttons, chips and tabs keep the >=36px phone touch target (APPLE-UX-CONTRACT). */
+  main button.text-xs,
+  main button.text-sm:not(.btn-primary):not(.btn-secondary),
+  main [role='tab'],
+  main .apple-text-link {
+    min-height: 2.25rem;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* ---- Dark: flat black canvas (Netra) -------------------------------------- */
+/* The desktop root carried an ambient navy radial wash (and the mesh layer), which Netra's dark
+   theme does not have; heroes keep their own glow. */
+html[data-theme='tahoe'] .mac-desktop-root,
+html[data-theme='tahoe'] .tahoe-page-root,
+html[data-ui-shell='default'] .mac-desktop-root,
+html[data-ui-shell='default'] .tahoe-page-root {
+  background-image: none !important;
+}
+html[data-theme='tahoe'] .tahoe-mesh,
+html[data-ui-shell='default'] .tahoe-mesh {
+  display: none !important;
+}
+
+/* ---- Dark: Tailwind palette shades written for a white page ----------------- */
+/* text-red-700, text-orange-800 ... are ~2:1 on the flat black canvas. Map them onto the
+   text-safe accent tokens instead of editing each page. Light theme is untouched. */
+html[data-theme='tahoe'] .text-red-600:not([class*='bg-white']),
+html[data-theme='tahoe'] .text-red-700:not([class*='bg-white']),
+html[data-theme='tahoe'] .text-red-800:not([class*='bg-white']),
+html[data-theme='tahoe'] .text-rose-600:not([class*='bg-white']),
+html[data-theme='tahoe'] .text-rose-700:not([class*='bg-white']) { color: var(--nl-accent-red-text) !important; }
+html[data-theme='tahoe'] .text-orange-600:not([class*='bg-white']),
+html[data-theme='tahoe'] .text-orange-700:not([class*='bg-white']),
+html[data-theme='tahoe'] .text-orange-800:not([class*='bg-white']),
+html[data-theme='tahoe'] .text-orange-900:not([class*='bg-white']),
+html[data-theme='tahoe'] .text-amber-600:not([class*='bg-white']),
+html[data-theme='tahoe'] .text-amber-700:not([class*='bg-white']),
+html[data-theme='tahoe'] .text-amber-800:not([class*='bg-white']) { color: var(--nl-accent-amber-text) !important; }
+html[data-theme='tahoe'] .text-emerald-600:not([class*='bg-white']),
+html[data-theme='tahoe'] .text-emerald-700:not([class*='bg-white']),
+html[data-theme='tahoe'] .text-emerald-800:not([class*='bg-white']),
+html[data-theme='tahoe'] .text-teal-700:not([class*='bg-white']),
+html[data-theme='tahoe'] .text-teal-800:not([class*='bg-white']) { color: var(--nl-accent-green-text) !important; }
+html[data-theme='tahoe'] .text-sky-600:not([class*='bg-white']),
+html[data-theme='tahoe'] .text-sky-700:not([class*='bg-white']) { color: var(--nl-accent-cyan-text) !important; }
+html[data-theme='tahoe'] .text-indigo-700:not([class*='bg-white']) { color: #2997ff !important; }
+html[data-theme='tahoe'] .text-purple-600:not([class*='bg-white']) { color: var(--nl-accent-purple-text) !important; }
+
+/* ---- Light: Machine Finder tiles are white cards, not grey panels ---------- */
+/* APPLE-UX-CONTRACT: "a grey panel on a white page is a bug". The tile fill was --nl-fill (4% black). */
+html[data-theme='tahoe-light'] .machine-finder-card,
+html.apple-light .machine-finder-card,
+html.light-theme .machine-finder-card {
+  background: #ffffff;
+  border-color: var(--nl-hairline);
+}
+html[data-theme='tahoe-light'] .machine-finder-card .mx-auto.rounded-2xl,
+html.apple-light .machine-finder-card .mx-auto.rounded-2xl,
+html.light-theme .machine-finder-card .mx-auto.rounded-2xl {
+  background: var(--nl-fill) !important;
+}
+html[data-theme='tahoe-light'] .machine-finder-card .mx-auto.rounded-2xl svg,
+html.apple-light .machine-finder-card .mx-auto.rounded-2xl svg,
+html.light-theme .machine-finder-card .mx-auto.rounded-2xl svg {
+  color: var(--text-muted) !important;
+}
+
+/* =============================================================================
+   Netra signature layer: motion, page heroes, pulse band, fleet stage
+   ========================================================================== */
+
+/* ---- Motion ---------------------------------------------------------------- */
+@keyframes nl-fade-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.nl-fade-rise {
+  animation: nl-fade-rise 0.42s var(--nl-ease) both;
+}
+.nl-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s var(--nl-ease), transform 0.7s var(--nl-ease);
+  transition-delay: var(--nl-delay, 0s);
+}
+.nl-reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+@keyframes nl-ping {
+  0% { box-shadow: 0 0 0 0 rgba(48, 209, 88, 0.5); }
+  100% { box-shadow: 0 0 0 8px rgba(48, 209, 88, 0); }
+}
+@keyframes nl-dash {
+  to { stroke-dashoffset: -24; }
+}
+/* Children of a grid/list rise in one after another (no wrapper elements, so layout and test ids
+   are untouched). */
+.nl-stagger > * {
+  animation: nl-fade-rise 0.42s var(--nl-ease) both;
+}
+.nl-stagger > *:nth-child(2) { animation-delay: 0.05s; }
+.nl-stagger > *:nth-child(3) { animation-delay: 0.1s; }
+.nl-stagger > *:nth-child(4) { animation-delay: 0.15s; }
+.nl-stagger > *:nth-child(5) { animation-delay: 0.2s; }
+.nl-stagger > *:nth-child(6) { animation-delay: 0.25s; }
+.nl-stagger > *:nth-child(7) { animation-delay: 0.3s; }
+.nl-stagger > *:nth-child(n + 8) { animation-delay: 0.35s; }
+@media (prefers-reduced-motion: reduce) {
+  .nl-stagger > * { animation: none; }
+  .nl-fade-rise { animation: none; }
+  .nl-reveal { opacity: 1; transform: none; transition: none; }
+  .nl-live-pill i, .nl-link { animation: none !important; }
+}
+
+/* ---- Page header: Netra eyebrow / title / lede ------------------------------ */
+.apple-page-header .apple-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--apple-link, #0066cc);
+  margin: 0 0 0.5rem;
+}
+.apple-page-header .page-title {
+  font-size: clamp(1.5rem, 2.6vw, 2.125rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.apple-page-header .page-lede {
+  font-size: 1rem;
+  line-height: 1.4;
+  max-width: 70ch;
+  color: var(--text-secondary);
+}
+
+/* ---- Pulse band ------------------------------------------------------------- */
+.nl-pulse {
+  border: 1px solid var(--nl-hairline);
+  border-radius: 24px;
+  padding: clamp(1.25rem, 2.4vw, 1.75rem);
+  background: var(--surface-1, #fff);
+}
+.nl-pulse-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1.25rem;
+}
+.nl-pulse-title {
+  white-space: nowrap;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+.nl-live-pill {
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  border: 1px solid var(--nl-hairline);
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+}
+.nl-live-pill i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #30d158;
+  animation: nl-ping 1.8s infinite;
+}
+.nl-live-pill.is-down i {
+  background: var(--nl-danger, #ff3b30);
+  animation: none;
+}
+.nl-pulse-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem 2rem;
+}
+@media (min-width: 900px) {
+  .nl-pulse-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.nl-pulse-value {
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.nl-pulse-value.is-warn {
+  color: var(--nl-accent-amber-text, #8b4b00);
+}
+.nl-pulse-label {
+  margin-top: 0.4rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+.nl-pulse-spark {
+  margin-top: 0.75rem;
+  height: 32px;
+  color: var(--apple-blue, #0071e3);
+}
+.nl-spark { display: block; max-width: 100%; }
+.nl-spark-warm {
+  font-size: 0.6875rem;
+  color: var(--text-faint, #7d7d83);
+}
+
+/* ---- Fleet stage (signature SVG) -------------------------------------------- */
+.nl-stage {
+  position: relative;
+  border: 1px solid var(--nl-hairline);
+  border-radius: 24px;
+  padding: clamp(0.5rem, 2vw, 1.25rem);
+  background: var(--surface-1, #fff);
+  overflow: hidden;
+}
+html[data-theme='tahoe'] .nl-stage,
+html[data-ui-shell='default'] .nl-stage {
+  background:
+    radial-gradient(60% 80% at 20% 30%, rgba(41, 151, 255, 0.14), transparent 70%),
+    radial-gradient(50% 70% at 90% 90%, rgba(175, 82, 222, 0.12), transparent 70%),
+    var(--surface-1, #1d1d1f);
+}
+.nl-stage-svg { display: block; width: 100%; height: auto; max-height: 340px; }
+.nl-node { fill: var(--surface-1, #fff); stroke: var(--nl-hairline); stroke-width: 1.25; }
+html[data-theme='tahoe'] .nl-node, html[data-ui-shell='default'] .nl-node { fill: #2c2c2e; stroke: rgba(255, 255, 255, 0.14); }
+.nl-node.is-down { stroke: var(--nl-danger, #ff3b30); stroke-dasharray: 4 4; }
+.nl-node-title { font-size: 14px; font-weight: 600; fill: var(--text-primary); font-family: var(--font-display); }
+.nl-node-sub { font-size: 11.5px; fill: var(--text-secondary); font-family: var(--font-display); }
+.nl-link { stroke: url(#nl-link); stroke-width: 1.75; stroke-dasharray: 6 6; animation: nl-dash 1.4s linear infinite; }
+.nl-link.is-down { stroke: var(--nl-danger, #ff3b30); stroke-opacity: 0.6; animation: none; }
+.nl-dot { fill: var(--apple-blue, #0071e3); }
+.nl-vm { fill: var(--text-faint, #a1a1a6); opacity: 0.55; }
+.nl-vm.is-running { fill: var(--apple-blue, #0071e3); opacity: 1; }
+
+/* ---- Header stat strip (Netra pulse figures) -------------------------------- */
+.nl-stat-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.75rem;
+  margin-top: 0.25rem;
+}
+.nl-stat {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nl-stat b {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.nl-stat small {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* ---- Pages that pass space-y-* on a flex/gap container double their spacing --- */
+.apple-page[class*='space-y-'] > * {
+  margin-block: 0 !important;
+}
+
+/* ---- Sticky detail tabs: page-coloured strip, no tinted band overhanging the content ---- */
+html .platform-detail-tabs-sticky,
+html.apple-light .platform-detail-tabs-sticky,
+html.light-theme .platform-detail-tabs-sticky,
+html[data-theme='tahoe-light'] .platform-detail-tabs-sticky,
+html[data-theme='tahoe'] .platform-detail-tabs-sticky {
+  margin: 0 0 1rem !important;
+  padding: 0.25rem 0 0 !important;
+  background: var(--page-bg, #fff) !important;
+  backdrop-filter: none !important;
+  border-bottom: 1px solid var(--nl-hairline) !important;
+}
+
+
+/* ---- Command Center: big live screen -------------------------------------- */
+.nl-console-stage {
+  --nl-tone: #86868b;
+  position: relative;
+  border-radius: 22px;
+  padding: 3px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--nl-tone) 55%, transparent), color-mix(in srgb, var(--nl-tone) 8%, transparent) 55%);
+  box-shadow: 0 18px 50px -24px color-mix(in srgb, var(--nl-tone) 70%, transparent);
+}
+.nl-console-stage[data-tone='ok'] { --nl-tone: #30d158; }
+.nl-console-stage[data-tone='warn'] { --nl-tone: #ff9f0a; }
+.nl-console-stage[data-tone='error'] { --nl-tone: #ff453a; }
+.nl-console-screen {
+  position: relative;
+  overflow: hidden;
+  border-radius: 19px;
+  aspect-ratio: 16 / 10;
+  width: 100%;
+  max-height: min(68vh, 44rem);
+  min-height: 15rem;
+  background:
+    radial-gradient(70% 80% at 25% 20%, rgba(0, 113, 227, 0.16), transparent 70%),
+    #05060a;
+}
+.nl-console-screen > div:first-child { position: absolute; inset: 0; }
+.nl-console-poster {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  text-align: center;
+  padding: 1.5rem;
+}
+.nl-console-poster-icon {
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 1rem;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.08);
+  margin-bottom: 0.5rem;
+}
+.nl-console-badges { position: absolute; z-index: 2; top: 0.85rem; left: 0.85rem; right: 0.85rem; display: flex; gap: 0.5rem; pointer-events: none; }
+.nl-console-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  max-width: 100%;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(10, 10, 14, 0.55);
+  backdrop-filter: blur(14px);
+  border: 1px solid color-mix(in srgb, var(--nl-tone, #86868b) 45%, transparent);
+}
+.nl-console-stage .nl-console-pill i {
+  width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--nl-tone);
+}
+.nl-console-stage[data-tone='ok'] .nl-console-pill i { animation: nl-ping 1.8s infinite; }
+.nl-console-pill-sub { font-weight: 400; color: rgba(255, 255, 255, 0.65); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nl-console-controls {
+  position: absolute;
+  z-index: 2;
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2.5rem 0.9rem 0.85rem;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.78), transparent);
+  opacity: 1;
+  transition: opacity 0.2s;
+}
+html .nl-console-controls .nl-console-protocols a { background: rgba(10, 10, 14, 0.82) !important; color: #fff !important; border: 1px solid rgba(255, 255, 255, 0.18) !important; opacity: 1 !important; backdrop-filter: blur(10px); }
+html .nl-console-controls .nl-console-protocols a[title*='recommended'] { background: rgba(48, 209, 88, 0.3) !important; }
+.cc-grid { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1024px) { .cc-grid { grid-template-columns: minmax(0, 2.5fr) minmax(300px, 1fr); } }
+
+
+/* ---- Landing: aurora hero, status chips, launch tiles -------------------------- */
+.nl-aurora-host { position: relative; isolation: isolate; overflow: hidden; }
+.nl-aurora {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(40% 50% at 18% 30%, rgba(10, 132, 255, 0.22), transparent 70%),
+    radial-gradient(36% 46% at 82% 24%, rgba(191, 90, 242, 0.18), transparent 70%),
+    radial-gradient(40% 50% at 55% 85%, rgba(48, 209, 88, 0.14), transparent 70%);
+  filter: blur(8px);
+  animation: nl-aurora-drift 18s ease-in-out infinite alternate;
+  mask-image: radial-gradient(ellipse 75% 85% at 50% 40%, #000 35%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 75% 85% at 50% 40%, #000 35%, transparent 100%);
+}
+.nl-aurora-host[data-status='degraded'] .nl-aurora {
+  background:
+    radial-gradient(40% 50% at 20% 30%, rgba(255, 159, 10, 0.24), transparent 70%),
+    radial-gradient(36% 46% at 80% 24%, rgba(255, 69, 58, 0.16), transparent 70%),
+    radial-gradient(40% 50% at 55% 85%, rgba(10, 132, 255, 0.12), transparent 70%);
+}
+.nl-aurora-host[data-status='offline'] .nl-aurora {
+  background: radial-gradient(50% 60% at 50% 30%, rgba(255, 69, 58, 0.22), transparent 70%);
+}
+@keyframes nl-aurora-drift {
+  from { transform: translate3d(-2%, 0, 0) scale(1); }
+  to { transform: translate3d(2%, 3%, 0) scale(1.06); }
+}
+@media (prefers-reduced-motion: reduce) { .nl-aurora { animation: none; } }
+html[data-theme='tahoe'] .nl-aurora { opacity: 0.85; }
+
+.nl-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.nl-chip {
+  --chip: #86868b;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  border: 1px solid color-mix(in srgb, var(--chip) 35%, transparent);
+  background: color-mix(in srgb, var(--chip) 11%, transparent);
+  backdrop-filter: blur(10px);
+}
+.nl-chip i { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--chip); }
+.nl-chip[data-tone='ok'] { --chip: #30d158; }
+.nl-chip[data-tone='warn'] { --chip: #ff9f0a; }
+.nl-chip[data-tone='info'] { --chip: #0a84ff; }
+
+.nl-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 0.875rem;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.nl-tile {
+  --tile-glow: #0a84ff;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  width: 100%;
+  padding: 1rem 1.1rem;
+  text-align: left;
+  border-radius: 20px;
+  border: 1px solid var(--nl-hairline);
+  background: var(--surface-1, #fff);
+  color: var(--text-primary);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.nl-tile:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--tile-glow) 45%, transparent);
+  box-shadow: 0 14px 34px -18px color-mix(in srgb, var(--tile-glow) 70%, transparent);
+}
+.nl-tile-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 14px;
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 6px 14px -6px rgba(0, 0, 0, 0.35);
+}
+.nl-tile-title { font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.01em; }
+.nl-tile-sub { margin-top: 0.1rem; font-size: 0.8125rem; color: var(--text-secondary); }
+.nl-tile-chevron { margin-left: auto; font-size: 1.25rem; color: var(--text-muted); transition: transform 0.2s ease; }
+.nl-tile:hover .nl-tile-chevron { transform: translateX(3px); color: var(--tile-glow); }
+@media (prefers-reduced-motion: reduce) { .nl-tile, .nl-tile-chevron { transition: none; } .nl-tile:hover { transform: none; } }
+
+/* Login split layout: wins over the earlier single-column chapter rules. */
+@media (min-width: 1100px) {
+  .login-chapter-hero,
+  .login-chapter-sign-in {
+    justify-content: center;
+    padding-top: clamp(2rem, 6vh, 4rem);
+    padding-bottom: clamp(2rem, 6vh, 4rem);
+  }
+  .login-chapter-hero .login-tagline { margin-left: 0; text-align: left; }
+  .login-chapter-hero .login-hero-title { font-size: clamp(2.75rem, 4.6vw, 4.5rem) !important; }
+  .login-chapter-sign-in { background: hsl(240 5% 97%); }
+}
+
+
+/* ---- Mission Control: capacity rings + duo cards ---------------------------- */
+.nl-capacity {
+  display: grid;
+  gap: 1.5rem 2.5rem;
+  align-items: center;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border: 1px solid var(--nl-hairline);
+  border-radius: 24px;
+  background: linear-gradient(135deg, color-mix(in srgb, #0a84ff 6%, transparent), color-mix(in srgb, #30d158 5%, transparent));
+}
+@media (min-width: 900px) { .nl-capacity { grid-template-columns: minmax(0, 1fr) auto; } }
+.nl-capacity-rings { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.5rem 2.25rem; }
+.nl-duo { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .nl-duo { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.nl-duo > .apple-section {
+  border: 1px solid var(--nl-hairline) !important;
+  border-radius: 24px;
+  padding: clamp(1.25rem, 3vw, 2rem) !important;
+  margin: 0 !important;
+  background: linear-gradient(160deg, color-mix(in srgb, #bf5af2 5%, transparent), transparent 60%);
+}
+.nl-duo > .apple-section:nth-child(2) { background: linear-gradient(160deg, color-mix(in srgb, #0a84ff 6%, transparent), transparent 60%); }
+.nl-duo .apple-display--sm { font-size: clamp(1.5rem, 2.4vw, 2rem); }
+[data-testid='mission-control-capacity'] { padding-left: 0 !important; padding-right: 0 !important; }
+
+/* ---- Keyboard focus for the newer controls (tabs, tiles, rails, console chips) ---- */
+html .nl-tile:focus-visible,
+html .nl-console-controls a:focus-visible,
+html .nl-console-controls button:focus-visible,
+html [role='tablist'] [role='tab']:focus-visible,
+html .mac-settings-detail ~ nav button:focus-visible,
+html nav[aria-label$=' sections'] button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring) !important;
+  border-radius: 12px;
+}
+
+/* ---- Motion: honour reduced-motion for the new surfaces ---------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .nl-console-stage[data-tone='ok'] .nl-console-pill i,
+  .nl-chip i,
+  .nl-aurora { animation: none !important; }
+  .nl-console-stage, .nl-console-controls, .nl-tile, .mc-host-fleet-card { transition: none !important; }
+  .mc-host-fleet-card:hover { transform: none !important; }
+}
+
+/* ---- Friendlier empty states ---------------------------------------------------------- */
+.apple-empty {
+  border: 1px dashed var(--nl-hairline);
+  background: linear-gradient(160deg, color-mix(in srgb, #0a84ff 5%, transparent), transparent 65%), var(--apple-surface);
+  box-shadow: none;
+  border-radius: 24px;
+}
+.apple-empty-icon {
+  width: 3rem;
+  height: 3rem;
+  border: 0;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(145deg, #0a84ff, #5e5ce6);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 8px 18px -8px rgba(10, 132, 255, 0.55);
+}
+.apple-empty .apple-cta-row { margin-top: 1.25rem; }
+
+
+/* ---- Dark theme: the floating console control strips were hard-coded white glass ---- */
+html[data-theme='tahoe'] [data-testid='cinema-control-strip'] > div,
+html[data-theme='tahoe'] [data-nl-dock] {
+  background: rgba(28, 28, 32, 0.88) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: #f5f5f7 !important;
+  box-shadow: 0 18px 44px -18px rgba(0, 0, 0, 0.75) !important;
+}
+html[data-theme='tahoe'] [data-testid='cinema-control-strip'] button,
+html[data-theme='tahoe'] [data-nl-dock] button {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: #f5f5f7 !important;
+}
+html[data-theme='tahoe'] [data-testid='cinema-control-strip'] button:hover,
+html[data-theme='tahoe'] [data-nl-dock] button:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+html[data-theme='tahoe'] [data-testid='cinema-control-strip'] [class*='bg-white/95'],
+html[data-theme='tahoe'] [data-nl-dock] [class*='bg-white/95'] {
+  background: rgba(34, 34, 40, 0.97) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+html[data-theme='tahoe'] [data-testid='cinema-control-strip'] [class*='text-slate-900'],
+html[data-theme='tahoe'] [data-nl-dock] [class*='text-slate-900'] { color: #f5f5f7; }
+html[data-theme='tahoe'] [data-testid='cinema-control-strip'] [class*='hover:bg-black/5']:hover { background: rgba(255, 255, 255, 0.12) !important; }
+
+
+/* ---- Get started checklist ------------------------------------------------------ */
+.nl-getstarted {
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border: 1px solid var(--nl-hairline);
+  border-radius: 24px;
+  background: linear-gradient(135deg, color-mix(in srgb, #0a84ff 7%, transparent), color-mix(in srgb, #bf5af2 5%, transparent));
+}
+.nl-getstarted-bar { height: 6px; margin: 1rem 0 1.25rem; border-radius: 999px; background: var(--apple-fill-tertiary); overflow: hidden; }
+.nl-getstarted-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #0a84ff, #30d158); transition: width 0.6s ease; }
+.nl-getstarted-list { display: grid; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.nl-getstarted-step {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: 16px;
+}
+.nl-getstarted-step[data-next='true'] { background: var(--surface-1, #fff); border-color: color-mix(in srgb, #0a84ff 35%, transparent); box-shadow: 0 10px 26px -18px rgba(10, 132, 255, 0.55); }
+.nl-getstarted-step[data-done='true'] { opacity: 0.7; }
+.nl-getstarted-check {
+  display: grid; place-items: center; flex: none; width: 1.5rem; height: 1.5rem; border-radius: 50%;
+  border: 1.5px solid var(--nl-hairline); color: #fff;
+}
+.nl-getstarted-step[data-done='true'] .nl-getstarted-check { background: #30d158; border-color: #30d158; }
+.nl-getstarted-step[data-next='true'] .nl-getstarted-check { border-color: #0a84ff; }

@@ -1,0 +1,6 @@
+9dc222362223dba791de0e349347b310bb289f69:core/src/oidc.rs:private-key:353
+747af3bf443537bb1127fc71c30b081c8ab2e93d:scripts/regression/ops-host.js:generic-api-key:18
+23f51dbd7b4c9edb4a71605e05b211f58fe72058:translate/src/domain_xml.rs:generic-api-key:445
+23f51dbd7b4c9edb4a71605e05b211f58fe72058:spec/src/vm.rs:generic-api-key:589
+36239ee3bbae5de7f8e96c50ca216a103c1cd42d:docs/platform.md:generic-api-key:273
+e68836894215e056606f1a77946501d274e3a6ea:README.md:curl-auth-header:773

@@ -1,0 +1,28 @@
+[Unit]
+Description=Machina VM backup
+Documentation=https://github.com/zyvorai/machina
+After=libvirtd.service network-online.target machina-daemon.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/share/machina/scripts/backup.sh --config /etc/machina/backup.conf
+
+# Allow NFS mounts and disk access
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/machina /mnt/machina-backup
+PrivateTmp=true
+
+# Need mount capability for NFS
+AmbientCapabilities=CAP_SYS_ADMIN
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_NET_ADMIN CAP_DAC_OVERRIDE
+NoNewPrivileges=true
+
+# Network: needed for API calls + NFS
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=machina-backup

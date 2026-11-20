@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Machina capabilities</title>
+<!-- SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+     1600x590. Rendered by ./build.sh to docs/ux/readme-capabilities.jpg. Every item maps to code in daemon/, controller/, bpf/ or web/. -->
+<link rel="stylesheet" href="card.css">
+<style>
+  body { height:590px; }
+  .grid { margin-top:26px; grid-template-columns:repeat(4,1fr); gap:22px; }
+  .grid .card { min-height:310px; }
+  .grid .card h3 { font-size:28px; }
+</style></head><body>
+<div class="bar"></div>
+<div class="wrap">
+  <div class="top"><img src="../../../web/public/zyvor-favicon.svg" alt=""><b>Zyvor</b><span>&middot;</span><span>Machina</span><span class="r">Capabilities at a glance</span></div>
+  <h1>Run it. Secure it. Scale it. <em>Let AI watch it.</em></h1>
+  <div class="row grid">
+    <div class="card k"><span class="lane">RUN</span><h3>Every VM operation</h3><ul>
+      <li>Quick create, clone, snapshot</li><li>Cloud-init and golden images</li><li>Boot Doctor offline repair</li><li>GPU passthrough, FluxVM backend</li><li>Browser noVNC, SPICE, SSH</li></ul></div>
+    <div class="card t"><span class="lane">SECURE</span><h3>Native eBPF</h3><ul>
+      <li>Flows, L7 and DNS visibility</li><li>VM network policy, mTLS</li><li>Quarantine with a lease</li><li>Just-in-time access, 2 approvers</li><li>DNS threat feeds</li></ul></div>
+    <div class="card m"><span class="lane">SCALE</span><h3>Fleet control plane</h3><ul>
+      <li>gRPC agent per hypervisor</li><li>HA failover and DRS balancing</li><li>Live migration across hosts</li><li>Fleet Cloud + EC2-compatible API</li><li>Load balancers, no amphora VM</li></ul></div>
+    <div class="card v"><span class="lane">OPERATE</span><h3>Zyra AI on call</h3><ul>
+      <li>Diagnoses incidents</li><li>Fixes wait for your approval</li><li>Verifies the fix, one-click undo</li><li>Lateral-movement alerts</li><li>Prometheus, OTLP, webhooks</li></ul></div>
+  </div>
+  <div class="foot"><b>github.com/zyvorai/zyvor-machina</b><span class="r">libvirt &middot; QEMU/KVM &middot; Linux x86_64</span></div>
+</div>
+</body></html>

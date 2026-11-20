@@ -1,0 +1,24 @@
+[package]
+name = "rvb"
+version = "0.1.0"
+edition = "2021"
+description = "Prototype control-plane CLI: virt-builder-style UX over the mkosi image engine"
+license = "LicenseRef-Zyvor-Production-1.0"
+publish = false
+
+[[bin]]
+name = "rvb"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+sha2 = "0.11"
+tempfile = "3"
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }

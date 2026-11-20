@@ -1,0 +1,5 @@
+out/
+assets/bed.mp3
+*.mp4
+*.webm
+!assets/.gitkeep

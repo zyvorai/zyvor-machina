@@ -1,0 +1,51 @@
+html, body {
+  margin: 0; padding: 0; width: 1920px; height: 1080px;
+  background: #070b14;
+  background-image:
+    radial-gradient(ellipse 60% 50% at 20% 0%, rgba(37,99,235,0.18), transparent 55%),
+    radial-gradient(ellipse 50% 45% at 85% 100%, rgba(56,189,248,0.12), transparent 55%);
+  display: flex; align-items: center; justify-content: center;
+  font-family: -apple-system, "SF Pro Text", Segoe UI, sans-serif;
+}
+.window {
+  width: 1620px; height: 920px;
+  background: #0b0f1a;
+  border: 1px solid rgba(56,189,248,0.25);
+  border-radius: 14px;
+  box-shadow: 0 40px 100px rgba(0,0,0,0.55);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.titlebar {
+  height: 46px; flex: none;
+  background: #11172a;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; padding: 0 18px; gap: 10px;
+}
+.dot { width: 13px; height: 13px; border-radius: 50%; }
+.dot.red { background: #ff5f57; }
+.dot.yellow { background: #febc2e; }
+.dot.green { background: #28c840; }
+.titletext {
+  flex: 1; text-align: center; color: #8a93a8; font-size: 14px;
+  font-family: ui-monospace, "SF Mono", monospace; letter-spacing: 0.02em;
+  margin-right: 60px;
+}
+.body {
+  flex: 1; padding: 28px 34px; overflow: hidden;
+  font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+  font-size: 22px; line-height: 1.55; color: #d7dee8;
+}
+.line { white-space: pre-wrap; word-break: break-all; }
+.prompt { color: #38bdf8; }
+.cmd { color: #f4f7fc; }
+.out { color: #9aa5b8; }
+.ok { color: #34d399; }
+.bad { color: #f87171; }
+.hl { color: #fbbf24; }
+.cursor {
+  display: inline-block; width: 11px; height: 24px; background: #38bdf8;
+  vertical-align: text-bottom; margin-left: 2px;
+  animation: blink 1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }

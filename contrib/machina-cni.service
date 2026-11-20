@@ -1,0 +1,55 @@
+[Unit]
+Description=Machina native eBPF Kubernetes CNI agent (pod routing, NetworkPolicy, Services)
+Documentation=https://github.com/zyvorai/machina
+After=network-online.target machina-bpfd.service k3s.service
+Wants=network-online.target
+Requires=machina-bpfd.service
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+# Overrides the Environment= lines below. Set MACHINA_CNI_CILIUM_POLICIES=1
+# here to also enforce CiliumNetworkPolicy / CiliumClusterwideNetworkPolicy,
+# MACHINA_CNI_CLUSTER_CIDR6 for dual-stack, MACHINA_CNI_LB_MODE=snat|dsr and
+# MACHINA_CNI_XDP=1 for the XDP NodePort fast path.
+#
+# Opt-in: the agent exits with status 78 when another CNI config (flannel,
+# Calico, Cilium, ...) is already present and does not touch the node. Set
+# MACHINA_CNI_TAKEOVER=1 here only to replace that CNI deliberately.
+EnvironmentFile=-/etc/default/machina-cni
+Environment=KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+Environment=MACHINA_BPFD_SOCK=/run/machina-bpf/bpfd.sock
+Environment=MACHINA_CNI_CLUSTER_CIDR=10.42.0.0/16
+Environment=RUST_LOG=machina_cni=info
+# k3s bundles kubectl; the bootstrap symlinks it to /usr/local/bin/kubectl.
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+ExecStart=/usr/local/bin/machina-cni agent
+Restart=always
+RestartSec=3
+RestartPreventExitStatus=78
+
+# Writes CNI config/binaries, node routes and the nft masquerade table.
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_DAC_OVERRIDE CAP_FOWNER
+NoNewPrivileges=true
+ProtectHome=true
+PrivateTmp=true
+ProtectClock=true
+ProtectHostname=true
+RestrictRealtime=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=machina-cni
+
+MemoryMax=256M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

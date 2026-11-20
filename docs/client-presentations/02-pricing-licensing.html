@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>machina — Pricing &amp; Licensing</title>
+<style>
+  @page { size: A4; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #1a1a2e; background: #fff; line-height: 1.6; }
+
+  /* Cover Page */
+  .cover { height: 100vh; background: linear-gradient(135deg, #0f0c29, #302b63, #24243e); color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; page-break-after: always; position: relative; overflow: hidden; }
+  .cover::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle at 30% 50%, rgba(59,130,246,0.15) 0%, transparent 50%), radial-gradient(circle at 70% 80%, rgba(99,102,241,0.1) 0%, transparent 50%); }
+  .cover h1 { font-size: 3.5em; font-weight: 800; letter-spacing: -2px; margin-bottom: 0.2em; position: relative; }
+  .cover h1 span { color: #3b82f6; }
+  .cover h2 { font-size: 1.4em; font-weight: 300; opacity: 0.9; margin-bottom: 2em; position: relative; }
+  .cover .tagline { font-size: 1.1em; opacity: 0.7; max-width: 600px; position: relative; }
+  .cover .badge { display: inline-block; background: rgba(59,130,246,0.2); border: 1px solid rgba(59,130,246,0.4); padding: 8px 20px; border-radius: 20px; font-size: 0.9em; margin-top: 2em; position: relative; }
+
+  /* Section Pages */
+  .page { min-height: 100vh; padding: 60px 80px; page-break-after: always; }
+  .page-dark { background: #0f111a; color: #e8e6df; }
+  .page-light { background: #fafbfc; }
+  .page-accent { background: linear-gradient(135deg, #1a1a2e, #16213e); color: #e8e6df; }
+
+  h2.section-title { font-size: 2.2em; font-weight: 700; margin-bottom: 0.8em; letter-spacing: -1px; }
+  h2.section-title span { color: #3b82f6; }
+  h3 { font-size: 1.3em; font-weight: 600; margin: 1.2em 0 0.5em; }
+  p { margin-bottom: 1em; font-size: 1.05em; }
+  .subtitle { font-size: 1.1em; opacity: 0.7; margin-bottom: 2em; }
+
+  /* Cards */
+  .card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin: 1.5em 0; }
+  .card-grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 28px; }
+  .page-light .card { background: #fff; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .card .icon { font-size: 2em; margin-bottom: 12px; }
+  .card h4 { font-size: 1.15em; font-weight: 600; margin-bottom: 8px; }
+  .card p { font-size: 0.95em; opacity: 0.85; margin-bottom: 0; }
+
+  /* Stats */
+  .stat-row { display: flex; gap: 40px; margin: 2em 0; }
+  .stat { text-align: center; flex: 1; }
+  .stat .number { font-size: 3em; font-weight: 800; color: #3b82f6; line-height: 1; }
+  .stat .label { font-size: 0.95em; opacity: 0.7; margin-top: 8px; }
+
+  /* Comparison Table */
+  table { width: 100%; border-collapse: collapse; margin: 1.5em 0; font-size: 0.95em; }
+  th { background: #3b82f6; color: #fff; padding: 14px 18px; text-align: left; font-weight: 600; }
+  td { padding: 12px 18px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .page-light td { border-bottom: 1px solid #e5e7eb; }
+  tr:nth-child(even) td { background: rgba(255,255,255,0.03); }
+  .page-light tr:nth-child(even) td { background: #f9fafb; }
+  .check { color: #22c55e; font-weight: 700; }
+  .cross { color: #ef4444; font-weight: 700; }
+
+  /* Timeline */
+  .timeline { margin: 2em 0; }
+  .timeline-item { display: flex; gap: 20px; margin-bottom: 20px; align-items: flex-start; }
+  .timeline-dot { width: 40px; height: 40px; background: #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .timeline-content h4 { margin-bottom: 4px; }
+  .timeline-content p { font-size: 0.95em; opacity: 0.8; margin-bottom: 0; }
+
+  /* Quote */
+  .quote { border-left: 4px solid #3b82f6; padding: 20px 30px; margin: 2em 0; font-size: 1.1em; font-style: italic; opacity: 0.9; }
+
+  /* CTA */
+  .cta-box { background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; padding: 40px; border-radius: 16px; text-align: center; margin: 2em 0; }
+  .cta-box h3 { font-size: 1.5em; margin-bottom: 0.5em; }
+  .cta-box p { opacity: 0.9; }
+
+  /* Flow diagram */
+  .flow { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 2em 0; flex-wrap: wrap; }
+  .flow-step { background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); padding: 12px 20px; border-radius: 8px; font-weight: 600; font-size: 0.95em; }
+  .flow-arrow { font-size: 1.5em; color: #3b82f6; }
+
+  /* Lists */
+  ul { margin: 0.5em 0 1em 1.5em; }
+  li { margin-bottom: 0.4em; font-size: 1em; }
+
+  /* Footer */
+  .footer { text-align: center; padding: 20px; font-size: 0.85em; opacity: 0.5; }
+
+  /* Pricing-specific styles */
+  .tier-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 32px; text-align: center; }
+  .page-light .tier-card { background: #fff; border: 1px solid #e5e7eb; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .tier-card.featured { border: 2px solid #3b82f6; position: relative; }
+  .tier-card.featured::after { content: 'Most Popular'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: #3b82f6; color: #fff; padding: 4px 16px; border-radius: 12px; font-size: 0.8em; font-weight: 600; }
+  .tier-card h4 { font-size: 1.4em; font-weight: 700; margin-bottom: 8px; }
+  .tier-card .price { font-size: 1.8em; font-weight: 800; color: #3b82f6; margin: 16px 0; }
+  .tier-card .price-note { font-size: 0.85em; opacity: 0.6; margin-top: -12px; margin-bottom: 16px; }
+  .tier-card ul { text-align: left; margin: 1em 0 0 1.2em; }
+  .tier-card li { font-size: 0.95em; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<!-- COVER PAGE -->
+<div class="cover">
+  <h1>ma<span>china</span></h1>
+  <h2>Pricing &amp; Licensing</h2>
+  <p class="tagline">Enterprise Linux hypervisor host management by HyperSDK. Flexible licensing tiers designed to scale from single bare-metal nodes to large enterprise infrastructure.</p>
+  <div class="badge">HyperSDK Proprietary — All Prices To Be Determined</div>
+</div>
+
+<!-- PAGE 2: LICENSING MODEL -->
+<div class="page page-dark">
+  <h2 class="section-title">Licensing <span>Model</span></h2>
+  <p class="subtitle">Zyvor Production License v1.0.</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <h4>License Type</h4>
+      <p>Machina is source-available under the Zyvor Production License v1.0. It is not open source. Non-production use is free; production use needs a paid commercial licence from ZyvorAI Labs Private Limited (<a href="https://zyvor.dev/pricing">zyvor.dev/pricing</a>, sales@zyvor.dev).</p>
+    </div>
+    <div class="card">
+      <h4>License Grant</h4>
+      <p>Upon purchase, customers receive a non-exclusive, non-transferable license to use machina on the agreed number of hosts for the duration of the subscription period. The license includes software updates and support per the selected tier.</p>
+    </div>
+    <div class="card">
+      <h4>Restrictions</h4>
+      <ul>
+        <li>No redistribution or sublicensing</li>
+        <li>No reverse engineering or decompilation</li>
+        <li>No modification of binary or source code</li>
+        <li>No use beyond licensed host count</li>
+        <li>No sharing of API tokens or credentials</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Compliance</h4>
+      <ul>
+        <li>License key validation on daemon startup</li>
+        <li>Host count enforcement per tier</li>
+        <li>Annual license renewal required</li>
+        <li>Audit rights reserved by HyperSDK</li>
+        <li>Grace period for renewal lapses</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="quote">
+    "machina is proprietary software developed and maintained by HyperSDK. Our licensing model is designed to be straightforward and predictable — no surprise true-ups, no per-core penalties."
+  </div>
+</div>
+
+<!-- PAGE 3: PRICING TIERS -->
+<div class="page page-light">
+  <h2 class="section-title">Pricing <span>Tiers</span></h2>
+  <p class="subtitle">Choose the tier that matches your infrastructure scale. All prices to be determined.</p>
+
+  <div class="card-grid card-grid-3">
+    <div class="tier-card">
+      <h4>Starter</h4>
+      <div class="price">TBD *</div>
+      <div class="price-note">* Price to be determined</div>
+      <ul>
+        <li>Single host deployment</li>
+        <li>Up to 10 VMs</li>
+        <li>Web UI + TUI access</li>
+        <li>REST API (all endpoints)</li>
+        <li>VNC &amp; Serial console</li>
+        <li>Basic metrics</li>
+        <li>Documentation access</li>
+      </ul>
+    </div>
+    <div class="tier-card featured">
+      <h4>Professional</h4>
+      <div class="price">TBD *</div>
+      <div class="price-note">* Price to be determined</div>
+      <ul>
+        <li>Up to 5 hosts</li>
+        <li>Unlimited VMs</li>
+        <li>RBAC &amp; API tokens</li>
+        <li>Automated backup/restore</li>
+        <li>NFS backup targets</li>
+        <li>Prometheus metrics endpoint</li>
+        <li>Snapshot scheduling</li>
+        <li>Email support (business hours)</li>
+      </ul>
+    </div>
+    <div class="tier-card">
+      <h4>Enterprise</h4>
+      <div class="price">TBD *</div>
+      <div class="price-note">* Price to be determined</div>
+      <ul>
+        <li>Unlimited hosts</li>
+        <li>Unlimited VMs</li>
+        <li>HA support &amp; guidance</li>
+        <li>Custom integrations</li>
+        <li>Priority support (24/7)</li>
+        <li>Dedicated account manager</li>
+        <li>SLA guarantees</li>
+        <li>On-site training available</li>
+      </ul>
+    </div>
+  </div>
+
+  <p style="text-align: center; font-size: 0.9em; opacity: 0.6; margin-top: 1em;">* All pricing to be determined based on deployment scale and requirements. Contact HyperSDK for a custom quote.</p>
+</div>
+
+<!-- PAGE 4: FEATURE COMPARISON TABLE -->
+<div class="page page-dark">
+  <h2 class="section-title">Feature <span>Comparison</span></h2>
+  <p class="subtitle">Detailed feature availability across tiers.</p>
+
+  <table>
+    <tr><th>Feature</th><th>Starter</th><th>Professional</th><th>Enterprise</th></tr>
+    <tr><td>Web UI (React, dark/light theme)</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>REST API (30+ endpoints)</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>VNC Console (noVNC in browser)</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>SSH Browser Terminal</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>Serial Console (WebSocket)</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>VM Snapshots</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>Network Management</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>Storage Pool Management</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>Host count</td><td>1</td><td>Up to 5</td><td>Unlimited</td></tr>
+    <tr><td>VM limit</td><td>10</td><td>Unlimited</td><td>Unlimited</td></tr>
+    <tr><td>RBAC / Access Control</td><td class="cross">&#x2717;</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>API Tokens</td><td class="cross">&#x2717;</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>Automated Backup / Restore</td><td class="cross">&#x2717;</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>NFS Backup Targets</td><td class="cross">&#x2717;</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>Prometheus Metrics Endpoint</td><td class="cross">&#x2717;</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>Snapshot Scheduling</td><td class="cross">&#x2717;</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>Batch Operations</td><td class="cross">&#x2717;</td><td class="check">&#x2713;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>Custom Integrations</td><td class="cross">&#x2717;</td><td class="cross">&#x2717;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>HA Support &amp; Guidance</td><td class="cross">&#x2717;</td><td class="cross">&#x2717;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>SLA Guarantees</td><td class="cross">&#x2717;</td><td class="cross">&#x2717;</td><td class="check">&#x2713;</td></tr>
+    <tr><td>Support Level</td><td>Documentation</td><td>Email (business hours)</td><td>Priority 24/7</td></tr>
+  </table>
+</div>
+
+<!-- PAGE 5: WHAT'S INCLUDED -->
+<div class="page page-light">
+  <h2 class="section-title">What's <span>Included</span></h2>
+  <p class="subtitle">Every tier includes the full machina platform. No feature gating on core functionality.</p>
+
+  <div class="card-grid card-grid-3">
+    <div class="card">
+      <h4>Web Dashboard</h4>
+      <p>Full React-based web UI with dark and light themes, real-time status updates, and mobile responsive design.</p>
+    </div>
+    <div class="card">
+      <h4>machinactl CLI</h4>
+      <p>Deploy, verify, health, and backup from the terminal. One-command host install and upgrade.</p>
+    </div>
+    <div class="card">
+      <h4>REST API</h4>
+      <p>30+ API endpoints for complete VM lifecycle management. JSON responses, structured error handling.</p>
+    </div>
+    <div class="card">
+      <h4>VNC Console</h4>
+      <p>In-browser noVNC console for direct graphical access to VMs. No external VNC client needed.</p>
+    </div>
+    <div class="card">
+      <h4>SSH &amp; Serial Console</h4>
+      <p>Browser-based SSH terminal and serial console via WebSocket. Access any VM from the dashboard.</p>
+    </div>
+    <div class="card">
+      <h4>VM Snapshots</h4>
+      <p>Create, list, revert, and delete VM snapshots. Point-in-time recovery for all virtual machines.</p>
+    </div>
+    <div class="card">
+      <h4>Network Management</h4>
+      <p>Create, edit, and delete virtual networks. DHCP configuration, IP range validation, bridge management.</p>
+    </div>
+    <div class="card">
+      <h4>Storage Management</h4>
+      <p>Manage storage pools and volumes. Create, resize, and delete storage with overflow-safe calculations.</p>
+    </div>
+    <div class="card">
+      <h4>Live Metrics</h4>
+      <p>Real-time CPU, memory, disk I/O, and network metrics per VM. Host hardware information display.</p>
+    </div>
+    <div class="card">
+      <h4>Dark / Light Theme</h4>
+      <p>Toggle between dark and light themes in the web UI. User preference persisted across sessions.</p>
+    </div>
+    <div class="card">
+      <h4>VM Cloning</h4>
+      <p>Clone VMs with automatic MAC address regeneration using dual-RandomState generation for uniqueness.</p>
+    </div>
+    <div class="card">
+      <h4>CD-ROM Management</h4>
+      <p>Attach, detach, and swap ISO images on VM CD-ROM drives with path canonicalization security.</p>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 6: ADD-ONS -->
+<div class="page page-accent">
+  <h2 class="section-title"><span>Add-ons</span></h2>
+  <p class="subtitle">Optional services available for any tier. All prices to be determined.</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="icon">&#x1F527;</div>
+      <h4>Custom Integrations</h4>
+      <p>Integration with your existing monitoring, alerting, CMDB, or ticketing systems. Custom API development for specific workflow requirements.</p>
+      <p style="margin-top: 8px; opacity: 0.6; font-size: 0.85em;">* Price to be determined</p>
+    </div>
+    <div class="card">
+      <div class="icon">&#x1F393;</div>
+      <h4>On-Site Training</h4>
+      <p>Hands-on training for your operations team. Covers installation (<code>install.sh</code> and <code>deploy-remote.sh</code>), configuration, daily operations, API usage, background jobs (virt-image-build / Golden Forge Packer + dockur Windows), TUI workflows, and troubleshooting.</p>
+      <p style="margin-top: 8px; opacity: 0.6; font-size: 0.85em;">* Price to be determined</p>
+    </div>
+    <div class="card">
+      <div class="icon">&#x1F500;</div>
+      <h4>Migration Assistance</h4>
+      <p>Guided migration from Cockpit, Proxmox, or custom VM management setups. We help you transition smoothly with data integrity validation.</p>
+      <p style="margin-top: 8px; opacity: 0.6; font-size: 0.85em;">* Price to be determined</p>
+    </div>
+    <div class="card">
+      <div class="icon">&#x1F6E1;</div>
+      <h4>Priority Support Upgrade</h4>
+      <p>Upgrade any tier to 24/7 priority support with guaranteed response times. Dedicated support channel and escalation path.</p>
+      <p style="margin-top: 8px; opacity: 0.6; font-size: 0.85em;">* Price to be determined</p>
+    </div>
+  </div>
+
+  <div class="card-grid" style="margin-top: 1em;">
+    <div class="card">
+      <div class="icon">&#x1F4CB;</div>
+      <h4>Compliance Package</h4>
+      <p>Audit trail reports, compliance documentation, and security assessment support. SOC 2, ISO 27001, and HIPAA readiness guidance.</p>
+      <p style="margin-top: 8px; opacity: 0.6; font-size: 0.85em;">* Price to be determined</p>
+    </div>
+    <div class="card">
+      <div class="icon">&#x1F4E6;</div>
+      <h4>Extended Deployment Support</h4>
+      <p>HyperSDK engineers assist with production deployment, systemd service configuration, TLS setup, and performance tuning for your specific hardware.</p>
+      <p style="margin-top: 8px; opacity: 0.6; font-size: 0.85em;">* Price to be determined</p>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 7: CTA -->
+<div class="page page-light">
+  <h2 class="section-title">Contact <span>HyperSDK</span></h2>
+  <p class="subtitle">All prices to be determined based on deployment scale and requirements.</p>
+
+  <div class="cta-box">
+    <h3>Get Your Custom Quote</h3>
+    <p>Every deployment is different. Contact HyperSDK to discuss your infrastructure,<br>
+    host count, VM requirements, and support needs. We'll build a pricing package that fits.</p>
+    <p style="margin-top: 1.5em; font-weight: 600; font-size: 1.1em;">Reach out to HyperSDK for pricing and licensing details.</p>
+  </div>
+
+  <div class="card-grid">
+    <div class="card">
+      <h4>Why HyperSDK?</h4>
+      <ul>
+        <li>Purpose-built for Linux hypervisor hosts (KVM/libvirt, optional KubeVirt)</li>
+        <li>Written in Rust for reliability and performance</li>
+        <li>Modern web UI with React and TypeScript</li>
+        <li>Security-first architecture at every layer</li>
+        <li>Active development with regular updates</li>
+        <li>Responsive support from the engineering team</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>Engagement Process</h4>
+      <div class="timeline" style="margin: 0.5em 0;">
+        <div class="timeline-item">
+          <div class="timeline-dot" style="width: 30px; height: 30px; font-size: 0.8em;">1</div>
+          <div class="timeline-content">
+            <h4 style="font-size: 1em;">Discovery Call</h4>
+            <p style="font-size: 0.85em;">Understand your infrastructure and requirements</p>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot" style="width: 30px; height: 30px; font-size: 0.8em;">2</div>
+          <div class="timeline-content">
+            <h4 style="font-size: 1em;">Live Demo</h4>
+            <p style="font-size: 0.85em;">See machina in action with your use cases</p>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot" style="width: 30px; height: 30px; font-size: 0.8em;">3</div>
+          <div class="timeline-content">
+            <h4 style="font-size: 1em;">Custom Quote</h4>
+            <p style="font-size: 0.85em;">Pricing tailored to your deployment scale</p>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-dot" style="width: 30px; height: 30px; font-size: 0.8em;">4</div>
+          <div class="timeline-content">
+            <h4 style="font-size: 1em;">Pilot &amp; Go-Live</h4>
+            <p style="font-size: 0.85em;">Deploy, validate, and move to production</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>machina — Enterprise VM Management Platform<br>
+    A HyperSDK Product — Proprietary Software<br>
+    All Prices To Be Determined Based on Deployment Scale and Requirements</p>
+  </div>
+</div>
+
+</body>
+</html>

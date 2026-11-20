@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Machina hero</title>
+<!-- SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+     1600x640. Rendered by ./build.sh to docs/ux/readme-hero.jpg. -->
+<link rel="stylesheet" href="card.css">
+<style>
+  body { height:680px; }
+  h1 { font-size:70px; margin-top:26px; }
+  .lede { margin:16px 0 0; font-size:25px; line-height:1.4; color:var(--soft); max-width:1200px; }
+  .grid { margin-top:30px; grid-template-columns:repeat(3,1fr); gap:24px; }
+  .grid .card { min-height:236px; } .grid .card h3 { font-size:29px; }
+  .chips { margin-top:22px; display:flex; gap:10px; flex-wrap:wrap; }
+  .chips span { font-family:var(--mono); font-size:16px; padding:5px 14px; border-radius:16px; background:rgba(255,255,255,.06); border:1px solid var(--line); color:#d1d1d6; }
+</style></head><body>
+<div class="bar"></div>
+<div class="wrap">
+  <div class="top"><img src="../../../web/public/zyvor-favicon.svg" alt=""><b>Zyvor</b><span>&middot;</span><span>Machina</span><span class="r">Your metal. Your cloud.</span></div>
+  <h1>Run your own cloud on <em>your own hardware.</em></h1>
+  <p class="lede">Machina turns Linux KVM hosts into a private cloud: VMs, a fleet control plane, an EC2-compatible API and a native eBPF network. One <span style="font-family:var(--mono)">machinactl deploy</span> on a single host.</p>
+  <div class="row grid">
+    <div class="card k"><span class="lane">HYPERVISOR</span><h3>VMs, done properly</h3><p>Create, clone, snapshot, migrate. Browser consoles, GPU passthrough, cloud-init, golden images, and a FluxVM backend (QEMU, Cloud Hypervisor, Firecracker).</p></div>
+    <div class="card m"><span class="lane">PRIVATE CLOUD</span><h3>Fleet Cloud + EC2 API</h3><p>Flavors, images, volumes, security groups, load balancers, stacks. <code>aws</code> and boto3 work with an endpoint override.</p></div>
+    <div class="card t"><span class="lane">NETWORK</span><h3>Native eBPF</h3><p>Flows, L7 visibility and VM network policy in the kernel. Enforcement is lease-gated and fails open.</p></div>
+  </div>
+  <div class="chips"><span>4 Rust services</span><span>SQLite or PostgreSQL</span><span>optional NATS</span><span>HA + DRS</span><span>Zyra AI, approval-gated</span><span>OpenStack alternative</span></div>
+  <div class="foot"><b>github.com/zyvorai/zyvor-machina</b><span class="r">libvirt &middot; QEMU/KVM &middot; Linux x86_64</span></div>
+</div>
+</body></html>

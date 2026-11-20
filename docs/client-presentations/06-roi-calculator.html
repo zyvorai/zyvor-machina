@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>machina — ROI &amp; Total Cost of Ownership</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{--accent:#3b82f6;--accent-dark:#2563eb;--accent-light:#60a5fa;--bg-dark:#0f172a;--bg-light:#f8fafc;--text-dark:#1e293b;--text-light:#e2e8f0;--card-dark:#1e293b;--card-light:#ffffff;--border:#334155;--shadow:0 4px 24px rgba(0,0,0,.12)}
+  html{font-size:16px;scroll-behavior:smooth}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;line-height:1.6;color:var(--text-dark)}
+
+  /* ---------- page types ---------- */
+  .page{min-height:100vh;padding:80px 64px;display:flex;flex-direction:column;justify-content:center}
+  @media(max-width:768px){.page{padding:48px 24px}}
+
+  .cover{background:linear-gradient(135deg,var(--bg-dark) 0%,#1e3a5f 100%);color:var(--text-light);text-align:center;position:relative;overflow:hidden}
+  .cover::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 30% 40%,rgba(59,130,246,.25) 0%,transparent 60%)}
+  .cover .brand{font-size:.9rem;text-transform:uppercase;letter-spacing:4px;color:var(--accent-light);margin-bottom:16px;position:relative}
+  .cover h1{font-size:3.2rem;font-weight:800;line-height:1.15;margin-bottom:24px;position:relative}
+  .cover .subtitle{font-size:1.25rem;opacity:.85;max-width:640px;margin:0 auto;position:relative}
+
+  .page-dark{background:var(--bg-dark);color:var(--text-light)}
+  .page-light{background:var(--bg-light);color:var(--text-dark)}
+  .page-accent{background:linear-gradient(135deg,var(--accent) 0%,var(--accent-dark) 100%);color:#fff}
+
+  .page h2{font-size:2.2rem;font-weight:700;margin-bottom:12px}
+  .page .lead{font-size:1.1rem;opacity:.8;margin-bottom:40px;max-width:720px}
+
+  /* ---------- card grid ---------- */
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;margin-top:8px}
+  .card{background:var(--card-light);border-radius:12px;padding:28px;box-shadow:var(--shadow);border:1px solid #e2e8f0}
+  .page-dark .card{background:var(--card-dark);border-color:var(--border);color:var(--text-light)}
+  .card h3{font-size:1.15rem;font-weight:700;margin-bottom:8px;color:var(--accent)}
+  .page-dark .card h3{color:var(--accent-light)}
+  .card p{font-size:.95rem;opacity:.85;line-height:1.55}
+  .card code{background:rgba(59,130,246,.12);padding:2px 6px;border-radius:4px;font-size:.85rem;font-family:'SF Mono',Consolas,monospace}
+  .page-dark .card code{background:rgba(96,165,250,.15)}
+
+  /* ---------- stat row ---------- */
+  .stat-row{display:flex;flex-wrap:wrap;gap:32px;margin:32px 0}
+  .stat{flex:1;min-width:180px;text-align:center}
+  .stat .num{font-size:2.8rem;font-weight:800;color:var(--accent);line-height:1.1}
+  .page-dark .stat .num{color:var(--accent-light)}
+  .stat .label{font-size:.95rem;opacity:.7;margin-top:4px}
+
+  /* ---------- table ---------- */
+  .tbl-wrap{overflow-x:auto;margin-top:16px}
+  table{width:100%;border-collapse:collapse;font-size:.95rem}
+  th,td{padding:14px 18px;text-align:left;border-bottom:1px solid #e2e8f0}
+  .page-dark th,.page-dark td{border-color:var(--border)}
+  th{font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--accent)}
+  .page-dark th{color:var(--accent-light)}
+  td{opacity:.9}
+
+  /* ---------- check / cross ---------- */
+  .check{color:#22c55e;font-weight:700}
+  .check::before{content:'\2713 '}
+  .cross{color:#ef4444;font-weight:700}
+  .cross::before{content:'\2717 '}
+
+  /* ---------- timeline ---------- */
+  .timeline{position:relative;padding-left:36px;margin-top:24px}
+  .timeline::before{content:'';position:absolute;left:14px;top:0;bottom:0;width:3px;background:var(--accent);border-radius:3px}
+  .timeline .step{position:relative;margin-bottom:36px}
+  .timeline .step::before{content:'';position:absolute;left:-29px;top:6px;width:14px;height:14px;border-radius:50%;background:var(--accent);border:3px solid var(--bg-dark)}
+  .page-light .timeline .step::before{border-color:var(--bg-light)}
+  .timeline .step h3{font-size:1.1rem;font-weight:700;margin-bottom:4px}
+  .timeline .step p{font-size:.95rem;opacity:.8}
+
+  /* ---------- quote ---------- */
+  .quote{border-left:4px solid var(--accent);padding:20px 28px;margin:32px 0;font-style:italic;font-size:1.05rem;opacity:.85;background:rgba(59,130,246,.06);border-radius:0 8px 8px 0}
+  .page-dark .quote{background:rgba(59,130,246,.1)}
+
+  /* ---------- CTA ---------- */
+  .cta-box{text-align:center;margin-top:48px}
+  .cta-box h2{margin-bottom:16px}
+  .cta-box p{max-width:600px;margin:0 auto 28px;font-size:1.1rem;opacity:.9}
+  .cta-btn{display:inline-block;padding:16px 48px;background:#fff;color:var(--accent-dark);font-size:1.1rem;font-weight:700;border-radius:8px;text-decoration:none;transition:transform .15s,box-shadow .15s}
+  .cta-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.2)}
+
+  /* ---------- flow ---------- */
+  .flow{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px;margin:32px 0}
+  .flow-step{background:var(--card-dark);border:1px solid var(--border);border-radius:10px;padding:18px 24px;text-align:center;min-width:150px;flex:1}
+  .page-light .flow-step{background:var(--card-light);border-color:#e2e8f0}
+  .flow-step strong{display:block;font-size:1rem;margin-bottom:4px}
+  .flow-step span{font-size:.85rem;opacity:.7}
+  .flow-arrow{font-size:1.6rem;color:var(--accent);flex:0 0 auto}
+
+  /* ---------- footer ---------- */
+  .footer{text-align:center;padding:40px 24px;font-size:.85rem;opacity:.5;background:var(--bg-dark);color:var(--text-light)}
+
+  /* ---------- pricing tier ---------- */
+  .tier{background:var(--card-light);border-radius:12px;padding:32px;box-shadow:var(--shadow);border:1px solid #e2e8f0;text-align:center;position:relative}
+  .page-dark .tier{background:var(--card-dark);border-color:var(--border);color:var(--text-light)}
+  .tier.featured{border-color:var(--accent);border-width:2px}
+  .tier.featured::after{content:'POPULAR';position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:.7rem;font-weight:700;letter-spacing:1px;padding:4px 16px;border-radius:12px}
+  .tier h3{font-size:1.3rem;font-weight:700;margin-bottom:8px;color:var(--accent)}
+  .page-dark .tier h3{color:var(--accent-light)}
+  .tier .price{font-size:2rem;font-weight:800;margin:12px 0 4px}
+  .tier .price-note{font-size:.8rem;opacity:.6;margin-bottom:16px}
+  .tier ul{list-style:none;text-align:left;font-size:.92rem;margin-bottom:20px}
+  .tier ul li{padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06);position:relative;padding-left:22px}
+  .page-dark .tier ul li{border-color:rgba(255,255,255,.06)}
+  .tier ul li::before{content:'\2713';position:absolute;left:0;color:#22c55e;font-weight:700}
+
+  /* ---------- highlight num ---------- */
+  .highlight-num{font-size:3.4rem;font-weight:800;color:var(--accent-light);line-height:1}
+
+  /* ---------- tbd badge ---------- */
+  .tbd{display:inline-block;background:rgba(251,191,36,.2);color:#f59e0b;font-size:.75rem;font-weight:700;padding:2px 8px;border-radius:4px;margin-left:8px;vertical-align:middle}
+</style>
+</head>
+<body>
+
+<!-- ========== PAGE 1: COVER ========== -->
+<section class="page cover">
+  <div class="brand">HyperSDK</div>
+  <h1>ROI Calculator &amp;<br>TCO Analysis</h1>
+  <p class="subtitle">Quantify the time savings, cost reduction, and operational efficiency gains from adopting machina for your virtualization management.</p>
+</section>
+
+<!-- ========== PAGE 2: HIDDEN COST OF MANUAL VM MANAGEMENT ========== -->
+<section class="page page-dark">
+  <h2>The Hidden Cost of Manual VM Management</h2>
+  <p class="lead">Every minute spent on CLI commands, manual configuration, and context switching is a minute not spent on innovation.</p>
+
+  <div class="stat-row">
+    <div class="stat">
+      <div class="num">15 min</div>
+      <div class="label">Average time per VM operation (CLI)</div>
+    </div>
+    <div class="stat">
+      <div class="num">30 sec</div>
+      <div class="label">Average time with machina</div>
+    </div>
+    <div class="stat">
+      <div class="num">25 hrs</div>
+      <div class="label">Time saved per 100 VMs/month</div>
+    </div>
+    <div class="stat">
+      <div class="num">$22,500</div>
+      <div class="label">Annual savings (at $75/hr)</div>
+    </div>
+  </div>
+
+  <div class="quote">
+    A team managing 100 VMs saves over <strong>25 hours per month</strong> by switching from manual virsh commands to machina's web interface and API. At a fully loaded cost of $75/hour, that translates to <strong>$22,500 in annual savings</strong> per team.
+  </div>
+
+  <div class="flow" style="margin-top:40px">
+    <div class="flow-step">
+      <strong>Manual CLI</strong>
+      <span>virsh + virt-install + XML editing</span>
+    </div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step" style="border-color:var(--accent)">
+      <strong>machina</strong>
+      <span>Web UI + REST API + Automation</span>
+    </div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step" style="border-color:#22c55e">
+      <strong>30x Faster</strong>
+      <span>From 15 min to 30 sec</span>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PAGE 3: TCO COMPARISON ========== -->
+<section class="page page-light">
+  <h2>TCO Comparison</h2>
+  <p class="lead">How machina stacks up against alternatives across key capabilities. <span class="tbd">All prices TBD</span></p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>machina</th>
+          <th>Proxmox VE</th>
+          <th>Manual virsh</th>
+          <th>VMware vCenter</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>License Cost</strong></td>
+          <td>TBD</td>
+          <td>Free / Subscription</td>
+          <td>Free</td>
+          <td>$$$$</td>
+        </tr>
+        <tr>
+          <td><strong>Management UI</strong></td>
+          <td><span class="check">Full Web UI</span></td>
+          <td><span class="check">Web UI</span></td>
+          <td><span class="cross">CLI only</span></td>
+          <td><span class="check">Web + Desktop</span></td>
+        </tr>
+        <tr>
+          <td><strong>Console Access</strong></td>
+          <td><span class="check">VNC + Serial + SSH</span></td>
+          <td><span class="check">noVNC + xterm.js</span></td>
+          <td><span class="cross">Manual setup</span></td>
+          <td><span class="check">VMRC</span></td>
+        </tr>
+        <tr>
+          <td><strong>Backup / Restore</strong></td>
+          <td><span class="check">Built-in + NFS</span></td>
+          <td><span class="check">PBS integration</span></td>
+          <td><span class="cross">Scripts required</span></td>
+          <td><span class="check">VADP</span></td>
+        </tr>
+        <tr>
+          <td><strong>Monitoring</strong></td>
+          <td><span class="check">Built-in + Prometheus</span></td>
+          <td><span class="check">Built-in</span></td>
+          <td><span class="cross">External tools</span></td>
+          <td><span class="check">vRealize</span></td>
+        </tr>
+        <tr>
+          <td><strong>Automation API</strong></td>
+          <td><span class="check">100+ REST endpoints</span></td>
+          <td><span class="check">REST API</span></td>
+          <td><span class="cross">Shell scripts</span></td>
+          <td><span class="check">vSphere API</span></td>
+        </tr>
+        <tr>
+          <td><strong>RBAC</strong></td>
+          <td><span class="check">3-tier roles</span></td>
+          <td><span class="check">Role-based</span></td>
+          <td><span class="cross">Root only</span></td>
+          <td><span class="check">Fine-grained</span></td>
+        </tr>
+        <tr>
+          <td><strong>REST API</strong></td>
+          <td><span class="check">Native</span></td>
+          <td><span class="check">Native</span></td>
+          <td><span class="cross">None</span></td>
+          <td><span class="check">SOAP + REST</span></td>
+        </tr>
+        <tr style="font-weight:700;border-top:2px solid var(--accent)">
+          <td>Total Year 1</td>
+          <td>TBD</td>
+          <td>Free - $$</td>
+          <td>$$ (labor)</td>
+          <td>$$$$</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="quote" style="margin-top:32px">
+    machina delivers enterprise-grade features at a fraction of the complexity and cost of VMware, while exceeding the capabilities of manual virsh management.
+  </div>
+</section>
+
+<!-- ========== PAGE 4: PRICING TIERS ========== -->
+<section class="page page-dark">
+  <h2>Pricing Tiers <span class="tbd">All prices TBD</span></h2>
+  <p class="lead">Flexible plans scaled to your infrastructure. Contact HyperSDK for current pricing.</p>
+
+  <div class="card-grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+    <div class="tier">
+      <h3>Starter</h3>
+      <div class="price">TBD</div>
+      <div class="price-note">per host / month</div>
+      <ul>
+        <li>Single host management</li>
+        <li>Web UI &amp; REST API</li>
+        <li>VNC &amp; Serial console</li>
+        <li>Basic monitoring</li>
+        <li>Documentation access</li>
+      </ul>
+    </div>
+    <div class="tier featured">
+      <h3>Professional</h3>
+      <div class="price">TBD</div>
+      <div class="price-note">per host / month</div>
+      <ul>
+        <li>Multi-host management</li>
+        <li>Full feature set</li>
+        <li>Backup &amp; restore (+ NFS)</li>
+        <li>RBAC &amp; audit logging</li>
+        <li>Prometheus metrics export</li>
+        <li>Batch operations</li>
+        <li>Email support (48hr SLA)</li>
+      </ul>
+    </div>
+    <div class="tier">
+      <h3>Enterprise</h3>
+      <div class="price">TBD</div>
+      <div class="price-note">unlimited hosts</div>
+      <ul>
+        <li>Unlimited host management</li>
+        <li>All Professional features</li>
+        <li>Priority support (4hr SLA)</li>
+        <li>Custom integrations</li>
+        <li>On-premise deployment assistance</li>
+        <li>Security compliance reports</li>
+        <li>Dedicated account manager</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="quote" style="margin-top:40px">
+    Contact HyperSDK for current pricing and volume discounts. All plans include free upgrades within the major version.
+  </div>
+</section>
+
+<!-- ========== PAGE 5: OPERATIONAL EFFICIENCY GAINS ========== -->
+<section class="page page-light">
+  <h2>Operational Efficiency Gains</h2>
+  <p class="lead">machina replaces an entire toolchain with a single, integrated platform that accelerates every workflow.</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <h3>Batch Operations</h3>
+      <p>Start, stop, snapshot, or delete <strong>100 VMs in seconds</strong> using the batch API or built-in bulk scripts. No more looping through virsh commands one at a time.</p>
+    </div>
+    <div class="card">
+      <h3>Command Palette</h3>
+      <p>Find any VM, action, or setting instantly with <code>Ctrl+K</code>. Fuzzy search across all resources without navigating through menus. Keyboard-driven productivity.</p>
+    </div>
+    <div class="card">
+      <h3>API Automation</h3>
+      <p><strong>100+ REST endpoints</strong> covering every VM lifecycle operation. Integrate with CI/CD pipelines, infrastructure-as-code tools, and custom automation scripts.</p>
+    </div>
+    <div class="card">
+      <h3>Backup Scheduler</h3>
+      <p>Automated daily backups via systemd timers. Configurable retention policies, NFS target support, and one-click restore from the web UI.</p>
+    </div>
+    <div class="card">
+      <h3>Live Metrics Dashboards</h3>
+      <p>Real-time CPU, memory, disk I/O, and network charts <strong>without deploying Grafana</strong>. Built-in dashboards with per-VM drill-down and Prometheus export for existing stacks.</p>
+    </div>
+  </div>
+
+  <div class="stat-row" style="margin-top:48px">
+    <div class="stat">
+      <div class="num">100+</div>
+      <div class="label">REST API endpoints</div>
+    </div>
+    <div class="stat">
+      <div class="num">60+</div>
+      <div class="label">Features built-in</div>
+    </div>
+    <div class="stat">
+      <div class="num">5 min</div>
+      <div class="label">Install to production</div>
+    </div>
+    <div class="stat">
+      <div class="num">0</div>
+      <div class="label">External dependencies</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PAGE 6: MIGRATION TIMELINE ========== -->
+<section class="page page-dark">
+  <h2>Migration from Existing Tools</h2>
+  <p class="lead">Transition from manual management, Cockpit, or Proxmox to machina with zero downtime and minimal effort.</p>
+
+  <div class="timeline">
+    <div class="step">
+      <h3>Day 1 &mdash; Install machina</h3>
+      <p>Run the automated installer on the hypervisor (<code>sudo ./install.sh</code>) or use <code>scripts/deploy-remote.sh</code> to rsync sources and build <strong>on the server</strong>. Typical full install under <strong>5 minutes</strong>; systemd starts the daemon and the web UI is on port <strong>5092</strong>.</p>
+    </div>
+    <div class="step">
+      <h3>Day 1 &mdash; Import Existing VMs</h3>
+      <p>machina discovers every domain already defined in libvirt automatically. No import process required — your VMs appear in the dashboard as soon as the daemon starts. Existing disk images, networks, and storage pools are recognized instantly.</p>
+    </div>
+    <div class="step">
+      <h3>Week 1 &mdash; Migrate Workflows</h3>
+      <p>Replace manual virsh scripts with REST API calls. Migrate Cockpit or Proxmox workflows to machina's web UI. Set up backup schedules, monitoring dashboards, and RBAC roles. Train your team on the command palette (<code>Ctrl+K</code>).</p>
+    </div>
+    <div class="step">
+      <h3>Month 1 &mdash; Full Production Operation</h3>
+      <p>All VM management consolidated through machina. Automated backups running on schedule. Audit logs providing compliance evidence. Team fully productive with 30x faster operations. Legacy tools decommissioned.</p>
+    </div>
+  </div>
+
+  <div class="flow" style="margin-top:40px">
+    <div class="flow-step">
+      <strong>Before</strong>
+      <span>virsh + virt-manager + scripts</span>
+    </div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step">
+      <strong>Install</strong>
+      <span>5 minutes</span>
+    </div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step">
+      <strong>Discover</strong>
+      <span>Existing VMs auto-detected</span>
+    </div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step" style="border-color:#22c55e">
+      <strong>Production</strong>
+      <span>Full management in 1 month</span>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PAGE 7: CTA ========== -->
+<section class="page page-accent">
+  <div class="cta-box">
+    <h2>Ready to Reduce Your<br>VM Management Costs?</h2>
+    <p>Contact HyperSDK for a custom ROI analysis tailored to your infrastructure size, team, and workflows. All prices to be determined.</p>
+    <a href="#" class="cta-btn">Request Custom ROI Analysis</a>
+    <p style="margin-top:24px;font-size:.9rem;opacity:.7">Schedule a live demo &middot; Get volume pricing &middot; See it in your environment</p>
+  </div>
+</section>
+
+<!-- ========== FOOTER ========== -->
+<footer class="footer">
+  HyperSDK &middot; machina &mdash; ROI Calculator &amp; TCO Analysis &middot; Confidential
+</footer>
+
+</body>
+</html>

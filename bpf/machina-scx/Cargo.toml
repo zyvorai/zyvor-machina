@@ -1,0 +1,21 @@
+[package]
+name = "machina-scx"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "VM-aware sched_ext scheduler helper, supervised by machina-bpfd"
+
+# Without `scx` the binary only reports that it was built without support, so
+# workspace builds need no clang/bpftool/libelf.
+[features]
+default = []
+scx = ["dep:libbpf-rs", "dep:libbpf-cargo"]
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+libbpf-rs = { version = "0.27", optional = true }
+
+[build-dependencies]
+libbpf-cargo = { version = "0.27", optional = true }

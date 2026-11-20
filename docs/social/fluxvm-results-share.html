@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Machina + FluxVM results</title>
+<!-- SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+     1200x630 (link previews). Rendered by ./build-social-card.sh to fluxvm-results-share.jpg.
+     Every number is from scripts/regression/RESULTS.md (2026-10-08 runs on 175.110.122.71 and 212.8.248.187). -->
+<link rel="stylesheet" href="readme/card.css">
+<style>
+  body { width:1200px; height:630px; }
+  .wrap { left:52px; right:46px; top:34px; bottom:28px; }
+  .top { font-size:15px; } .top img { height:28px; }
+  h1 { font-size:56px; margin-top:20px; }
+  .grid { margin-top:30px; grid-template-columns:repeat(3,1fr); gap:20px; }
+  .card { padding:20px 22px; min-height:250px; display:flex; flex-direction:column; }
+  .card .lane { align-self:flex-start; font-size:12px; }
+  .big { font-size:86px; font-weight:800; letter-spacing:-.04em; line-height:1; margin-top:20px;
+    background:linear-gradient(90deg,var(--c),#fff 140%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .big small { font-size:38px; }
+  .card h3 { font-size:24px; margin-top:14px; }
+  .card p { font-size:17px; margin-top:auto; }
+  .foot { font-size:16px; }
+  .foot .g { color:var(--green); font-weight:700; }
+</style></head><body>
+<div class="bar"></div>
+<div class="wrap">
+  <div class="top"><img src="../../web/public/zyvor-favicon.svg" alt=""><b>Zyvor</b><span>&middot;</span><span>Machina + FluxVM</span><span class="r">Measured on real hosts</span></div>
+  <h1>Faster network.<br><em>VMs that survive a host.</em></h1>
+  <div class="row grid">
+    <div class="card k"><span class="lane">NETWORK</span><div class="big">2.6<small>&times;</small></div>
+      <h3>vhost-net datapath</h3><p>348 vs 133 MiB/s into the guest</p></div>
+    <div class="card o"><span class="lane">HIGH AVAILABILITY</span><div class="big">A&#8644;B</div>
+      <h3>HA across hosts</h3><p>Re-created on the other host and back</p></div>
+    <div class="card v"><span class="lane">DENSITY</span><div class="big">&minus;46<small>%</small></div>
+      <h3>Idle balloon</h3><p>239 &rarr; 129 MiB per idle VM</p></div>
+  </div>
+  <div class="foot"><span><span class="g">38/38</span> regression on both hosts</span><span class="r"><b>github.com/zyvorai/zyvor-machina</b></span></div>
+</div>
+</body></html>

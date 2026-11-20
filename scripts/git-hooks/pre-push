@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Local pre-push gate. Server-side branch protection on `main` requires GitHub Pro
+# (or a public repo); until that's available this hook is the substitute that
+# catches the highest-frequency regression class — a commit that doesn't compile
+# (which has reached `main` before, masked by a stale incremental cache).
+#
+# Enable once per clone:   git config core.hooksPath scripts/git-hooks
+# Bypass in an emergency:  git push --no-verify
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$ROOT"
+
+echo "pre-push: cargo check --workspace (locked) ..."
+if ! cargo check --workspace --locked; then
+  echo "pre-push: FAILED — workspace does not compile. Push aborted." >&2
+  echo "          Fix the build, or bypass with 'git push --no-verify' if intentional." >&2
+  exit 1
+fi
+
+# Fast unit tests on the pure crates (agent bin can't link off-Linux, so scope it).
+echo "pre-push: cargo test -p machina-controller -p machina-core ..."
+if ! cargo test -p machina-controller -p machina-core --locked; then
+  echo "pre-push: FAILED — unit tests broken. Push aborted." >&2
+  exit 1
+fi
+
+echo "pre-push: OK"

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Machina social card</title>
+<!--
+  SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+  1600x900 (16:9) card for LinkedIn and X. Dark, with live captures from docs/ux/.
+  Every claim maps to code in this repository (see docs/social/README.md).
+  Build:  ./docs/social/build-social-card.sh   ->  machina-social-card.jpg
+-->
+<style>
+  :root { --blue:#0071e3; --signal:#2997ff; --cyan:#64d2ff; --soft:#a1a1a6; --line:rgba(255,255,255,.1);
+    --green:#30d158; --violet:#a78bfa; --amber:#ff9f0a; --teal:#40c8e0;
+    --sans:'SF Pro Display','Helvetica Neue',Helvetica,Arial,sans-serif; --mono:'SF Mono',Menlo,Consolas,monospace; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; }
+  body { width:1600px; height:900px; overflow:hidden; color:#f5f5f7; font-family:var(--sans); position:relative; background:#000; }
+  .aurora { position:absolute; inset:0;
+    background:radial-gradient(900px 560px at 82% 12%, rgba(41,151,255,.40), transparent 62%),
+               radial-gradient(700px 480px at 104% 100%, rgba(100,210,255,.20), transparent 60%),
+               radial-gradient(640px 440px at -4% 106%, rgba(0,113,227,.30), transparent 60%); }
+  .grid { position:absolute; inset:0; opacity:.08;
+    background-image:linear-gradient(rgba(120,180,255,.9) 1px,transparent 1px),linear-gradient(90deg,rgba(120,180,255,.9) 1px,transparent 1px);
+    background-size:48px 48px; -webkit-mask-image:radial-gradient(1100px 700px at 70% 40%, #000 15%, transparent 75%); }
+  .wrap { position:absolute; left:76px; top:60px; width:720px; z-index:3; }
+  .top { display:flex; align-items:center; gap:14px; font-family:var(--mono); font-size:18px; letter-spacing:.18em; text-transform:uppercase; color:var(--soft); }
+  .top img { height:38px; } .top b { color:#fff; }
+  .word { margin:26px 0 0; font-size:150px; line-height:.9; font-weight:800; letter-spacing:-.06em;
+    background:linear-gradient(92deg,#fff 0%,#e3f0ff 36%,var(--signal) 70%,var(--cyan) 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  h1 { margin:22px 0 0; font-size:46px; line-height:1.08; letter-spacing:-.03em; font-weight:800; }
+  h1 em { font-style:normal; color:var(--signal); }
+  .sub { margin:16px 0 0; font-size:23px; line-height:1.42; color:#b8b8bf; width:660px; }
+  .feats { margin-top:30px; display:grid; grid-template-columns:1fr 1fr; gap:12px 16px; width:700px; }
+  .f { display:flex; align-items:center; gap:12px; padding:12px 16px; border-radius:14px; background:rgba(28,28,32,.7); border:1px solid var(--line); font-size:20px; font-weight:600; }
+  .f i { flex:none; width:10px; height:10px; border-radius:50%; background:var(--c); box-shadow:0 0 12px var(--c); }
+  .f span { color:var(--soft); font-weight:500; font-size:17px; margin-left:auto; font-family:var(--mono); }
+  .cmd { position:absolute; left:76px; bottom:56px; z-index:3; display:flex; align-items:center; gap:18px; font-family:var(--mono); font-size:22px;
+    padding:14px 22px; border-radius:14px; background:rgba(10,14,22,.85); border:1px solid rgba(41,151,255,.45); box-shadow:0 0 40px rgba(0,113,227,.25); }
+  .cmd .p { color:var(--signal); } .cmd .ok { color:var(--green); }
+  .repo { position:absolute; right:64px; bottom:62px; z-index:3; font-family:var(--mono); font-size:19px; font-weight:700; padding:10px 18px; border-radius:22px;
+    background:var(--blue); color:#fff; box-shadow:0 0 30px rgba(0,113,227,.6); }
+
+  .frame { position:absolute; border-radius:16px; overflow:hidden; background:#0b0b0d;
+    box-shadow:0 60px 120px rgba(0,0,0,.8), 0 0 0 1px rgba(255,255,255,.14), 0 0 90px rgba(41,151,255,.2); }
+  .frame img { display:block; width:100%; }
+  .chrome { height:32px; display:flex; align-items:center; gap:8px; padding:0 14px; background:#1c1c1e; border-bottom:1px solid rgba(255,255,255,.06); }
+  .chrome i { width:11px; height:11px; border-radius:50%; background:#ff5f57; } .chrome i:nth-child(2){background:#febc2e} .chrome i:nth-child(3){background:#28c840}
+  .chrome em { margin-left:14px; font-style:normal; font-family:var(--mono); font-size:13px; color:#8e8e93; }
+  .main { left:860px; top:96px; width:960px; transform:perspective(2000px) rotateY(-17deg) rotateX(5deg); transform-origin:left center; z-index:1; }
+  .f1 { left:1010px; top:470px; width:470px; transform:perspective(1500px) rotateY(-13deg) rotateX(4deg); transform-origin:left center; z-index:2;
+    box-shadow:0 40px 90px rgba(0,0,0,.85), 0 0 0 1px rgba(64,200,224,.5), 0 0 60px rgba(64,200,224,.3); }
+  .tag2 { position:absolute; left:990px; top:438px; z-index:4; font-family:var(--mono); font-size:13px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+    padding:6px 12px; border-radius:14px; background:rgba(10,20,35,.9); border:1px solid rgba(64,200,224,.6); color:#c9f3fb; }
+  .tag2 i { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--green); margin-right:8px; box-shadow:0 0 10px var(--green); }
+</style>
+</head>
+<body>
+<div class="aurora"></div>
+<div class="grid"></div>
+<div class="wrap">
+  <div class="top"><img src="../../web/public/zyvor-favicon.svg" alt=""><b>Zyvor</b><span>&middot;</span><span>Private cloud on KVM</span></div>
+  <div class="word">machina</div>
+  <h1>Your metal. Your cloud.<br><em>One control plane.</em></h1>
+  <p class="sub">VMs, browser consoles, fleet HA, native eBPF security and Zyra AI ops, from four Rust services. Install before lunch.</p>
+  <div class="feats">
+    <div class="f" style="--c:var(--signal)"><i></i>Quick create VMs<span>RUN</span></div>
+    <div class="f" style="--c:var(--teal)"><i></i>Native eBPF policy<span>SECURE</span></div>
+    <div class="f" style="--c:var(--amber)"><i></i>HA, DRS, live migrate<span>SCALE</span></div>
+    <div class="f" style="--c:var(--violet)"><i></i>Zyra AI, verify + undo<span>OPERATE</span></div>
+    <div class="f" style="--c:var(--green)"><i></i>Boot Doctor repair<span>FIX</span></div>
+    <div class="f" style="--c:var(--cyan)"><i></i>Quarantine, JIT access<span>CONTAIN</span></div>
+  </div>
+</div>
+<div class="cmd"><span class="p">$</span><span>machinactl deploy</span><span>&rarr; https://host:5092</span><span class="ok">&#10003; healthy</span></div>
+<div class="repo">github.com/zyvorai/zyvor-machina</div>
+<div class="frame main"><div class="chrome"><i></i><i></i><i></i><em>https://machina:5092</em></div><img src="../ux/machina-dashboard-dark.png" alt=""></div>
+<div class="tag2"><i></i>machina-bpfd &middot; datapath loaded</div>
+<div class="frame f1"><img src="../ux/machina-native-ebpf-dark.png" alt=""></div>
+</body>
+</html>

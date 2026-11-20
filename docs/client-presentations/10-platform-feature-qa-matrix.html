@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>machina — Platform Feature QA Matrix</title>
+<style>
+@page { size: A4; margin: 0; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; color: #1a1a2e; background: #fff; line-height: 1.6; }
+.cover { height: 100vh; background: linear-gradient(135deg, #1e1b4b, #312e81, #0f172a); color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; page-break-after: always; }
+.cover h1 { font-size: 2.8em; font-weight: 800; letter-spacing: -2px; margin-bottom: 0.2em; }
+.cover h1 span { color: #818cf8; }
+.cover p { font-size: 1.05em; opacity: 0.85; max-width: 640px; }
+.cover .badge { display: inline-block; background: rgba(129,140,248,0.2); border: 1px solid rgba(129,140,248,0.4); padding: 0.3em 1em; border-radius: 20px; font-size: 0.9em; margin-top: 1.5em; }
+.page { min-height: 100vh; padding: 52px 70px; page-break-after: always; position: relative; }
+.page-dark { background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; }
+.page-light { background: #f8fafc; }
+.page h2 { font-size: 2em; font-weight: 700; margin-bottom: 0.15em; }
+.page h2 span { color: #818cf8; }
+.page .subtitle { font-size: 1em; opacity: 0.7; margin-bottom: 1.5em; }
+table { width: 100%; border-collapse: collapse; font-size: 0.76em; margin-top: 0.8em; }
+th { background: #4f46e5; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; }
+td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+.page-dark td { border-bottom-color: rgba(255,255,255,0.08); }
+.page-dark tr:nth-child(even) { background: rgba(255,255,255,0.03); }
+.section-label { display: inline-block; background: rgba(129,140,248,0.15); color: #a5b4fc; padding: 4px 14px; border-radius: 20px; font-size: 0.76em; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.8em; }
+.code { background: #0f172a; color: #a5f3fc; padding: 14px 18px; border-radius: 10px; font-family: monospace; font-size: 0.78em; line-height: 1.7; margin: 1em 0; }
+.page-footer { position: absolute; bottom: 24px; left: 70px; right: 70px; display: flex; justify-content: space-between; font-size: 0.72em; opacity: 0.4; }
+.card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 1em; }
+.card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 18px; }
+.card h3 { color: #818cf8; font-size: 0.95em; margin-bottom: 0.4em; }
+.card p { font-size: 0.85em; opacity: 0.9; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="badge">Playwright · F01–F18 · Mock + Live</div>
+  <h1>Platform Feature <span>QA Matrix</span></h1>
+  <p style="font-size:1.3em;font-weight:700;margin-bottom:0.4em;">One feature at a time — serial automated walkthrough</p>
+  <p>Maps Connect/Access/ConsoleHub flows (F01–F13) and disk/compute/device ops (F14–F18) to serial Playwright tests.</p>
+</div>
+
+<div class="page page-dark">
+  <span class="section-label">F01–F07</span>
+  <h2>VM Detail &amp; <span>Connect</span></h2>
+  <p class="subtitle">Hero, actions, attention stack, Connect hub, Access tab, SSH, NAT.</p>
+  <table>
+    <tr><th>ID</th><th>Feature</th><th>Expected</th><th>Mock</th></tr>
+    <tr><td>F01</td><td>VM detail hero</td><td>Gradient icon, state, health pills</td><td><code>-g F01</code></td></tr>
+    <tr><td>F02</td><td>Action bar</td><td>Cinema, SSH, Power &amp; more overflow</td><td><code>-g F02</code></td></tr>
+    <tr><td>F03</td><td>Attention stack</td><td>Top banner expanded; chip swap</td><td><code>-g F03</code></td></tr>
+    <tr><td>F04</td><td>Connect hub (Overview)</td><td>vm-daily-access, checklist, copy</td><td><code>-g F04</code></td></tr>
+    <tr><td>F05</td><td>Access tab</td><td>Full NAT + export on ?tab=access</td><td><code>-g F05</code></td></tr>
+    <tr><td>F06</td><td>SSH dialog</td><td>NAT banner, expose SSH action</td><td><code>-g F06</code></td></tr>
+    <tr><td>F07</td><td>NAT presets</td><td>Network tab POST port-forwards 2222→22</td><td><code>-g F07</code></td></tr>
+  </table>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Platform Feature QA Matrix</span></div>
+</div>
+
+<div class="page page-light">
+  <span class="section-label">F08–F13</span>
+  <h2>Tabs, ConsoleHub &amp; <span>Fleet</span></h2>
+  <table>
+    <tr><th>ID</th><th>Feature</th><th>Expected</th><th>Mock</th></tr>
+    <tr><td>F08</td><td>Overview body</td><td>Usage bars + Doctor one-liner</td><td><code>-g F08</code></td></tr>
+    <tr><td>F09</td><td>Console tab</td><td>Cinema + Studio guidance links</td><td><code>-g F09</code></td></tr>
+    <tr><td>F10</td><td>Doctor tab</td><td>Run migrate plan → Guest health</td><td><code>-g F10</code></td></tr>
+    <tr><td>F11</td><td>ConsoleHub / Cinema</td><td>cinema-shell, recovery, ops shelf NAT</td><td><code>-g F11</code></td></tr>
+    <tr><td>F12</td><td>Machine Finder</td><td>Table SSH; Gallery → Cinema</td><td><code>-g F12</code></td></tr>
+    <tr><td>F13</td><td>Mission Control</td><td>Home VM card → SSH dialog</td><td><code>-g F13</code></td></tr>
+  </table>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Platform Feature QA Matrix</span></div>
+</div>
+
+<div class="page page-light">
+  <span class="section-label">F14–F18</span>
+  <h2>Disks, compute &amp; <span>devices</span></h2>
+  <table>
+    <tr><th>ID</th><th>Feature</th><th>Tab / action</th><th>Mock</th></tr>
+    <tr><td>F14</td><td>Compute</td><td>Overview → Edit CPU / Edit memory</td><td><code>-g F14</code></td></tr>
+    <tr><td>F15</td><td>Disks</td><td>Disks → Attach disk, Resize block device</td><td><code>-g F15</code></td></tr>
+    <tr><td>F16</td><td>Network</td><td>Network → Attach NIC</td><td><code>-g F16</code></td></tr>
+    <tr><td>F17</td><td>Snapshots</td><td>Snapshots → Create snapshot</td><td><code>-g F17</code></td></tr>
+    <tr><td>F18</td><td>Devices / ISO</td><td>Devices virtiofs; Disks insert ISO + eject</td><td><code>-g F18</code></td></tr>
+  </table>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Platform Feature QA Matrix</span></div>
+</div>
+
+<div class="page page-dark">
+  <span class="section-label">Run</span>
+  <h2>Commands &amp; <span>Configs</span></h2>
+  <div class="code">cd web
+npm run build
+npm run test:e2e:features          # mock matrix (serial F01–F18)
+npm run test:e2e:features:live     # live lab (read-only)
+
+# Single feature:
+npm run test:e2e:features -- -g F04
+
+# Remote lab:
+./scripts/e2e-feature-matrix-remote.sh
+E2E_FEATURE_MATRIX=1 ./scripts/e2e-platform-complete-remote.sh</div>
+  <div class="card-grid">
+    <div class="card"><h3>Mock config</h3><p><code>playwright.feature-matrix.config.ts</code> — platform mocks, no live host required.</p></div>
+    <div class="card"><h3>Live config</h3><p><code>playwright.feature-matrix.live.config.ts</code> — PLAYWRIGHT_LIVE_URL + credentials.</p></div>
+  </div>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Platform Feature QA Matrix</span></div>
+</div>
+
+<div class="page page-light">
+  <span class="section-label">Docs</span>
+  <h2>Guide &amp; <span>Integration</span></h2>
+  <p class="subtitle">Internal guide: <strong>docs/guides/platform-feature-qa.md</strong> · deck <strong>11-vm-disks-compute-operations</strong></p>
+  <table>
+    <tr><th>Artifact</th><th>Path</th></tr>
+    <tr><td>Helper</td><td><code>web/e2e/helpers/featureMatrix.ts</code></td></tr>
+    <tr><td>Mock spec</td><td><code>web/e2e/platform-feature-matrix.spec.ts</code></td></tr>
+    <tr><td>Live spec</td><td><code>web/e2e/platform-live-feature-matrix.spec.ts</code></td></tr>
+    <tr><td>Remote runner</td><td><code>scripts/e2e-feature-matrix-remote.sh</code></td></tr>
+  </table>
+  <p style="margin-top:1.2em;">Synced to hypersdk-web via <code>npm run presentations:sync</code> after HTML decks land in <code>docs/client-presentations/</code>.</p>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Platform Feature QA · zyvor.dev</span></div>
+</div>
+
+</body>
+</html>

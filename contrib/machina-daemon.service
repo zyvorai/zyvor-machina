@@ -1,0 +1,55 @@
+[Unit]
+Description=Machina libvirt management daemon
+Documentation=https://github.com/zyvorai/machina
+After=libvirtd.service network-online.target machina-bpfd.service
+Requires=libvirtd.service
+Wants=network-online.target machina-bpfd.service
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+# Match hyper2kvm h2kweb-style layout: runtime/state/log dirs, journal, resource caps.
+# Use `Type=notify` + `WatchdogSec=` when you want watchdog pings (daemon sends READY=1
+# after bind and WATCHDOG=1 from WATCHDOG_USEC).
+Type=simple
+# Type=notify
+# WatchdogSec=2min
+
+User=root
+Group=root
+
+EnvironmentFile=-/etc/default/machina-daemon
+EnvironmentFile=-/etc/default/machina-platform
+Environment=RUST_LOG=info
+# install.sh installs mkosi to /usr/local/bin/mkosi; some distros' default root PATH omits it.
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# ProtectHome=read-only blocks /root/.cache; redirect virt-builder and pip caches to writable dirs.
+Environment=XDG_CACHE_HOME=/var/cache/machina
+
+ExecStart=/usr/local/bin/machina-daemon --config /etc/machina/config.toml
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+RuntimeDirectory=machina
+StateDirectory=machina
+LogsDirectory=machina
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=machina-daemon
+
+MemoryMax=2G
+TasksMax=256
+
+# Filesystem protection — relaxed for host networking management
+# (ip, iptables, nmcli need access to /sys, /proc, /run)
+ProtectHome=read-only
+# PrivateTmp breaks libguestfs (virt-builder): qemu (uid:107) can't access /tmp/libguestfsXXX/ in the private namespace.
+# PrivateTmp=true
+
+# Network access
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+[package]
+license = "LicenseRef-Zyvor-Production-1.0"
+name = "machina-run-as-user-helper"
+version = "0.1.0"
+edition = "2021"
+description = "Setuid root helper for Machina OIDC run-as-user (drops to target user, exec allow-listed programs)"
+
+[[bin]]
+name = "machina-run-as-user"
+path = "src/main.rs"
+
+[dependencies]
+libc = "0.2"

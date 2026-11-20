@@ -1,0 +1,18 @@
+# Example passive standby unit — enable only during DR failover.
+# Copy to /usr/lib/systemd/system/ and: systemctl enable --now machina-daemon-standby
+#
+# On failover: stop primary site daemon, start this unit on standby hypervisor.
+
+[Unit]
+Description=Machina daemon (standby / DR)
+After=libvirtd.service network-online.target
+Requires=libvirtd.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/machina-daemon --config /etc/machina/config.toml
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

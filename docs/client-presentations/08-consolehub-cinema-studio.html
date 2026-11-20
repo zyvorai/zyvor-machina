@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>machina — ConsoleHub Cinema &amp; Studio</title>
+<style>
+@page { size: A4; margin: 0; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; color: #1a1a2e; background: #fff; line-height: 1.6; }
+.cover { height: 100vh; background: linear-gradient(135deg, #0f0c29, #312e81, #0f172a); color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; page-break-after: always; }
+.cover h1 { font-size: 3em; font-weight: 800; letter-spacing: -2px; margin-bottom: 0.2em; }
+.cover h1 span { color: #a78bfa; }
+.cover p { font-size: 1.1em; opacity: 0.85; max-width: 620px; }
+.cover .badge { display: inline-block; background: rgba(167,139,250,0.2); border: 1px solid rgba(167,139,250,0.4); padding: 0.3em 1em; border-radius: 20px; font-size: 0.9em; margin-top: 1.5em; }
+.page { min-height: 100vh; padding: 60px 80px; page-break-after: always; position: relative; }
+.page-dark { background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; }
+.page-light { background: #f8fafc; }
+.page h2 { font-size: 2.1em; font-weight: 700; margin-bottom: 0.15em; letter-spacing: -1px; }
+.page h2 span { color: #a78bfa; }
+.page-light h2 span { color: #7c3aed; }
+.page .subtitle { font-size: 1.05em; opacity: 0.7; margin-bottom: 2em; }
+.card-grid { display: grid; gap: 20px; }
+.card-grid-2 { grid-template-columns: 1fr 1fr; }
+.card-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+.card { background: #fff; border-radius: 12px; padding: 24px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.card-dark { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #e2e8f0; }
+.card h3 { font-size: 1.05em; font-weight: 700; margin-bottom: 0.5em; color: #7c3aed; }
+.card p, .card li { font-size: 0.9em; line-height: 1.65; }
+table { width: 100%; border-collapse: collapse; font-size: 0.88em; margin-top: 1em; }
+th { background: #7c3aed; color: #fff; padding: 12px 16px; text-align: left; }
+td { padding: 11px 16px; border-bottom: 1px solid #e2e8f0; }
+.page-dark td { border-bottom-color: rgba(255,255,255,0.08); }
+.check { color: #22c55e; font-weight: 700; }
+.flow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 1em 0; }
+.flow .step { background: rgba(124,58,237,0.12); border: 1px solid rgba(124,58,237,0.25); padding: 10px 14px; border-radius: 8px; font-size: 0.82em; font-weight: 600; }
+.flow .arrow { color: #a78bfa; font-weight: 700; }
+.section-label { display: inline-block; background: rgba(124,58,237,0.15); color: #a78bfa; padding: 4px 14px; border-radius: 20px; font-size: 0.78em; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1em; }
+.page-footer { position: absolute; bottom: 30px; left: 80px; right: 80px; display: flex; justify-content: space-between; font-size: 0.75em; opacity: 0.4; }
+ul { margin: 0.4em 0 0.8em 1.3em; } li { margin-bottom: 0.35em; font-size: 0.92em; }
+code { background: rgba(124,58,237,0.1); padding: 2px 6px; border-radius: 4px; font-size: 0.88em; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="badge">ConsoleHub · Machina Cinema &amp; Studio</div>
+  <h1>Machina <span>Cinema</span></h1>
+  <p style="font-size:1.4em;font-weight:700;margin-bottom:0.4em;">Player-style VM display + engineer Studio layout</p>
+  <p>Three operator experiences: Cinema for full-screen display, Studio for serial/shell/recovery, Mission Control wall for fleet live preview.</p>
+</div>
+
+<div class="page page-dark">
+  <span class="section-label">Modes</span>
+  <h2>Three <span>Experiences</span></h2>
+  <p class="subtitle">Public UI copy uses Machina Cinema, Machina Studio, and Ops Shelf — not generic “tabs.”</p>
+  <table>
+    <tr><th>Mode</th><th>URL</th><th>Best for</th></tr>
+    <tr><td><strong>Machina Cinema</strong></td><td><code>/platform/vms/:id/consolehub?mode=cinema</code></td><td>VNC, SPICE, WebRTC — full-screen player HUD</td></tr>
+    <tr><td><strong>Machina Studio</strong></td><td><code>?mode=studio</code></td><td>Serial, Shell, split panes, recovery cards, lens bar</td></tr>
+    <tr><td><strong>Mission Control wall</strong></td><td><code>/platform/mission-control/live</code></td><td>Fleet live preview grid (max 6 thumbnails)</td></tr>
+  </table>
+  <div class="flow">
+    <div class="step">VM detail → Open Cinema</div><span class="arrow">→</span>
+    <div class="step">ConsoleHub Cinema</div><span class="arrow">→</span>
+    <div class="step">Studio toggle / Ops Shelf</div>
+  </div>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>ConsoleHub Cinema &amp; Studio</span></div>
+</div>
+
+<div class="page page-light">
+  <span class="section-label">Cinema</span>
+  <h2>Cinema <span>Layout</span></h2>
+  <p class="subtitle">VM canvas fills the viewport; platform chrome hidden for immersive display access.</p>
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <h3>Hero canvas</h3>
+      <ul>
+        <li>Sidebar and checklist hidden in Cinema mode</li>
+        <li>Fit / Fill / Native / Scroll / Stretch scale modes</li>
+        <li>Idle-hide control strip (~3.5s); mouse move reveals HUD</li>
+        <li>Screenshot capture from bottom strip</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Access Note pill</h3>
+      <ul>
+        <li>Guest / NAT / SSH warnings collapse to one expandable pill</li>
+        <li>Command palette ⌘K for scoped console actions</li>
+        <li>Studio toggle + Ops Shelf handle on strip</li>
+        <li>Serial-recommended VMs auto-redirect Cinema → Studio</li>
+      </ul>
+    </div>
+  </div>
+  <p><strong>Entry points:</strong> VM detail Open Cinema, Machine Finder gallery, Fleet Command Center, Spotlight, Live Preview Wall.</p>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>ConsoleHub Cinema &amp; Studio</span></div>
+</div>
+
+<div class="page page-dark">
+  <span class="section-label">Studio</span>
+  <h2>Studio <span>Engineer</span> Layout</h2>
+  <p class="subtitle">Lens bar, recovery cards, and Ops Shelf for day-2 console work.</p>
+  <div class="card-grid card-grid-3">
+    <div class="card card-dark"><h3>Lens bar</h3><p>Display · Serial · Shell · AI — switch console modality without leaving ConsoleHub.</p></div>
+    <div class="card card-dark"><h3>Recovery cards</h3><p>ConsoleLoginRecoveryCard, GuestAccessBanner, ShellAccessBanner for login/NAT path guidance.</p></div>
+    <div class="card card-dark"><h3>Ops Shelf</h3><p>Slide-over CommandCenterPanel: port forwards, health, timeline, network lens NAT.</p></div>
+  </div>
+  <h3 style="margin-top:1.2em;color:#a78bfa;">Mode persistence</h3>
+  <ul>
+    <li>Key: <code>localStorage['machina-console-mode:{vmId}']</code></li>
+    <li>Restored when opening consolehub without <code>mode</code> query</li>
+    <li>Explicit <code>?mode=cinema</code> CTAs always honor Cinema</li>
+  </ul>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>ConsoleHub Cinema &amp; Studio</span></div>
+</div>
+
+<div class="page page-light">
+  <span class="section-label">Fleet</span>
+  <h2>Fleet <span>Surfaces</span></h2>
+  <p class="subtitle">Cinema entry from gallery rows and Mission Control live wall.</p>
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <h3>Machine Finder gallery</h3>
+      <p>Gallery lens → Netflix-style rows with poster screenshots → Open Cinema per VM tile.</p>
+    </div>
+    <div class="card">
+      <h3>Live Preview Wall</h3>
+      <p>Mission Control launchpad → <code>/platform/mission-control/live</code> — up to 6 concurrent live thumbnails.</p>
+    </div>
+    <div class="card">
+      <h3>Graphics (VNC + SPICE)</h3>
+      <p>New VMs default <code>graphics.type: both</code>. Add/remove listeners via VM Settings or API <code>/graphics/add</code>.</p>
+    </div>
+    <div class="card">
+      <h3>Deep links</h3>
+      <p><code>cinemaHubPath</code>, <code>studioHubPath</code>, <code>cinemaPopoutPath</code> in <code>consoleExperienceMode.ts</code>.</p>
+    </div>
+  </div>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>ConsoleHub Cinema &amp; Studio</span></div>
+</div>
+
+<div class="page page-dark">
+  <span class="section-label">QA</span>
+  <h2>Test <span>Coverage</span></h2>
+  <table>
+    <tr><th>Suite</th><th>Validates</th></tr>
+    <tr><td><code>platform-consolehub.spec.ts</code></td><td>Cinema default, pill, strip idle-hide, Studio, Ops Shelf, mode restore</td></tr>
+    <tr><td><code>platform-machine-finder.spec.ts</code></td><td>Gallery lens → Open Cinema navigation</td></tr>
+    <tr><td><code>platform-mission-control-live.spec.ts</code></td><td>Live wall tiles and preview grid</td></tr>
+    <tr><td><code>platform-feature-matrix.spec.ts</code> F11</td><td>Cinema shell, recovery card, ops shelf NAT</td></tr>
+  </table>
+  <p style="margin-top:1.5em;">Full guide: <strong>docs/machina-cinema-mode.md</strong></p>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>ConsoleHub · zyvor.dev</span></div>
+</div>
+
+</body>
+</html>

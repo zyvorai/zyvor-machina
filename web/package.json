@@ -1,0 +1,61 @@
+{
+  "name": "machina-web",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "playwright": "node scripts/run-playwright.mjs",
+    "test:e2e": "node scripts/run-playwright.mjs",
+    "test:e2e:install": "node scripts/run-playwright.mjs install --with-deps chromium",
+    "test:e2e:live-ux": "node scripts/run-playwright.mjs -c playwright.live-ux.config.ts",
+    "test:e2e:features": "node scripts/run-playwright.mjs -c playwright.feature-matrix.config.ts",
+    "test:e2e:features:live": "node scripts/run-playwright.mjs -c playwright.feature-matrix.live.config.ts",
+    "test:e2e:ui": "node scripts/run-playwright.mjs --ui",
+    "test:regression:api": "npm --prefix ../scripts/regression install --silent && node ../scripts/regression/api-sweep.js --loops 1",
+    "test:regression:pages": "npm --prefix ../scripts/regression install --silent && node ../scripts/regression/page-sweep.js --loops 1",
+    "check-ui-tokens": "node scripts/check-ui-tokens.mjs",
+    "generate-openapi": "node ../scripts/generate-openapi.mjs",
+    "generate-openapi:check": "node ../scripts/generate-openapi.mjs --check",
+    "api-ux-coverage": "node ../scripts/api-ux-coverage.mjs --write",
+    "api-ux-coverage:check": "node ../scripts/api-ux-coverage.mjs --check",
+    "generate-ux-live-manifest": "node ../scripts/generate-ux-live-manifest.mjs"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "framer-motion": "^14.0.0",
+    "i18next": "^26.3.3",
+    "lucide-react": "^1.22.0",
+    "novnc-core": "^0.3.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-i18next": "^17.0.8",
+    "react-router": "^8.4.0",
+    "recharts": "^3.9.0",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@tailwindcss/vite": "^4.3.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-react": "^6.0.3",
+    "@vitest/coverage-v8": "^5.0.3",
+    "jsdom": "^30.1.2",
+    "tailwindcss": "^4.3.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.3",
+    "vitest": "^5.0.3"
+  },
+  "overrides": {
+    "undici": "^8.12.2"
+  },
+  "license": "LicenseRef-Zyvor-Production-1.0"
+}

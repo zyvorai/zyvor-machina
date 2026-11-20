@@ -1,0 +1,30 @@
+name: Black Box
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/bpf/machina-blackbox.py'
+      - 'scripts/bpf/test_machina_blackbox.py'
+      - 'docs/ebpf/blackbox.md'
+      - '.github/workflows/blackbox.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/bpf/machina-blackbox.py'
+      - 'scripts/bpf/test_machina_blackbox.py'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax check
+        run: python3 -m py_compile scripts/bpf/machina-blackbox.py scripts/bpf/test_machina_blackbox.py
+      - name: Unit tests
+        run: python3 scripts/bpf/test_machina_blackbox.py

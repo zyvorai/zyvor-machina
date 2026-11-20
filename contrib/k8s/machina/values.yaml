@@ -1,0 +1,99 @@
+# Default values for machina daemon identity configuration.
+# Mount generated config.toml or inject env vars for JWT deep links and OIDC.
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/zyvorai/machina-daemon
+  # Pin to a specific, immutable release tag in production. Leaving this empty
+  # makes the deployment default to the chart's appVersion (see Chart.yaml);
+  # avoid "latest" since it makes the running version non-reproducible and
+  # lets the image change out from under you on pod reschedule.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 5092
+
+daemon:
+  host: "0.0.0.0"
+  port: 5092
+
+auth:
+  pamService: sshd
+  # Intentionally left empty rather than shipping a placeholder literal here.
+  # daemon/src/auth.rs only refuses its own hardcoded dev secret
+  # ("machina-dev-jwt-secret-change-me"); any other fixed string —
+  # including a chart-shipped placeholder like "change-me-in-production" —
+  # would be accepted as a real secret and used to sign persistent JWTs,
+  # even though it's public (this file is in the repo). Leaving this unset
+  # makes the daemon fall back to a random per-process secret (safe, but
+  # sessions don't survive a restart) until an operator sets a real value
+  # here or via env.MACHINA_JWT_SECRET / a Secret override.
+  jwtSecret: ""
+  ldap:
+    enabled: false
+    url: ""
+    baseDn: ""
+  oidc:
+    enabled: false
+    issuerUrl: ""
+    clientId: ""
+    clientSecret: ""
+    redirectUrl: ""
+    buttonLabel: "Sign in with SSO"
+    adminGroups: []
+    operatorGroups: []
+  saml:
+    enabled: false
+    spEntityId: ""
+    spAcsUrl: ""
+    idpEntityId: ""
+    idpMetadataUrl: ""
+    nameIdFormat: "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"
+    buttonLabel: "Sign in with SAML"
+
+# NOTE: despite the key name (kept for backwards compatibility), the rendered
+# config.toml contains real credentials (OIDC client secret, JWT secret) and is
+# deployed as a Kubernetes Secret, not a ConfigMap, so it isn't stored/readable
+# as casually as a ConfigMap would be. See templates/secret.yaml.
+configMap:
+  create: true
+  name: ""
+  mountPath: /etc/machina
+
+env:
+  MACHINA_JWT_SECRET: ""
+  MACHINA_DAEMON_SKIP_AUTH: "0"
+
+# Pod-level security context. runAsNonRoot causes the pod to fail fast (rather
+# than silently run as root) if the image itself doesn't declare a non-root
+# USER. This workload does not need host/device access.
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# Container-level security context.
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  # machina-daemon writes runtime state under /var/lib/machina and
+  # /run/machina (see daemon/src/main.rs, cluster_bootstrap.rs,
+  # k8s_inventory_history.rs). Do not flip this to true without also adding
+  # writable volumeMounts for those paths, or the daemon will fail to start.
+  readOnlyRootFilesystem: false
+
+# Baseline requests/limits so a single pod cannot exhaust node resources.
+# Tune to your workload; these are conservative defaults for the
+# identity/config-facing daemon this chart deploys.
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

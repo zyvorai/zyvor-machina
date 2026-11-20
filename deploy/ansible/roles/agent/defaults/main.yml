@@ -1,0 +1,5 @@
+---
+# Re-run the join even if this node already has a certificate (a re-join issues a new token and certificate).
+machina_force_rejoin: false
+# The first host of this group mints the one-time tokens.
+machina_controller_group: machina_controller

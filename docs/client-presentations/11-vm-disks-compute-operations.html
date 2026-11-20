@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>machina — VM Disks, Compute &amp; Device Operations</title>
+<style>
+@page { size: A4; margin: 0; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; color: #1a1a2e; background: #fff; line-height: 1.6; }
+.cover { height: 100vh; background: linear-gradient(135deg, #0f172a, #1e3a5f, #134e4a); color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; page-break-after: always; }
+.cover h1 { font-size: 2.8em; font-weight: 800; letter-spacing: -2px; margin-bottom: 0.2em; }
+.cover h1 span { color: #2dd4bf; }
+.cover p { font-size: 1.05em; opacity: 0.85; max-width: 640px; }
+.cover .badge { display: inline-block; background: rgba(45,212,191,0.15); border: 1px solid rgba(45,212,191,0.35); padding: 0.3em 1em; border-radius: 20px; font-size: 0.9em; margin-top: 1.5em; }
+.page { min-height: 100vh; padding: 56px 72px; page-break-after: always; position: relative; }
+.page-dark { background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; }
+.page-light { background: #f8fafc; }
+.page h2 { font-size: 2em; font-weight: 700; margin-bottom: 0.15em; }
+.page h2 span { color: #14b8a6; }
+.page-light h2 span { color: #0d9488; }
+.page .subtitle { font-size: 1em; opacity: 0.7; margin-bottom: 1.5em; }
+.card-grid { display: grid; gap: 18px; }
+.card-grid-2 { grid-template-columns: 1fr 1fr; }
+.card-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+.card { background: #fff; border-radius: 12px; padding: 22px; border: 1px solid #e2e8f0; }
+.card-dark { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #e2e8f0; }
+.card h3 { font-size: 1em; font-weight: 700; margin-bottom: 0.45em; color: #0d9488; }
+.card p, .card li { font-size: 0.88em; line-height: 1.6; }
+table { width: 100%; border-collapse: collapse; font-size: 0.82em; margin-top: 0.8em; }
+th { background: #0d9488; color: #fff; padding: 10px 12px; text-align: left; }
+td { padding: 9px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+.page-dark td { border-bottom-color: rgba(255,255,255,0.08); }
+.section-label { display: inline-block; background: rgba(20,184,166,0.12); color: #2dd4bf; padding: 4px 14px; border-radius: 20px; font-size: 0.76em; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.8em; }
+.flow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 1em 0; }
+.flow .step { background: rgba(13,148,136,0.12); border: 1px solid rgba(13,148,136,0.25); padding: 9px 12px; border-radius: 8px; font-size: 0.8em; font-weight: 600; }
+.flow .arrow { color: #2dd4bf; font-weight: 700; }
+.page-footer { position: absolute; bottom: 26px; left: 72px; right: 72px; display: flex; justify-content: space-between; font-size: 0.72em; opacity: 0.4; }
+ul { margin: 0.35em 0 0.7em 1.2em; } li { margin-bottom: 0.3em; font-size: 0.9em; }
+code { background: rgba(13,148,136,0.1); padding: 2px 6px; border-radius: 4px; font-size: 0.86em; }
+.warn { color: #f59e0b; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="badge">Cockpit parity · VM lifecycle ops</div>
+  <h1>Disks, Compute &amp; <span>Devices</span></h1>
+  <p style="font-size:1.35em;font-weight:700;margin-bottom:0.4em;">Attach disk · resize · CPU/memory · ISO · NIC · snapshots</p>
+  <p>Platform VM detail tabs for day-2 libvirt operations — not covered in Connect-hub decks 07–10.</p>
+</div>
+
+<div class="page page-dark">
+  <span class="section-label">Overview</span>
+  <h2>Compute &amp; <span>Live usage</span></h2>
+  <p class="subtitle">Overview tab — Cockpit-style metrics and hot topology edits.</p>
+  <div class="card-grid card-grid-2">
+    <div class="card card-dark">
+      <h3>Live usage panel</h3>
+      <ul>
+        <li>CPU and memory bars (<code>vm-usage-bars</code>)</li>
+        <li>Guest-agent metrics when QGA is online</li>
+        <li>vCPU count shown in hero strip</li>
+      </ul>
+    </div>
+    <div class="card card-dark">
+      <h3>Compute panel</h3>
+      <ul>
+        <li><strong>Edit CPU</strong> — topology modal (sockets/cores/threads)</li>
+        <li><strong>Edit memory</strong> — current vs maximum balloon sizing</li>
+        <li>Live libvirt query: <code>cpu.memory.topology</code></li>
+      </ul>
+    </div>
+  </div>
+  <table>
+    <tr><th>Action</th><th>Tab</th><th>API / libvirt</th></tr>
+    <tr><td>Change vCPU topology</td><td>Overview → Compute</td><td><code>invokeVmLibvirt</code> CPU tune</td></tr>
+    <tr><td>Resize guest RAM</td><td>Overview → Compute</td><td>Memory balloon / max memory</td></tr>
+    <tr><td>View topology</td><td>Overview</td><td><code>GET …/libvirt?action=cpu.memory.topology</code></td></tr>
+  </table>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>VM Disks, Compute &amp; Devices</span></div>
+</div>
+
+<div class="page page-light">
+  <span class="section-label">Disks tab</span>
+  <h2>Attach, detach &amp; <span>resize</span></h2>
+  <p class="subtitle"><code>?tab=disks</code> · <code>data-testid="vm-disks-panel"</code></p>
+  <div class="flow">
+    <div class="step">Libvirt inventory</div><span class="arrow">→</span>
+    <div class="step">Attach qcow2 path</div><span class="arrow">→</span>
+    <div class="step">Edit bus/cache</div><span class="arrow">→</span>
+    <div class="step">Resize GiB</div><span class="arrow">→</span>
+    <div class="step">Detach</div>
+  </div>
+  <table>
+    <tr><th>Operation</th><th>UI</th><th>Notes</th></tr>
+    <tr><td><strong>Attach disk</strong></td><td>Path + target dev (vdb…)</td><td><code>attachVmDisk</code> — requires managed VM</td></tr>
+    <tr><td><strong>Detach disk</strong></td><td>Per-row Detach</td><td>Queued libvirt detach by target</td></tr>
+    <tr><td><strong>Resize block device</strong></td><td>Select disk + GiB</td><td><code>resizeVmDisk</code></td></tr>
+    <tr><td><strong>Edit disk</strong></td><td>Bus, cache, readonly</td><td><code>disk.tune</code> — virtio/sata/scsi/ide</td></tr>
+    <tr><td><strong>CD-ROM insert / eject</strong></td><td>Insert ISO panel + Eject on cdrom row</td><td>ISO scan, host browse, typed path; <code>cdrom.insert</code> / <code>cdrom.eject</code></td></tr>
+    <tr><td><strong>Platform disk records</strong></td><td>Secondary list</td><td><code>GET /vms/{id}/disks</code></td></tr>
+  </table>
+  <p style="margin-top:1em;opacity:0.85;">Platform Disks tab: ISO scan dropdown, host browse (<code>GET /browse/dir</code>), typed path, attach-disk browse — parity with classic VM detail CD-ROM dialog.</p>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>VM Disks, Compute &amp; Devices</span></div>
+</div>
+
+<div class="page page-dark">
+  <span class="section-label">Network · Devices</span>
+  <h2>NIC, ISO &amp; <span>Passthrough</span></h2>
+  <div class="card-grid card-grid-2">
+    <div class="card card-dark">
+      <h3>Network tab</h3>
+      <ul>
+        <li>Live interface list from libvirt</li>
+        <li><strong>Attach NIC</strong> — libvirt network + model</li>
+        <li>Hypervisor NAT panel (also on Access tab)</li>
+        <li><code>data-testid="vm-network-panel"</code></li>
+      </ul>
+    </div>
+    <div class="card card-dark">
+      <h3>Devices tab</h3>
+      <ul>
+        <li>virtiofs shared directories</li>
+        <li>Watchdog, vsock, TPM status</li>
+        <li>USB / PCI passthrough inventory</li>
+        <li><code>data-testid="vm-devices-panel"</code></li>
+      </ul>
+    </div>
+    <div class="card card-dark">
+      <h3>ISO / install media</h3>
+      <ul>
+        <li>Create VM from ISO: <code>/platform/create-iso</code></li>
+        <li>Advanced install wizard: storage + unattended</li>
+        <li>Classic UI: insert/eject CD-ROM on running VM</li>
+        <li>Security: path canonicalization on ISO paths</li>
+      </ul>
+    </div>
+    <div class="card card-dark">
+      <h3>Advanced tab</h3>
+      <ul>
+        <li>Host USB attach to guest</li>
+        <li>PCI passthrough controls</li>
+        <li>Domain XML editor (Settings/Advanced)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>VM Disks, Compute &amp; Devices</span></div>
+</div>
+
+<div class="page page-light">
+  <span class="section-label">More tabs</span>
+  <h2>Snapshots, migrate &amp; <span>clone</span></h2>
+  <table>
+    <tr><th>Tab</th><th>Key operations</th></tr>
+    <tr><td><strong>Snapshots</strong></td><td>Create (disk-only / quiesce), revert, delete — <code>vm-snapshots-panel</code></td></tr>
+    <tr><td><strong>Settings</strong></td><td>Live migrate pre-check + migrate; full/linked clone; retire VM</td></tr>
+    <tr><td><strong>Backup</strong></td><td>Export disk (qcow2), backup cards on Overview</td></tr>
+    <tr><td><strong>Performance</strong></td><td>Time-series CPU/memory/disk/network charts</td></tr>
+    <tr><td><strong>Doctor / Guest health</strong></td><td>GuestKit offline migration plan, QGA health</td></tr>
+  </table>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>VM Disks, Compute &amp; Devices</span></div>
+</div>
+
+<div class="page page-dark">
+  <span class="section-label">QA</span>
+  <h2>Tests &amp; <span>coverage gap</span></h2>
+  <p class="subtitle">F01–F13 matrix covers Connect/Access only — disk/compute ops use separate suites.</p>
+  <table>
+    <tr><th>Suite</th><th>Covers</th></tr>
+    <tr><td><code>platform-cockpit-parity.spec.ts</code></td><td>Edit CPU modal, usage bars, storage pools</td></tr>
+    <tr><td><code>platform-live-vm-operations.spec.ts</code></td><td>Attach disk, resize, Attach NIC, snapshots, migrate, devices</td></tr>
+    <tr><td><code>platform-vm-lifecycle.spec.ts</code></td><td>Lifecycle panels and API wiring</td></tr>
+    <tr><td>Decks 01, 03, 04, 05</td><td>High-level resize, ISO security, API endpoints</td></tr>
+  </table>
+  <p style="margin-top:1.2em;opacity:0.9;">Extended matrix: <strong>F14 Compute</strong>, <strong>F15 Disks</strong>, <strong>F16 Network/NIC</strong>, <strong>F17 Snapshots</strong>, <strong>F18 ISO/devices</strong> — see deck 11.</p>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>VM ops · zyvor.dev</span></div>
+</div>
+
+</body>
+</html>

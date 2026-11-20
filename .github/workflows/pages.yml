@@ -1,0 +1,40 @@
+# Requires GitHub Pages enabled with Source = "GitHub Actions" (repo Settings
+# > Pages), done once via `gh api repos/zyvorai/zyvor-machina/pages -X POST -f
+# build_type=workflow`.
+name: Deploy Docs Site
+on:
+  push:
+    branches: [main]
+    paths: ['website/**', 'site/**', 'docs/ux/**', 'docs/social/**', '.github/workflows/pages.yml']
+  workflow_dispatch: {}
+concurrency:
+  group: pages
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-node@v7
+      with: {node-version: '22', cache: npm, cache-dependency-path: website/package-lock.json}
+    - run: npm --prefix website ci
+    - run: npm --prefix website run build
+    # The Zyvor landing page (site/) replaces the Docusaurus home page; docs, blog and every other page stay.
+    # Docusaurus keeps its own sitemap.xml and robots.txt, so those two are not copied.
+    - name: Overlay the landing page
+      run: |
+        cp site/index.html site/favicon.svg site/apple-touch-icon.png website/build/
+        cp -R site/assets/. website/build/assets/
+        cp -R site/social website/build/social
+    - uses: actions/upload-pages-artifact@v5
+      with: {path: website/build}
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: {name: github-pages, url: "${{ steps.deployment.outputs.page_url }}"}
+    permissions: {pages: write, id-token: write}
+    steps:
+    - id: deployment
+      uses: actions/deploy-pages@v5

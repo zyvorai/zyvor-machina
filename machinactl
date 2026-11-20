@@ -1,0 +1,1822 @@
+#!/usr/bin/env bash
+# machinactl — Install, manage, and demo machina (Linux hypervisor host control plane)
+#
+# Usage: machinactl <command> [options]
+#
+# Commands:
+#   deps            Install all system dependencies
+#   build           Build the backend (and optionally web UI)
+#   test            Run the test suite
+#   install         Install machina to the system
+#   uninstall       Remove machina from the system
+#   deploy          Full deployment: deps → build → install → start → verify
+#   reinstall       Rebuild and reinstall: stop → build → install → start → verify
+#   upgrade         Back up, then upgrade controller, daemon, agent with health gates and rollback
+#   start           Start the machina-daemon service
+#   stop            Stop the service
+#   restart         Restart the service
+#   status          Show service status
+#   logs            Follow service logs
+#   backup now      Run VM backup immediately
+#   backup enable   Enable daily backup timer
+#   backup disable  Disable backup timer
+#   backup status   Show backup timer and storage info
+#   backup logs     Follow backup logs
+#   verify          Post-install smoke test (API, VMs, backup)
+#   health          Deep health check (service, API, disk, libvirt, timers)
+#   doctor          Check system readiness
+#   preflight       Can this machine run Machina? (--role, --fix, --json)
+#   show-login      Sign-in URL and generated admin password
+#   tls             Generate self-signed TLS certificate
+#   demo            Run interactive API demo
+#   audit verify    Verify signed audit log (API or local file)
+#   integrations    Show KubeVirt/k8s/automation integration status
+#   sprite          Manage disposable sandbox VMs (list/get/create/delete/golden-images)
+#   netpol          VM network policies (CiliumNetworkPolicy schema)
+#   metal           Bare-metal provisioning (discover, commission, images, profiles, deploy, power)
+#   bootstrap       Set the public URL and join listener, publish the agent, wait until ready
+#   flow            Packet flows (observe / top / stats)
+#   vm label        Show or edit VM labels
+#   vm quarantine   Cut a VM off the network for a fixed time (vm release lifts it)
+#   help            Show this help
+#
+# Web UI sign-in uses PAM (Linux accounts on this host), not a separate machina password.
+
+set -euo pipefail
+
+# ── Globals ─────────────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+API_URL="${MACHINA_URL:-https://127.0.0.1:5092}"
+API_VERSION="v1"
+
+# ── Helpers ─────────────────────────────────────────────────────────────
+info()  { echo "ℹ️  $*"; }
+ok()    { echo "✅ $*"; }
+warn()  { echo "⚠️  $*"; }
+err()   { echo "❌ $*" >&2; }
+step()  { echo ""; echo "➡️  $*"; }
+need_root() {
+    if [[ $EUID -ne 0 ]]; then
+        info "Escalating to root..."
+        exec sudo "$0" "${ORIGINAL_ARGS[@]}"
+    fi
+}
+
+detect_distro() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        echo "$ID"
+    else
+        echo "unknown"
+    fi
+}
+
+# pam-sys (bindgen) needs libclang at compile time
+export_libclang_path() {
+    if [[ -n "${LIBCLANG_PATH:-}" && -d "$LIBCLANG_PATH" ]]; then
+        export LIBCLANG_PATH
+        return 0
+    fi
+
+    local llvm_cfg libdir candidate
+    llvm_cfg="$(command -v llvm-config 2>/dev/null || true)"
+    if [[ -n "$llvm_cfg" ]]; then
+        libdir="$("$llvm_cfg" --libdir 2>/dev/null || true)"
+        if [[ -n "$libdir" && -d "$libdir" ]]; then
+            if [[ -e "$libdir/libclang.so" || -e "$libdir/libclang.so.1" ]]; then
+                export LIBCLANG_PATH="$libdir"
+                return 0
+            fi
+        fi
+    fi
+
+    for candidate in /usr/lib/llvm/*/lib /usr/lib64/llvm/*/lib; do
+        [[ -d "$candidate" ]] || continue
+        if [[ -e "$candidate/libclang.so" || -e "$candidate/libclang.so.1" ]]; then
+            export LIBCLANG_PATH="$candidate"
+            return 0
+        fi
+    done
+
+    for candidate in /usr/lib /usr/lib64; do
+        if [[ -e "$candidate/libclang.so" || -e "$candidate/libclang.so.1" ]]; then
+            export LIBCLANG_PATH="$candidate"
+            return 0
+        fi
+    done
+
+    return 0
+}
+
+# ── deps: Install system dependencies ───────────────────────────────────
+cmd_deps() {
+    need_root
+    step "Installing system dependencies"
+
+    local distro
+    distro=$(detect_distro)
+    info "Detected: $distro"
+
+    case "$distro" in
+        fedora|rhel|centos|rocky|alma)
+            info "Installing packages via dnf..."
+
+            info "Libvirt & virtualization..."
+            dnf install -y \
+                libvirt libvirt-devel libvirt-daemon-kvm \
+                qemu-kvm qemu-img virt-install virt-viewer \
+                || { err "Failed to install libvirt packages"; exit 1; }
+
+            info "Build tools..."
+            dnf install -y \
+                gcc gcc-c++ make git pkg-config \
+                openssl-devel systemd-devel \
+                pam-devel clang-libs clang-devel \
+                || { err "Failed to install build deps"; exit 1; }
+
+            info "Utilities..."
+            dnf install -y \
+                curl jq rsync socat nftables wireguard-tools \
+                || { err "Failed to install utilities"; exit 1; }
+
+            ok "All Fedora/RHEL packages installed"
+            ;;
+
+        debian|ubuntu|linuxmint|pop)
+            info "Installing packages via apt..."
+
+            apt-get update -qq || { err "apt-get update failed"; exit 1; }
+
+            info "Libvirt & virtualization..."
+            apt-get install -y \
+                libvirt-daemon-system libvirt-dev libvirt-clients \
+                qemu-kvm qemu-utils virtinst virt-viewer \
+                || { err "Failed to install libvirt packages"; exit 1; }
+
+            info "Build tools..."
+            apt-get install -y \
+                gcc g++ make git pkg-config \
+                libssl-dev libsystemd-dev \
+                libpam0g-dev libclang-dev clang llvm-dev \
+                || { err "Failed to install build deps"; exit 1; }
+
+            info "Utilities..."
+            apt-get install -y \
+                curl jq rsync socat nftables wireguard-tools \
+                || { err "Failed to install utilities"; exit 1; }
+
+            ok "All Ubuntu/Debian packages installed"
+            ;;
+
+        *)
+            err "Unsupported distribution: $distro"
+            echo "Install manually: libvirt, qemu-kvm, gcc, make, git, pkg-config, openssl-dev, curl, jq, nftables, wireguard-tools"
+            exit 1
+            ;;
+    esac
+
+    # Rust toolchain
+    step "Rust toolchain"
+    if ! command -v cargo &>/dev/null; then
+        info "Installing Rust via rustup..."
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+        # shellcheck source=/dev/null
+        source "$HOME/.cargo/env" 2>/dev/null || true
+        ok "Rust installed ($(rustc --version 2>/dev/null || echo 'reload shell'))"
+    else
+        ok "Rust already installed ($(rustc --version))"
+    fi
+
+    # Node.js for web UI
+    step "Node.js (for web UI)"
+    if ! command -v node &>/dev/null; then
+        info "Installing Node.js..."
+        case "$distro" in
+            fedora|rhel|centos|rocky|alma) dnf install -y nodejs npm || warn "Node.js install failed" ;;
+            debian|ubuntu|linuxmint|pop)   apt-get install -y nodejs npm || warn "Node.js install failed" ;;
+        esac
+        if command -v node &>/dev/null; then
+            ok "Node.js installed ($(node --version))"
+        else
+            warn "Node.js not available — web UI build will be skipped"
+        fi
+    else
+        ok "Node.js already installed ($(node --version))"
+    fi
+
+    # Enable libvirtd
+    step "Enabling services"
+    systemctl enable --now libvirtd.service 2>/dev/null && ok "libvirtd enabled" || warn "libvirtd not available"
+
+    # Ensure user is in libvirt group
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        usermod -aG libvirt "$SUDO_USER" 2>/dev/null && ok "Added $SUDO_USER to libvirt group" || true
+    fi
+
+    # KVM check
+    step "KVM"
+    if [[ -e /dev/kvm ]]; then
+        ok "KVM available"
+    else
+        warn "KVM not available (VMs will be slow)"
+    fi
+
+    ok "All dependencies installed"
+    echo ""
+    info "Next: run ./machinactl build"
+}
+
+# ── build ───────────────────────────────────────────────────────────────
+cmd_build() {
+    step "Building machina"
+
+    local build_web=1
+    [[ "${1:-}" == "--no-web" ]] && build_web=0
+
+    info "Building backend (Rust)..."
+    cd "$SCRIPT_DIR"
+    export_libclang_path
+    cargo build --workspace --release 2>&1
+    ok "Backend built: machina-daemon"
+
+    if [[ $build_web -eq 1 ]] && [[ -d "$SCRIPT_DIR/web" ]]; then
+        if command -v node &>/dev/null; then
+            info "Building web UI..."
+            cd "$SCRIPT_DIR/web"
+            npm install --silent 2>&1 | tail -1
+            npm run build 2>&1 | tail -1
+            ok "Web UI built"
+        else
+            warn "Node.js not found — skipping web UI"
+        fi
+    fi
+
+    echo ""
+    ok "Build complete"
+    info "Next: run ./machinactl install"
+}
+
+# ── test ────────────────────────────────────────────────────────────────
+cmd_test() {
+    step "Running test suite"
+    cd "$SCRIPT_DIR"
+    export_libclang_path
+    cargo test --workspace 2>&1
+    ok "All tests passed"
+}
+
+# ── install ─────────────────────────────────────────────────────────────
+cmd_install() {
+    need_root
+    step "Installing machina"
+
+    if [[ ! -f "$SCRIPT_DIR/target/release/machina-daemon" ]]; then
+        err "Not built yet. Run: ./machinactl build"
+        exit 1
+    fi
+
+    cd "$SCRIPT_DIR"
+    make install
+    systemctl daemon-reload
+
+    # Create state directories
+    mkdir -p /var/lib/machina/backups
+
+    ok "machina installed"
+    info "Start with: ./machinactl start"
+}
+
+# ── uninstall ───────────────────────────────────────────────────────────
+cmd_uninstall() {
+    need_root
+    step "Uninstalling machina"
+
+    if [[ -t 0 ]]; then
+        warn "This will stop machina-daemon and remove installed binaries, configs, and systemd units."
+        read -rp "Continue? [y/N] " answer
+        if [[ "$answer" != "y" && "$answer" != "Y" ]]; then
+            info "Aborted"
+            return 1
+        fi
+    fi
+
+    if systemctl is-active --quiet machina-daemon 2>/dev/null; then
+        info "Stopping machina-daemon..."
+        systemctl stop machina-daemon
+    fi
+    systemctl disable machina-daemon machina-backup.timer 2>/dev/null || true
+
+    cd "$SCRIPT_DIR"
+    make uninstall 2>/dev/null || true
+    systemctl daemon-reload
+
+    ok "machina uninstalled"
+    warn "State data preserved at /var/lib/machina"
+    warn "To remove all data: sudo rm -rf /var/lib/machina"
+}
+
+# ── deploy ──────────────────────────────────────────────────────────────
+cmd_deploy() {
+    need_root
+    step "Full Deployment"
+    echo ""
+    echo "📋 This will:"
+    echo "  1. Install all system dependencies"
+    echo "  2. Build the backend (release mode)"
+    echo "  3. Install binaries, configs, and systemd units"
+    echo "  4. Start the machina-daemon service"
+    echo "  5. Run post-install verification"
+    echo ""
+
+    cmd_deps "$@"
+    echo ""
+
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        info "Building as $SUDO_USER..."
+        su - "$SUDO_USER" -c "cd '$SCRIPT_DIR' && ./machinactl build --no-web"
+    else
+        cmd_build --no-web
+    fi
+    echo ""
+
+    cmd_install
+    echo ""
+
+    cmd_start
+    echo ""
+
+    local verify_status=0
+    cmd_verify || verify_status=$?
+
+    if [[ $verify_status -eq 0 ]]; then
+        step "Deployment Complete"
+    else
+        step "Deployment Complete (with verification failures — see above)"
+    fi
+    echo ""
+    echo "  🔗 API:     $API_URL"
+    echo "  📊 Status:  ./machinactl status"
+    echo "  📜 Logs:    sudo journalctl -u machina-daemon -f"
+    echo ""
+
+    return $verify_status
+}
+
+# ── reinstall ───────────────────────────────────────────────────────────
+cmd_reinstall() {
+    need_root
+    step "Reinstalling machina"
+
+    if systemctl is-active --quiet machina-daemon 2>/dev/null; then
+        info "Stopping machina-daemon..."
+        systemctl stop machina-daemon
+    fi
+
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        info "Rebuilding as $SUDO_USER..."
+        su - "$SUDO_USER" -c "cd '$SCRIPT_DIR' && ./machinactl build --no-web"
+    else
+        cmd_build --no-web
+    fi
+    echo ""
+
+    cd "$SCRIPT_DIR"
+    make install
+    systemctl daemon-reload
+    systemctl start machina-daemon
+    sleep 2
+
+    if systemctl is-active --quiet machina-daemon; then
+        ok "machina reinstalled and running"
+        echo ""
+        cmd_verify || true
+    else
+        err "Failed to start. Check: sudo journalctl -u machina-daemon -e"
+        exit 1
+    fi
+}
+
+# ── upgrade: back up, then controller → daemon → agent, each behind a health gate, rolled back on failure ──
+# Needs the new binaries: --from DIR (a release directory: machina-controller, machina-daemon, machina-agent,
+# machina-bpfd, optionally web/ and VERSION) or --pull (git pull + cargo build --release, the old behaviour).
+# Controller first (it applies database migrations, so the backup is what a failed controller is rolled back to),
+# then daemon, then the local agent; remote agents are listed, never touched. A failing step is undone at once:
+# its previous binary comes back, and a failed controller also gets the pre-upgrade database back.
+UP_ROOT=/; UP_CTL=""; UP_WAIT=60; UP_HEALTH_CMD=""
+_sha() { sha256sum "$1" 2>/dev/null | cut -c1-12; }
+_up_restart() { if [[ $UP_ROOT == / ]]; then systemctl restart "$@"; fi; }
+_up_health() { # COMPONENT: 0 when it is healthy (--health-cmd replaces the built-in probe; sandbox roots have none)
+    local c="$1"
+    if [[ -n $UP_HEALTH_CMD ]]; then bash -c "$UP_HEALTH_CMD" _ "$c"; return; fi
+    if [[ $UP_ROOT != / ]]; then return 0; fi
+    case "$c" in
+        controller) curl -fsS -m 5 "$UP_CTL/api/v1/health" 2>/dev/null | grep -q '"database":"ok"' ;;
+        daemon) [[ "$(curl -sk -m 5 -o /dev/null -w '%{http_code}' "$API_URL/api/$API_VERSION/health" 2>/dev/null)" == 200 ]] ;;
+        agent) systemctl is-active --quiet machina-agent && sleep 6 && systemctl is-active --quiet machina-agent ;;
+    esac
+}
+_up_wait() { # COMPONENT: poll until healthy or UP_WAIT seconds pass
+    local until=$((SECONDS + UP_WAIT))
+    while (( SECONDS < until )); do
+        if _up_health "$1"; then return 0; fi
+        sleep 2
+    done
+    return 1
+}
+_up_version() { # DIR -> the version of a release directory (VERSION file, else the workspace Cargo.toml above it)
+    local d="$1" f
+    if [[ -f $d/VERSION ]]; then head -1 "$d/VERSION" | tr -d ' \r'; return; fi
+    for f in "$d/../../Cargo.toml" "$d/Cargo.toml"; do
+        if [[ -f $f ]]; then sed -n 's/^version = "\([^"]*\)".*/\1/p' "$f" | head -1; return; fi
+    done
+}
+_up_semver_cmp() { # A B -> prints -1, 0 or 1 (numeric x.y.z; anything else compares as equal)
+    python3 - "$1" "$2" <<'PY'
+import re, sys
+def v(s):
+    m = re.match(r"^v?(\d+)\.(\d+)\.(\d+)", s or "")
+    return tuple(int(x) for x in m.groups()) if m else None
+a, b = v(sys.argv[1]), v(sys.argv[2])
+print(0 if a is None or b is None else (a > b) - (a < b))
+PY
+}
+_up_swap() { # NEW DEST: keep DEST as DEST.prev, then put NEW in place atomically
+    if [[ -e $2 ]]; then cp -p "$2" "$2.prev"; fi
+    install -m 0755 "$1" "$2.new" && mv -f "$2.new" "$2"
+}
+_up_unswap() { if [[ -e $1.prev ]]; then mv -f "$1.prev" "$1"; fi; }
+_up_rollback() { # COMPONENT: undo one step; the controller also gets its database back
+    local c="$1" f
+    warn "rolling $c back to the version it was running before"
+    case "$c" in
+        controller) _up_unswap "$UP_BIN/machina-controller" ;;
+        daemon)
+            _up_unswap "$UP_BIN/machina-daemon"
+            if [[ -d $UP_WEB.prev ]]; then rm -rf "$UP_WEB"; mv "$UP_WEB.prev" "$UP_WEB"; fi ;;
+        agent) for f in machina-agent machina-bpfd; do _up_unswap "$UP_BIN/$f"; done ;;
+    esac
+    if [[ $c == controller ]]; then
+        if [[ -n $UP_ARCHIVE && -f $UP_ARCHIVE ]]; then
+            info "restoring the database from $UP_ARCHIVE (the new version may have migrated it)"
+            local ra=(--yes --root "$UP_ROOT"); [[ $UP_ROOT == / ]] || ra+=(--no-restart)
+            ( cmd_restore_all "$UP_ARCHIVE" "${ra[@]}" ) \
+                || warn "the restore failed: do it by hand:  sudo machinactl restore $UP_ARCHIVE"
+        else
+            warn "no backup was taken (--no-backup): the previous binary is back, but if the new version migrated the database it may not start"
+        fi
+    fi
+    case "$c" in
+        controller) _up_restart machina-controller ;;
+        daemon) _up_restart machina-daemon ;;
+        agent) _up_restart machina-bpfd machina-agent ;;
+    esac
+    if _up_wait "$c"; then ok "$c is healthy again on the previous version"; else err "$c is still unhealthy after the rollback: journalctl -u machina-$c -n 50"; fi
+}
+
+cmd_upgrade() {
+    need_root
+    local from="" pull=0 dry=0 backup=1 allow_down=0 want_agent=1 out="" bin_dir=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --from) from="${2:?}"; shift 2 ;;
+            --pull) pull=1; shift ;;
+            --dry-run) dry=1; shift ;;
+            --no-backup) backup=0; shift ;;
+            --allow-downgrade) allow_down=1; shift ;;
+            --no-agent) want_agent=0; shift ;;
+            --out) out="${2:?}"; shift 2 ;;
+            --root) UP_ROOT="${2:?}"; shift 2 ;;            # sandbox for tests: install under this directory, touch no service
+            --bin-dir) bin_dir="${2:?}"; shift 2 ;;
+            --health-wait) UP_WAIT="${2:?}"; shift 2 ;;
+            --health-cmd) UP_HEALTH_CMD="${2:?}"; shift 2 ;;  # run per step with the component name as $1 (tests / custom probes)
+            --controller-url) UP_CTL="${2:?}"; shift 2 ;;
+            *) err "unknown option for upgrade: $1"; exit 1 ;;
+        esac
+    done
+    UP_ROOT="${UP_ROOT%/}"; UP_ROOT="${UP_ROOT:-/}"
+    local base="${UP_ROOT%/}"
+    UP_BIN="${bin_dir:-$base/usr/local/bin}"; UP_WEB="$base/usr/local/share/machina/web"
+    UP_CTL="${UP_CTL:-$(_ctl_url)}"; UP_ARCHIVE=""
+    [[ -n $out ]] || out="$base$BACKUP_ALL_DIR_DEFAULT"
+    if [[ -z $from && $pull != 1 ]]; then
+        err "Usage: machinactl upgrade --from DIR [--dry-run] [--no-backup] [--no-agent] [--allow-downgrade]"
+        err "       machinactl upgrade --pull            (git pull + cargo build --release here, then upgrade from target/release)"
+        exit 1
+    fi
+    if [[ $pull == 1 ]]; then
+        step "Fetching and building the new version"
+        if [[ -n "${SUDO_USER:-}" ]]; then
+            su - "$SUDO_USER" -c "cd '$SCRIPT_DIR' && git pull --ff-only && ./machinactl build --no-web"
+        else
+            ( cd "$SCRIPT_DIR" && git pull --ff-only ) && cmd_build --no-web
+        fi
+        from="$SCRIPT_DIR/target/release"
+    fi
+    [[ -d $from ]] || { err "$from is not a directory"; exit 1; }
+
+    step "Upgrade plan"
+    local comps=() c f label
+    for c in controller daemon agent; do
+        [[ $c == agent && $want_agent != 1 ]] && continue
+        f="machina-$c"
+        if [[ ! -x $from/$f ]]; then info "$c: no $f in $from, skipped"; continue; fi
+        if [[ ! -e $UP_BIN/$f ]]; then info "$c: $f is not installed in $UP_BIN, skipped (use the installer for a first install)"; continue; fi
+        label="$(_sha "$UP_BIN/$f") -> $(_sha "$from/$f")"
+        if cmp -s "$from/$f" "$UP_BIN/$f" && { [[ $c != agent || ! -x $from/machina-bpfd ]] || cmp -s "$from/machina-bpfd" "$UP_BIN/machina-bpfd"; }; then
+            info "$c: already on this build ($(_sha "$UP_BIN/$f"))"
+        else
+            echo "   $c: $label"; comps+=("$c")
+        fi
+    done
+    if [[ ${#comps[@]} -eq 0 ]]; then ok "everything is already on this build, nothing to do"; return 0; fi
+
+    # version skew: never go backwards by accident, and agents must not be newer than their controller
+    local newv curv hosts_json="" skew
+    newv="$(_up_version "$from")"; curv=""
+    if [[ $UP_ROOT == / ]]; then
+        curv="$(curl -fsS -m 5 "$UP_CTL/api/v1/health" 2>/dev/null | python3 -c 'import sys,json; print(json.load(sys.stdin).get("version",""))' 2>/dev/null || true)"
+        hosts_json="$(_ctl GET /api/v1/hosts 2>/dev/null || true)"
+    fi
+    info "running version: ${curv:-unknown}, new version: ${newv:-unknown}"
+    if [[ -n $newv && -n $curv ]]; then
+        skew="$(_up_semver_cmp "$newv" "$curv")"
+        if [[ $skew == -1 && $allow_down != 1 ]]; then
+            err "$newv is older than the running $curv: refusing to downgrade (--allow-downgrade overrides)"; exit 1
+        fi
+    fi
+    if [[ -n $newv && -n $hosts_json ]]; then
+        local ahead behind
+        ahead="$(printf %s "$hosts_json" | python3 -c '
+import sys, json, re
+def v(s):
+    m = re.match(r"^v?(\d+)\.(\d+)\.(\d+)", s or ""); return tuple(map(int, m.groups())) if m else None
+new = v(sys.argv[1])
+for h in json.load(sys.stdin):
+    a = v(h.get("agent_version"))
+    if new and a and a > new: print("%s (%s)" % (h["hostname"], h["agent_version"]))' "$newv")"
+        if [[ -n $ahead ]]; then err "these agents are newer than $newv, and an agent must never be newer than its controller: ${ahead//$'\n'/, }"; exit 1; fi
+        behind="$(printf %s "$hosts_json" | python3 -c '
+import sys, json
+new = sys.argv[1]
+print(", ".join("%s (%s)" % (h["hostname"], h.get("agent_version") or "?") for h in json.load(sys.stdin) if h.get("agent_version") and h["agent_version"] != new))' "$newv")"
+        [[ -z $behind ]] || info "remote agents not on $newv (not touched by this command): $behind"
+    fi
+    if [[ $backup == 1 ]]; then info "a full backup is taken first (machinactl backup all)"; else warn "--no-backup: a failed controller can only get its old binary back, not its old database"; fi
+    info "order: ${comps[*]}; each step restarts its service and waits up to ${UP_WAIT}s for it to be healthy, otherwise it is rolled back"
+    if [[ $dry == 1 ]]; then ok "dry run: nothing was changed"; return 0; fi
+
+    if [[ $backup == 1 ]]; then
+        local ba=(--root "$UP_ROOT" --out "$out")
+        ( cmd_backup_all "${ba[@]}" ) || { err "the backup failed: nothing was changed"; exit 1; }
+        UP_ARCHIVE="$(find "$out" -maxdepth 1 -name 'machina-full-*.tar.gz' -type f | sort | tail -1)"
+        [[ -f $UP_ARCHIVE ]] || { err "cannot find the backup that was just written"; exit 1; }
+    fi
+
+    local done_c=()
+    for c in "${comps[@]}"; do
+        step "Upgrading $c"
+        case "$c" in
+            controller) _up_swap "$from/machina-controller" "$UP_BIN/machina-controller" ;;
+            daemon)
+                _up_swap "$from/machina-daemon" "$UP_BIN/machina-daemon"
+                if [[ -f $from/web/index.html && -d $UP_WEB ]]; then
+                    rm -rf "$UP_WEB.prev"; cp -a "$UP_WEB" "$UP_WEB.prev"; rm -rf "$UP_WEB"; cp -a "$from/web" "$UP_WEB"
+                fi ;;
+            agent)
+                for f in machina-agent machina-bpfd; do if [[ -x $from/$f && -e $UP_BIN/$f ]]; then _up_swap "$from/$f" "$UP_BIN/$f"; fi; done ;;
+        esac
+        case "$c" in
+            controller) _up_restart machina-controller ;;
+            daemon) _up_restart machina-daemon ;;
+            agent) _up_restart machina-bpfd machina-agent ;;
+        esac
+        if _up_wait "$c"; then
+            ok "$c upgraded and healthy"; done_c+=("$c")
+        else
+            err "$c did not become healthy within ${UP_WAIT}s"
+            _up_rollback "$c"
+            if [[ ${#done_c[@]} -gt 0 ]]; then warn "already upgraded and left as they are: ${done_c[*]}"; fi
+            err "upgrade stopped at $c; nothing after it was touched"
+            exit 1
+        fi
+    done
+    if [[ $UP_ROOT == / && -f /var/lib/machina/dist/SHA256SUMS && " ${done_c[*]} " == *" agent "* ]]; then
+        ( cmd_dist publish >/dev/null 2>&1 ) && info "the new agent is published for joining nodes (/dist)" || true
+    fi
+    ok "upgraded: ${done_c[*]}"
+    [[ -z $UP_ARCHIVE ]] || info "the pre-upgrade backup is $UP_ARCHIVE  (undo everything with: sudo machinactl restore FILE after putting the *.prev binaries back)"
+}
+
+# ── verify: Post-install smoke test ─────────────────────────────────────
+cmd_verify() {
+    step "Post-Install Verification"
+    local failures=0
+
+    info "Checking service..."
+    if systemctl is-active --quiet machina-daemon 2>/dev/null; then
+        ok "Service is running"
+    elif pgrep -f "machina-daemon" &>/dev/null; then
+        ok "machina-daemon process is running"
+    else
+        err "machina-daemon is not running"
+        ((failures++)) || true
+        return 1
+    fi
+
+    info "Checking API..."
+    local http_code
+    http_code=$(curl -sk -o /dev/null -w "%{http_code}" "$API_URL/api/$API_VERSION/health" --max-time 5 2>/dev/null) || http_code="000"
+    if [[ "$http_code" == "200" ]]; then
+        ok "API responding (HTTP $http_code)"
+    else
+        err "API not responding (HTTP $http_code)"
+        ((failures++)) || true
+    fi
+
+    info "Checking integrations status..."
+    local int_code
+    int_code=$(curl -sk -o /dev/null -w "%{http_code}" "$API_URL/api/$API_VERSION/integrations/status" --max-time 5 2>/dev/null) || int_code="000"
+    if [[ "$int_code" == "200" ]]; then
+        ok "Integrations status (HTTP $int_code)"
+    else
+        warn "Integrations status HTTP $int_code"
+    fi
+
+    info "Checking VM list..."
+    local vm_response
+    vm_response=$(curl -sk "$API_URL/api/$API_VERSION/vms" --max-time 5 2>/dev/null)
+    if [[ -n "$vm_response" ]]; then
+        local vm_count
+        vm_count=$(echo "$vm_response" | jq 'if type=="array" then length else 0 end' 2>/dev/null || echo "0")
+        ok "VM list: $vm_count VM(s)"
+    else
+        warn "VM list endpoint not responding"
+    fi
+
+    info "Checking libvirt..."
+    if virsh list --all &>/dev/null; then
+        local running
+        running=$(virsh list --state-running --name 2>/dev/null | grep -c . || echo "0")
+        local total
+        total=$(virsh list --all --name 2>/dev/null | grep -c . || echo "0")
+        ok "libvirt: $running running, $total total"
+    else
+        warn "virsh not accessible"
+    fi
+
+    info "Checking backup timer..."
+    if systemctl is-active --quiet machina-backup.timer 2>/dev/null; then
+        ok "Backup timer active"
+    else
+        warn "Backup timer not active (enable with: systemctl enable --now machina-backup.timer)"
+    fi
+
+    echo ""
+    if [[ $failures -eq 0 ]]; then
+        ok "All verification checks passed"
+    else
+        err "$failures check(s) failed"
+        return 1
+    fi
+}
+
+# ── health: Deep health check ──────────────────────────────────────────
+cmd_health() {
+    step "machina Health Check"
+    local warnings=0 errors=0
+
+    echo ""
+    echo "📦 Service"
+    if systemctl is-active --quiet machina-daemon 2>/dev/null; then
+        ok "machina-daemon is running"
+    else
+        err "machina-daemon is not running"; ((errors++)) || true
+    fi
+
+    echo ""
+    echo "🔗 API"
+    local http_code
+    http_code=$(curl -sk -o /dev/null -w "%{http_code}" "$API_URL/api/$API_VERSION/health" --max-time 5 2>/dev/null) || http_code="000"
+    if [[ "$http_code" == "200" ]]; then
+        ok "API responding (HTTP $http_code)"
+    else
+        err "API not responding (HTTP $http_code)"; ((errors++)) || true
+    fi
+
+    echo ""
+    echo "🖥️  Libvirt"
+    if virsh uri &>/dev/null; then
+        ok "libvirt connected: $(virsh uri 2>/dev/null)"
+        local running total
+        running=$(virsh list --state-running --name 2>/dev/null | grep -c . || echo "0")
+        total=$(virsh list --all --name 2>/dev/null | grep -c . || echo "0")
+        ok "VMs: $running running, $total total"
+    else
+        err "libvirt not accessible"; ((errors++)) || true
+    fi
+
+    echo ""
+    echo "💾 Disk space"
+    local backup_dir="/var/lib/machina/backups"
+    if [[ -d "$backup_dir" ]]; then
+        local size usage
+        size=$(du -sh "$backup_dir" 2>/dev/null | cut -f1)
+        usage=$(df "$backup_dir" | tail -1 | awk '{print $5}' | tr -d '%')
+        if [[ "$usage" -lt 80 ]]; then
+            ok "Backups: $size (${usage}% disk used)"
+        elif [[ "$usage" -lt 95 ]]; then
+            warn "Backups: $size (${usage}% disk used — getting full)"; ((warnings++)) || true
+        else
+            err "Backups: $size (${usage}% disk used — CRITICAL)"; ((errors++)) || true
+        fi
+    fi
+
+    echo ""
+    echo "⏱️  Timers"
+    if systemctl is-active --quiet machina-backup.timer 2>/dev/null; then
+        ok "Backup timer active"
+    else
+        warn "Backup timer not active"; ((warnings++)) || true
+    fi
+
+    echo ""
+    echo "⚙️  System"
+    if [[ -e /dev/kvm ]]; then ok "KVM available"; else warn "KVM not available"; ((warnings++)) || true; fi
+    local mem_avail mem_total mem_pct
+    mem_avail=$(awk '/MemAvailable/ {printf "%.0f", $2/1024}' /proc/meminfo 2>/dev/null || echo "0")
+    mem_total=$(awk '/MemTotal/ {printf "%.0f", $2/1024}' /proc/meminfo 2>/dev/null || echo "1")
+    mem_pct=$((100 - (mem_avail * 100 / mem_total)))
+    ok "Memory: ${mem_avail}MB available (${mem_pct}% used)"
+    ok "Load: $(awk '{print $1}' /proc/loadavg) ($(nproc) CPUs)"
+
+    echo ""
+    if [[ $errors -gt 0 ]]; then
+        echo "❌ CRITICAL — $errors error(s), $warnings warning(s)"; return 2
+    elif [[ $warnings -gt 0 ]]; then
+        echo "⚠️ DEGRADED — $warnings warning(s)"; return 1
+    else
+        echo "✅ HEALTHY — all checks passed"
+    fi
+}
+
+# ── backup ──────────────────────────────────────────────────────────────
+cmd_backup() {
+    local subcmd="${1:-now}"
+    case "$subcmd" in
+        now)
+            need_root
+            step "Running VM backup now"
+            if [[ -x "$SCRIPT_DIR/scripts/backup.sh" ]]; then
+                "$SCRIPT_DIR/scripts/backup.sh"
+            else
+                err "Backup script not found at scripts/backup.sh"
+                exit 1
+            fi
+            ;;
+        enable)
+            need_root
+            systemctl enable --now machina-backup.timer
+            ok "Backup timer enabled (daily at 2:00 AM)"
+            systemctl list-timers machina-backup.timer --no-pager
+            ;;
+        disable)
+            need_root
+            systemctl disable --now machina-backup.timer
+            ok "Backup timer disabled"
+            ;;
+        status)
+            echo ""
+            if systemctl is-active --quiet machina-backup.timer 2>/dev/null; then
+                ok "Backup timer is active"
+            else
+                warn "Backup timer is inactive"
+            fi
+            echo ""
+            systemctl list-timers machina-backup.timer --no-pager 2>/dev/null || true
+            echo ""
+            local backup_dir="/var/lib/machina/backups"
+            info "Backup directory: $backup_dir"
+            if [[ -d "$backup_dir" ]]; then
+                info "Backup count: $(find "$backup_dir" -maxdepth 2 -name "*.xml" 2>/dev/null | wc -l) configs"
+                info "Total size: $(du -sh "$backup_dir" 2>/dev/null | cut -f1)"
+            fi
+            ;;
+        logs)
+            journalctl -u machina-backup -f --no-hostname
+            ;;
+        all)
+            shift || true
+            cmd_backup_all "$@"
+            ;;
+        *)
+            echo "Usage: machinactl backup <now|enable|disable|status|logs|all>"
+            ;;
+    esac
+}
+
+# ── backup all / restore: the controller database + config + secrets + certificates in one archive ──
+# What a lost controller needs to come back: the database (SQLite online copy or pg_dump), /etc/default/machina-*,
+# /etc/machina (config, TLS, first-run password), the fleet and VM-network-policy CAs and any node pki.
+BACKUP_ALL_DIR_DEFAULT=/var/backups/machina/full
+_state_paths() { # paths (relative to /) that make up the controller's state, those that exist under ROOT
+    local root="$1" p
+    # (if, not `[[ ]] && echo`: a missing path must not make the function fail under set -e / pipefail)
+    for p in etc/default/machina-platform etc/default/machina-daemon etc/machina var/lib/machina/fleet-ca var/lib/machina/dist; do
+        if [[ -e "$root/$p" ]]; then echo "$p"; fi
+    done
+    for p in "$root"/var/lib/machina/*-ca "$root"/var/lib/machina/*netpol*; do
+        if [[ -e $p ]]; then echo "${p#"$root"/}"; fi
+    done
+}
+
+cmd_backup_all() {
+    need_root
+    local out="$BACKUP_ALL_DIR_DEFAULT" keep=7 root=/
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --out) out="${2:?}"; shift 2 ;;
+            --keep) keep="${2:?}"; shift 2 ;;
+            --root) root="${2:?}"; shift 2 ;;   # sandbox for tests: read state from here
+            *) err "unknown option for backup all: $1"; exit 1 ;;
+        esac
+    done
+    local stamp work file dbfile="" backend=sqlite dburl dbpath=""
+    stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+    work="$(mktemp -d)"; trap "rm -rf '$work'" RETURN
+    mkdir -p "$out"; chmod 700 "$out"
+    step "Backing up the controller (database, config, secrets, certificates)"
+    dburl="$(sed -n 's/^DATABASE_URL=//p' "$root/etc/default/machina-platform" 2>/dev/null | head -1)"
+    dburl="${dburl:-sqlite:///var/lib/machina/controller.db}"
+    case "$dburl" in
+        postgres://*|postgresql://*) backend=postgres ;;
+        *) dbpath="${dburl#sqlite://}"; dbpath="${dbpath%%\?*}" ;;
+    esac
+    mkdir -p "$work/files"
+    if [[ $backend == sqlite ]]; then
+        [[ -f "$root$dbpath" ]] || { err "no database file at $root$dbpath"; exit 1; }
+        command -v sqlite3 >/dev/null || { err "sqlite3 is required for an online copy (apt install sqlite3)"; exit 1; }
+        dbfile="database.sqlite"
+        sqlite3 "$root$dbpath" ".backup '$work/$dbfile'" || { err "database copy failed"; exit 1; }
+        ok "database copied online ($(du -h "$work/$dbfile" | cut -f1))"
+    else
+        local tool; tool="$(command -v machina-db 2>/dev/null || echo "$SCRIPT_DIR/scripts/db/machina-db.sh")"
+        "$tool" backup --out "$work/db" >/dev/null || { err "PostgreSQL backup failed"; exit 1; }
+        dbfile="$(cd "$work/db" && ls controller-*.dump | head -1)"; mv "$work/db/$dbfile" "$work/$dbfile"
+        ok "PostgreSQL dumped ($(du -h "$work/$dbfile" | cut -f1))"
+    fi
+    local list; list="$(_state_paths "$root" | sort -u)"
+    [[ -n $list ]] || { err "found no machina configuration under $root"; exit 1; }
+    ( cd "$root" && tar -cf - $list ) | ( cd "$work/files" && tar -xf - )
+    ok "config and certificates: $(echo "$list" | tr '\n' ' ')"
+    python3 - "$work" "$stamp" "$backend" "$dbfile" "$dbpath" <<'PY'
+import hashlib, json, os, socket, sys
+work, stamp, backend, dbfile, dbpath = sys.argv[1:6]
+files = {}
+for base in (work,):
+    for d, _, names in os.walk(base):
+        for n in names:
+            p = os.path.join(d, n)
+            rel = os.path.relpath(p, work)
+            if rel == "MANIFEST.json":
+                continue
+            files[rel] = hashlib.sha256(open(p, "rb").read()).hexdigest()
+json.dump({"format": 1, "created": stamp, "host": socket.gethostname(), "backend": backend,
+           "database": dbfile, "sqlite_path": dbpath, "files": files}, open(os.path.join(work, "MANIFEST.json"), "w"), indent=1)
+PY
+    file="$out/machina-full-$stamp.tar.gz"
+    ( umask 077 && tar -czf "$file" -C "$work" . )
+    chmod 600 "$file"
+    find "$out" -maxdepth 1 -name 'machina-full-*.tar.gz' -type f | sort | head -n -"$keep" | xargs -r rm -f
+    ok "backup written: $file ($(du -h "$file" | cut -f1)), keeping the newest $keep"
+    warn "this archive holds secrets (JWT/agent keys, CA private keys, admin password): store it somewhere private"
+}
+
+cmd_restore_all() {
+    need_root
+    local file="" yes=0 root=/ norestart=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --yes) yes=1; shift ;;
+            --root) root="${2:?}"; shift 2 ;;   # sandbox for tests: restore into this directory, touch no service
+            --no-restart) norestart=1; shift ;;
+            -*) err "unknown option for restore: $1"; exit 1 ;;
+            *) file="$1"; shift ;;
+        esac
+    done
+    [[ -n $file && -f $file ]] || { err "Usage: machinactl restore FILE [--yes] [--no-restart]   (FILE from: machinactl backup all)"; exit 1; }
+    local work; work="$(mktemp -d)"; trap "rm -rf '$work'" RETURN
+    tar -xzf "$file" -C "$work" || { err "cannot read $file"; exit 1; }
+    [[ -f $work/MANIFEST.json ]] || { err "$file is not a machina full backup (no MANIFEST.json)"; exit 1; }
+    step "Verifying $file"
+    python3 - "$work" <<'PY' || { err "the archive failed verification: it is damaged or was modified"; exit 1; }
+import hashlib, json, os, sys
+work = sys.argv[1]
+m = json.load(open(os.path.join(work, "MANIFEST.json")))
+bad = [r for r, h in m["files"].items() if not os.path.isfile(os.path.join(work, r)) or hashlib.sha256(open(os.path.join(work, r), "rb").read()).hexdigest() != h]
+print("backup of %s taken %s, database: %s, %d files" % (m["host"], m["created"], m["backend"], len(m["files"])))
+sys.exit(1 if bad else 0)
+PY
+    ok "checksums match"
+    if [[ $yes != 1 ]]; then
+        warn "this replaces the controller's database, configuration and certificates on this machine (the current ones are kept aside first)"
+        read -r -p "Continue? [y/N] " a; [[ $a == y || $a == Y || $a == yes ]] || { info "cancelled"; exit 1; }
+    fi
+    local backend dbfile dbpath aside stamp
+    backend="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["backend"])' "$work/MANIFEST.json")"
+    dbfile="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["database"])' "$work/MANIFEST.json")"
+    dbpath="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["sqlite_path"])' "$work/MANIFEST.json")"
+    stamp="$(date -u +%Y%m%dT%H%M%SZ)"; aside="$root/var/lib/machina/pre-restore-$stamp"
+    if [[ $root == / && $norestart != 1 ]]; then
+        step "Stopping services"
+        systemctl stop machina-controller machina-daemon 2>/dev/null || true
+    fi
+    mkdir -p "$aside"; chmod 700 "$aside"
+    local rel
+    ( cd "$work/files" && find . -mindepth 1 -maxdepth 4 -type f | sed 's#^\./##' ) | while read -r rel; do
+        if [[ -e "$root/$rel" ]]; then mkdir -p "$aside/$(dirname "$rel")"; cp -a "$root/$rel" "$aside/$rel"; fi
+    done
+    if [[ $backend == sqlite && -f "$root$dbpath" ]]; then mkdir -p "$aside/db"; cp -a "$root$dbpath" "$aside/db/"; fi
+    ok "current state kept in ${aside#"$root"}"
+    ( cd "$work/files" && tar -cf - . ) | ( cd "$root" && tar -xf - --no-same-owner )
+    chmod 600 "$root/etc/default/machina-platform" 2>/dev/null || true
+    if [[ $backend == sqlite ]]; then
+        mkdir -p "$(dirname "$root$dbpath")"
+        rm -f "$root$dbpath" "$root$dbpath-wal" "$root$dbpath-shm"
+        cp "$work/$dbfile" "$root$dbpath"
+        ok "database restored to $dbpath"
+    elif [[ $root == / ]]; then
+        local tool; tool="$(command -v machina-db 2>/dev/null || echo "$SCRIPT_DIR/scripts/db/machina-db.sh")"
+        MACHINA_DB_NO_CONTROLLER=1 "$tool" restore "$work/$dbfile" --yes || { err "PostgreSQL restore failed"; exit 1; }
+    else
+        warn "PostgreSQL dump left in the archive: $dbfile (not restored into a sandbox root)"
+    fi
+    if [[ $root == / && $norestart != 1 ]]; then
+        step "Starting services"
+        systemctl start machina-controller 2>/dev/null || true
+        systemctl start machina-daemon 2>/dev/null || true
+        sleep 4
+        if curl -fsS -m 10 http://127.0.0.1:5093/api/v1/health >/dev/null 2>&1; then ok "controller is healthy"; else warn "controller did not answer yet: journalctl -u machina-controller -n 50"; fi
+    fi
+    ok "restore complete"
+}
+
+# ── start/stop/restart/status/logs ──────────────────────────────────────
+cmd_start() {
+    need_root
+    step "Starting machina-daemon"
+    systemctl start machina-daemon
+    sleep 2
+    if systemctl is-active --quiet machina-daemon; then
+        ok "machina-daemon is running"
+        info "API: $API_URL"
+    else
+        err "Failed to start. Check: sudo journalctl -u machina-daemon -e"
+        exit 1
+    fi
+}
+
+cmd_stop() {
+    need_root
+    systemctl stop machina-daemon
+    ok "machina-daemon stopped"
+}
+
+cmd_restart() {
+    need_root
+    systemctl restart machina-daemon
+    sleep 2
+    if systemctl is-active --quiet machina-daemon; then
+        ok "machina-daemon restarted"
+    else
+        err "Failed to restart. Check: sudo journalctl -u machina-daemon -e"
+    fi
+}
+
+cmd_status() {
+    echo ""
+    if systemctl is-active --quiet machina-daemon 2>/dev/null; then
+        ok "machina-daemon is running"
+    else
+        warn "machina-daemon is stopped"
+    fi
+    echo ""
+    systemctl status machina-daemon --no-pager 2>/dev/null || true
+}
+
+cmd_logs() {
+    journalctl -u machina-daemon -f --no-hostname "${@}"
+}
+
+# ── doctor ──────────────────────────────────────────────────────────────
+cmd_doctor() {
+    step "System Readiness Check"
+    local issues=0
+
+    local distro
+    distro=$(detect_distro)
+    info "Distribution: $distro"
+
+    # systemd version
+    local sd_ver
+    sd_ver=$(systemctl --version 2>/dev/null | head -1 | awk '{print $2}') || sd_ver="unknown"
+    ok "systemd $sd_ver"
+
+    # KVM
+    if [[ -e /dev/kvm ]]; then ok "KVM available"; else warn "KVM not available"; ((issues++)) || true; fi
+
+    # Required commands
+    for cmd in virsh virt-install qemu-img curl jq; do
+        if command -v "$cmd" &>/dev/null; then
+            ok "$cmd found"
+        else
+            err "$cmd not found"; ((issues++)) || true
+        fi
+    done
+
+    # Optional
+    for cmd in rsync socat virt-viewer; do
+        if command -v "$cmd" &>/dev/null; then
+            ok "$cmd found (optional)"
+        else
+            warn "$cmd not found (optional)"
+        fi
+    done
+
+    # Rust (only needed to build from source; a package install has no use for it)
+    if command -v cargo &>/dev/null; then
+        ok "Rust $(rustc --version | awk '{print $2}')"
+    elif command -v machina-daemon &>/dev/null; then
+        info "Rust toolchain not installed (not needed: Machina is installed from packages)"
+    else
+        err "Rust toolchain not installed (needed to build from source)"; ((issues++)) || true
+    fi
+
+    # libvirtd
+    if systemctl is-active --quiet libvirtd 2>/dev/null; then
+        ok "libvirtd is running"
+    else
+        warn "libvirtd is not running"
+    fi
+
+    # machina
+    if command -v machina-daemon &>/dev/null; then
+        ok "machina-daemon is installed"
+    else
+        warn "machina-daemon not yet installed"
+    fi
+
+    if systemctl is-active --quiet machina-daemon 2>/dev/null; then
+        ok "machina-daemon is running"
+    else
+        warn "machina-daemon is not running"
+    fi
+
+    echo ""
+    if [[ $issues -eq 0 ]]; then
+        ok "System is ready"
+    else
+        warn "$issues issue(s) found — run ./machinactl deps to fix"
+    fi
+}
+
+# ── preflight ───────────────────────────────────────────────────────────
+# Can this machine run Machina? Same script the installer uses (scripts/preflight.sh, shipped as machina-preflight).
+cmd_preflight() {
+    local script
+    if command -v machina-preflight &>/dev/null; then
+        script="$(command -v machina-preflight)"
+    elif [[ -f "$SCRIPT_DIR/scripts/preflight.sh" ]]; then
+        script="$SCRIPT_DIR/scripts/preflight.sh"
+    else
+        err "machina-preflight not found (reinstall the machina package, or run from a source checkout)"
+        exit 1
+    fi
+    exec bash "$script" "$@"
+}
+
+# ── controller API helpers (root: reads the admin password from /etc/default/machina-platform) ──
+_ctl_url() { echo "${MACHINA_CONTROLLER_URL:-http://127.0.0.1:5093}"; }
+_ctl_token() {
+    local env=/etc/default/machina-platform user pw
+    [[ -r $env ]] || { err "cannot read $env (run as root on the controller)"; exit 1; }
+    user="$(sed -n 's/^MACHINA_ADMIN_USER=//p' "$env" | head -1)"; user="${user:-admin}"
+    pw="$(sed -n 's/^MACHINA_ADMIN_PASSWORD=//p' "$env" | head -1)"
+    curl -fsS -m 15 -X POST "$(_ctl_url)/api/v1/auth/login" -H 'content-type: application/json' \
+        -d "{\"username\":\"$user\",\"password\":\"$pw\"}" | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])'
+}
+_ctl() { # METHOD PATH [JSON]
+    local m="$1" path="$2" body="${3:-}" tok
+    tok="$(_ctl_token)" || exit 1
+    if [[ -n $body ]]; then
+        curl -fsS -m 60 -X "$m" "$(_ctl_url)$path" -H "authorization: Bearer $tok" -H 'content-type: application/json' -d "$body"
+    else
+        curl -fsS -m 60 -X "$m" "$(_ctl_url)$path" -H "authorization: Bearer $tok"
+    fi
+}
+_host_id() { # NAME -> id
+    _ctl GET /api/v1/hosts | python3 -c '
+import sys, json
+n = sys.argv[1]
+for h in json.load(sys.stdin):
+    if h["hostname"] == n or h["address"] == n:
+        print(h["id"]); break' "$1"
+}
+
+# ── dist: publish the agent so a bare node can install itself from this controller ──
+cmd_dist() {
+    local sub="${1:-}"; shift || true
+    case "$sub" in
+        publish)
+            need_root
+            local dest="${MACHINA_DIST_DIR:-/var/lib/machina/dist}" f src
+            mkdir -p "$dest"
+            for f in machina-agent machina-bpfd; do
+                src="$(command -v "$f" || true)"; [[ -n $src ]] || src="$SCRIPT_DIR/target/release/$f"
+                [[ -x $src ]] || { err "$f not found (install the agent package or build it)"; exit 1; }
+                install -m 0755 "$src" "$dest/$f"
+            done
+            for f in machina-agent.service machina-bpfd.service; do
+                src=""
+                for d in /etc/systemd/system /usr/lib/systemd/system "$SCRIPT_DIR/contrib"; do [[ -f $d/$f ]] && { src="$d/$f"; break; }; done
+                [[ -n $src ]] || { err "$f not found"; exit 1; }
+                install -m 0644 "$src" "$dest/$f"
+            done
+            (cd "$dest" && sha256sum machina-agent machina-bpfd machina-agent.service machina-bpfd.service > SHA256SUMS)
+            # Keep the bare-metal ramdisk entries a previous publish-metal added.
+            [[ -f $dest/SHA256SUMS.metal ]] && cat "$dest/SHA256SUMS.metal" >> "$dest/SHA256SUMS"
+            ok "published to $dest (served at /dist/ by the controller)"
+            ( cd "$dest" && cat SHA256SUMS )
+            ;;
+        publish-metal)
+            # The ramdisk PXE machines boot (scripts/metal/build-image.sh output).
+            need_root
+            local dest="${MACHINA_DIST_DIR:-/var/lib/machina/dist}" from="" f
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --dir) from="${2:-}"; shift 2 ;;
+                    *) err "unknown option $1"; exit 1 ;;
+                esac
+            done
+            [[ -n $from ]] || from="${MACHINA_METAL_OUT:-/var/tmp/machina-metal-out}"
+            for f in metal-vmlinuz metal-initrd metal-rootfs.squashfs; do
+                [[ -f $from/$f ]] || { err "$from/$f not found (build it: sudo scripts/metal/build-image.sh)"; exit 1; }
+            done
+            mkdir -p "$dest"
+            for f in metal-vmlinuz metal-initrd metal-rootfs.squashfs; do
+                install -m 0644 "$from/$f" "$dest/$f"
+            done
+            # Optional: the iPXE ISOs for virtual-media boots (scripts/metal/build-ipxe-iso.sh).
+            local isos=()
+            for f in metal-ipxe.iso metal-ipxe-uefi.iso; do
+                if [[ -f $from/$f ]]; then install -m 0644 "$from/$f" "$dest/$f"; isos+=("$f"); fi
+            done
+            (cd "$dest" && sha256sum metal-vmlinuz metal-initrd metal-rootfs.squashfs "${isos[@]}" > SHA256SUMS.metal)
+            # SHA256SUMS = everything except old metal lines, plus the new ones.
+            (cd "$dest" && { [[ -f SHA256SUMS ]] && grep -v ' metal-' SHA256SUMS || true; cat SHA256SUMS.metal; } > SHA256SUMS.new && mv SHA256SUMS.new SHA256SUMS)
+            ok "bare-metal ramdisk published to $dest (served at /dist/)"
+            ( cd "$dest" && cat SHA256SUMS.metal )
+            ;;
+        status)
+            local dest="${MACHINA_DIST_DIR:-/var/lib/machina/dist}"
+            if [[ -f $dest/SHA256SUMS ]]; then ok "published in $dest"; cat "$dest/SHA256SUMS"; else warn "nothing published: run  sudo machinactl dist publish"; fi
+            ;;
+        *) err "Usage: machinactl dist publish|publish-metal|status"; exit 1 ;;
+    esac
+}
+
+# ── bootstrap: make this controller ready to enrol nodes in one step ──
+# Sets the public URL and the join (TLS) listener, restarts the controller if they changed,
+# publishes the agent, and prints a ready join command. Replaces "set env, restart, dist publish".
+cmd_bootstrap() {
+    need_root
+    local url="" tls="0.0.0.0:5094" sans="" envf="${MACHINA_ENV_FILE:-/etc/default/machina-platform}"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --public-url) url="${2:-}"; shift 2 ;;
+            --tls-addr) tls="${2:-}"; shift 2 ;;
+            --tls-sans) sans="${2:-}"; shift 2 ;;
+            --env-file) envf="${2:-}"; shift 2 ;;
+            *) err "Usage: machinactl bootstrap [--public-url URL] [--tls-addr HOST:PORT] [--tls-sans a,b] [--env-file F]"; exit 1 ;;
+        esac
+    done
+    if [[ -z $url ]]; then
+        local ip; ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+        [[ -n $ip ]] || { err "cannot work out this host's address; pass --public-url"; exit 1; }
+        url="http://$ip:5093"
+        info "no --public-url: using $url (nodes must be able to reach it)"
+    fi
+    [[ $url =~ ^https?://[][A-Za-z0-9._:-]+$ ]] || { err "invalid --public-url: $url"; exit 1; }
+    [[ $tls =~ ^[][A-Za-z0-9._:-]+$ ]] || { err "invalid --tls-addr: $tls"; exit 1; }
+    [[ -z $sans || $sans =~ ^[A-Za-z0-9._,:-]+$ ]] || { err "invalid --tls-sans"; exit 1; }
+    step "Configuring the controller ($envf)"
+    mkdir -p "$(dirname "$envf")"
+    [[ -f $envf ]] || { (umask 077 && : >"$envf"); }
+    chmod 600 "$envf"
+    local changed=0 kv k v
+    for kv in "MACHINA_PUBLIC_URL=$url" "MACHINA_CONTROLLER_TLS_ADDR=$tls" ${sans:+"MACHINA_CONTROLLER_TLS_SANS=$sans"}; do
+        k="${kv%%=*}"; v="${kv#*=}"
+        if grep -q "^$k=" "$envf"; then
+            [[ "$(grep "^$k=" "$envf" | tail -1)" == "$k=$v" ]] && continue
+            # No sed with user text: rewrite the file without the old line, then append.
+            grep -v "^$k=" "$envf" >"$envf.new" || true
+            mv "$envf.new" "$envf"; chmod 600 "$envf"
+        fi
+        printf '%s=%s\n' "$k" "$v" >>"$envf"; changed=1
+    done
+    if [[ $changed -eq 1 ]]; then
+        systemctl restart machina-controller 2>/dev/null && ok "controller restarted with the new settings" \
+            || warn "could not restart machina-controller; restart it yourself"
+    else
+        ok "settings already in place"
+    fi
+    step "Publishing the agent for new nodes"
+    cmd_dist publish
+    step "Waiting for the controller"
+    local i
+    for i in $(seq 40); do
+        curl -fsS -o /dev/null "http://127.0.0.1:5093/api/v1/health" 2>/dev/null && break
+        sleep 2
+    done
+    curl -fsS -o /dev/null "http://127.0.0.1:5093/api/v1/health" 2>/dev/null || { err "controller did not come up"; exit 1; }
+    ok "ready. Add nodes with:  machinactl host add USER@HOST   (or --file hosts.txt --parallel 8)"
+}
+
+# ── host: add / list / drain / remove nodes ──
+cmd_host() {
+    local sub="${1:-}"; shift || true
+    case "$sub" in
+        list|ls)
+            _ctl GET /api/v1/hosts | python3 -c '
+import sys, json
+rows = json.load(sys.stdin)
+print("%-26s %-16s %-10s %-5s %-6s %-9s %s" % ("NAME", "ADDRESS", "STATE", "VMS", "CPU%", "AGENT", "VALIDATION"))
+for h in rows:
+    print("%-26s %-16s %-10s %-5s %-6s %-9s %s" % (h["hostname"][:26], h["address"][:16], h["state"], h["vm_count"], round(h["cpu_percent"] or 0), (h.get("agent_version") or "?")[:9], h["validation_status"]))'
+            ;;
+        add)
+            # machinactl host add USER@HOST [USER@HOST ...] [--file F] [--parallel N]
+            #     [--site S] [--rack R] [--tag T]... [--network N]... [--pool P]... [--cluster ID] [--ttl H]
+            local targets=() file="" par=4 site="" rack="" cluster="" ttl=1 tags=() nets=() pools=()
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --file) file="${2:-}"; shift 2 ;;
+                    --parallel) par="${2:-4}"; shift 2 ;;
+                    --site) site="${2:-}"; shift 2 ;;
+                    --rack) rack="${2:-}"; shift 2 ;;
+                    --tag) tags+=("${2:-}"); shift 2 ;;
+                    --network) nets+=("${2:-}"); shift 2 ;;
+                    --pool) pools+=("${2:-}"); shift 2 ;;
+                    --cluster) cluster="${2:-}"; shift 2 ;;
+                    --ttl) ttl="${2:-1}"; shift 2 ;;
+                    -*) err "unknown option $1"; exit 1 ;;
+                    *) targets+=("$1"); shift ;;
+                esac
+            done
+            if [[ -n $file ]]; then
+                [[ -r $file ]] || { err "cannot read $file"; exit 1; }
+                local line
+                while IFS= read -r line || [[ -n $line ]]; do
+                    line="${line%%#*}"; line="${line//[[:space:]]/}"
+                    [[ -n $line ]] && targets+=("$line")
+                done <"$file"
+            fi
+            [[ ${#targets[@]} -gt 0 ]] || { err "Usage: machinactl host add USER@HOST... | --file hosts.txt [--parallel N] [--site S] [--rack R] [--tag T] [--network N] [--pool P] [--cluster ID]   (needs SSH access and sudo on each node)"; exit 1; }
+            [[ $par =~ ^[0-9]+$ && $par -ge 1 ]] || { err "--parallel must be a positive number"; exit 1; }
+            [[ $ttl =~ ^[0-9]+$ ]] || { err "--ttl must be hours"; exit 1; }
+            # One token per host (single use), carrying the labels.
+            _host_add_body() {
+                SITE="$site" RACK="$rack" CLUSTER="$cluster" TTL="$ttl" \
+                TAGS="$(printf '%s\n' "${tags[@]+"${tags[@]}"}")" NETS="$(printf '%s\n' "${nets[@]+"${nets[@]}"}")" \
+                POOLS="$(printf '%s\n' "${pools[@]+"${pools[@]}"}")" python3 -c '
+import json, os
+split = lambda k: [x for x in os.environ.get(k, "").split("\n") if x.strip()]
+d = {"ttl_hours": int(os.environ["TTL"]), "site": os.environ["SITE"], "rack": os.environ["RACK"],
+     "tags": split("TAGS"), "networks": split("NETS"), "storage_pools": split("POOLS")}
+if os.environ["CLUSTER"]:
+    d["cluster_id"] = os.environ["CLUSTER"]
+print(json.dumps(d))'
+            }
+            _host_add_one() {
+                local target="$1" resp cmd tok body sshopt=(-o StrictHostKeyChecking=accept-new)
+                body="$(_host_add_body)" || return 1
+                resp="$(_ctl POST /api/v1/enrollment/tokens "$body")" || return 1
+                cmd="$(printf %s "$resp" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("join_command") or d["install_command"])')"
+                tok="$(printf %s "$resp" | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])')"
+                if [[ ${#targets[@]} -eq 1 ]]; then sshopt+=(-t); else sshopt+=(-o BatchMode=yes); fi
+                if ssh "${sshopt[@]}" "$target" "$cmd"; then
+                    return 0
+                fi
+                _ctl DELETE "/api/v1/enrollment/tokens/$tok" >/dev/null 2>&1 || true
+                return 1
+            }
+            step "Adding ${#targets[@]} node(s) to the fleet (up to $par at a time)"
+            local failed=() t pids=() names=() i
+            for t in "${targets[@]}"; do
+                while [[ ${#pids[@]} -ge $par ]]; do
+                    # wait for the oldest job
+                    if wait "${pids[0]}"; then ok "${names[0]} ran the join command"; else failed+=("${names[0]}"); err "${names[0]}: the join command failed (token revoked)"; fi
+                    pids=("${pids[@]:1}"); names=("${names[@]:1}")
+                done
+                _host_add_one "$t" &
+                pids+=($!); names+=("$t")
+            done
+            for i in "${!pids[@]}"; do
+                if wait "${pids[$i]}"; then ok "${names[$i]} ran the join command"; else failed+=("${names[$i]}"); err "${names[$i]}: the join command failed (token revoked)"; fi
+            done
+            if [[ ${#failed[@]} -gt 0 ]]; then
+                err "${#failed[@]} of ${#targets[@]} failed: ${failed[*]}"
+                exit 1
+            fi
+            ok "all ${#targets[@]} ran the join command; in a few seconds:  machinactl host list"
+            info "or watch them join live in the web UI: Platform > Hosts"
+            ;;
+        drain)
+            local id; id="$(_host_id "${1:-}")"; [[ -n $id ]] || { err "no such host: ${1:-}"; exit 1; }
+            _ctl POST "/api/v1/hosts/$id/maintenance" '{"action":"enter","evacuate":true}' >/dev/null && ok "${1} is draining: VMs are being moved off it"
+            ;;
+        undrain)
+            local id; id="$(_host_id "${1:-}")"; [[ -n $id ]] || { err "no such host: ${1:-}"; exit 1; }
+            _ctl POST "/api/v1/hosts/$id/maintenance" '{"action":"exit","evacuate":false}' >/dev/null && ok "${1} is schedulable again"
+            ;;
+        remove|rm)
+            local id; id="$(_host_id "${1:-}")"; [[ -n $id ]] || { err "no such host: ${1:-}"; exit 1; }
+            _ctl DELETE "/api/v1/hosts/$id" >/dev/null && ok "${1} removed from the fleet (its agent token and certificate are no longer accepted)"
+            ;;
+        *) err "Usage: machinactl host list|add USER@HOST...|drain NAME|undrain NAME|remove NAME"; exit 1 ;;
+    esac
+}
+
+# ── show-login ──────────────────────────────────────────────────────────
+# Where to sign in and with what, for a first-run install (the generated admin password is root-only).
+cmd_show_login() {
+    local file=/etc/machina/INITIAL_ADMIN_PASSWORD env=/etc/default/machina-platform user=admin pw="" host
+    if [[ $EUID -ne 0 ]]; then
+        err "run as root: sudo machinactl show-login (the password file is readable by root only)"; exit 1
+    fi
+    if [[ -r $file ]]; then
+        user="$(sed -n 's/^username: *//p' "$file" | head -1)"; user="${user:-admin}"
+        pw="$(sed -n 's/^password: *//p' "$file" | head -1)"
+    fi
+    [[ -z $pw && -r $env ]] && pw="$(sed -n 's/^MACHINA_ADMIN_PASSWORD=//p' "$env" | head -1)"
+    host="$(hostname -I 2>/dev/null | awk '{print $1}')"; host="${host:-$(hostname -f 2>/dev/null || hostname)}"
+    echo ""
+    echo "  Sign in:   https://${host}:5092   (the certificate is self-signed until you install your own: machinactl tls)"
+    if [[ -n $pw ]]; then
+        echo "  Username:  $user"
+        echo "  Password:  $pw"
+        echo ""
+        warn "Change the password after your first sign-in."
+    else
+        echo "  No generated admin password found: sign in with a local (PAM) Linux account."
+    fi
+    echo ""
+}
+
+# ── tls ─────────────────────────────────────────────────────────────────
+cmd_tls() {
+    need_root
+    step "TLS Certificate Setup"
+
+    local cert_dir="/etc/machina/ssl"
+    local cert_file="$cert_dir/cert.pem"
+    local key_file="$cert_dir/key.pem"
+
+    mkdir -p "$cert_dir"
+
+    if [[ -f "$cert_file" && -f "$key_file" ]]; then
+        local expiry
+        expiry=$(openssl x509 -enddate -noout -in "$cert_file" 2>/dev/null | cut -d= -f2)
+        ok "Certificate already exists (expires: $expiry)"
+        read -rp "Regenerate? [y/N] " answer
+        [[ "$answer" != "y" && "$answer" != "Y" ]] && return
+    fi
+
+    local hostname
+    hostname=$(hostname -f 2>/dev/null || hostname)
+
+    info "Generating self-signed certificate for $hostname..."
+    # umask 077 so key_file is created non-world-readable from the first byte openssl
+    # writes — no window where the private key sits world-readable before the chmod below.
+    (umask 077 && openssl req -x509 -newkey rsa:4096 \
+        -keyout "$key_file" -out "$cert_file" \
+        -sha256 -days 365 -nodes \
+        -subj "/CN=$hostname/O=machina" \
+        -addext "subjectAltName=DNS:$hostname,DNS:localhost,IP:127.0.0.1" \
+        2>/dev/null)
+
+    chmod 600 "$key_file"
+    chmod 644 "$cert_file"
+
+    ok "Certificate generated"
+    info "Cert: $cert_file"
+    info "Key:  $key_file"
+}
+
+# ── integrations status ────────────────────────────────────────────────
+cmd_integrations() {
+    step "Integration status"
+    if ! curl -sfk "$API_URL/api/$API_VERSION/health" &>/dev/null; then
+        err "machina-daemon is not running at $API_URL"
+        exit 1
+    fi
+    curl -sk "$API_URL/api/$API_VERSION/integrations/status" | jq '.' 2>/dev/null || \
+        curl -sk "$API_URL/api/$API_VERSION/integrations/status"
+}
+
+# ── audit verify ───────────────────────────────────────────────────────
+cmd_audit_verify() {
+    step "Audit log signature verification"
+    local max_lines="${1:-50000}"
+    if curl -sfk "$API_URL/api/$API_VERSION/health" &>/dev/null; then
+        info "Using API $API_URL/api/$API_VERSION/audit/verify"
+        curl -sk "$API_URL/api/$API_VERSION/audit/verify?max_lines=$max_lines" | jq '.' 2>/dev/null || \
+            curl -sk "$API_URL/api/$API_VERSION/audit/verify?max_lines=$max_lines"
+        return
+    fi
+    local log="/var/lib/machina/audit.log"
+    if [[ ! -f "$log" ]]; then
+        err "No audit log at $log and daemon is not reachable"
+        exit 1
+    fi
+    info "Verifying $log locally (sha256 lines)"
+    local total=0 valid=0 invalid=0 unsigned=0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ -z "$line" ]] && continue
+        total=$((total + 1))
+        if [[ "$line" != sha256:* ]]; then
+            unsigned=$((unsigned + 1))
+            continue
+        fi
+        local hex="${line#sha256:}"
+        hex="${hex%%$'\t'*}"
+        local payload="${line#sha256:*$'\t'}"
+        local expect
+        expect=$(printf '%s' "$payload" | sha256sum | awk '{print $1}')
+        if [[ "${hex,,}" == "${expect,,}" ]]; then
+            valid=$((valid + 1))
+        else
+            invalid=$((invalid + 1))
+        fi
+    done < "$log"
+    ok "total=$total signed_valid=$valid signed_invalid=$invalid unsigned=$unsigned"
+}
+
+# ── demo ────────────────────────────────────────────────────────────────
+cmd_demo() {
+    step "machina Interactive Demo"
+
+    if ! curl -sfk "$API_URL/api/$API_VERSION/health" &>/dev/null; then
+        err "machina-daemon is not running at $API_URL"
+        info "Start it with: ./machinactl start"
+        exit 1
+    fi
+    ok "machina-daemon is running"
+
+    echo ""
+    echo "=== VMs ==="
+    curl -sk "$API_URL/api/$API_VERSION/vms" | jq '.' 2>/dev/null || echo "(no response)"
+
+    echo ""
+    echo "=== Health ==="
+    curl -sk "$API_URL/api/$API_VERSION/health" | jq '.' 2>/dev/null
+
+    echo ""
+    echo "=== System ==="
+    curl -sk "$API_URL/api/$API_VERSION/system/info" | jq '.' 2>/dev/null || echo "(endpoint not available)"
+
+    echo ""
+    echo "📋 Quick reference:"
+    echo "  🔗 API:   $API_URL/api/$API_VERSION"
+    echo "  🌐 Web:   $API_URL"
+    echo ""
+}
+
+# ── sprites (disposable sandbox VMs) ──────────────────────────────────────
+cmd_sprite() {
+    local subcmd="${1:-list}"
+    shift || true
+
+    local auth_header=()
+    if [[ -n "${MACHINA_API_TOKEN:-}" ]]; then
+        auth_header=(-H "Authorization: Bearer ${MACHINA_API_TOKEN}")
+    fi
+
+    case "$subcmd" in
+        list)
+            curl -sk "${auth_header[@]}" "$API_URL/api/$API_VERSION/sprites" | jq '.' 2>/dev/null || echo "(no response)"
+            ;;
+        get)
+            local id="${1:?Usage: machinactl sprite get <id>}"
+            curl -sk "${auth_header[@]}" "$API_URL/api/$API_VERSION/sprites/$id" | jq '.' 2>/dev/null || echo "(no response)"
+            ;;
+        golden-images)
+            curl -sk "${auth_header[@]}" "$API_URL/api/$API_VERSION/sprites/golden-images" | jq '.' 2>/dev/null || echo "(no response)"
+            ;;
+        create)
+            local golden_image="" vcpus=1 memory_mb=512 ttl_seconds=300 backend="libvirt" network_egress=false
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --golden-image)   golden_image="$2"; shift 2 ;;
+                    --vcpus)          vcpus="$2"; shift 2 ;;
+                    --memory-mb)      memory_mb="$2"; shift 2 ;;
+                    --ttl-seconds)    ttl_seconds="$2"; shift 2 ;;
+                    --backend)        backend="$2"; shift 2 ;;
+                    --network-egress) network_egress=true; shift ;;
+                    *) err "Unknown option: $1"; exit 1 ;;
+                esac
+            done
+            if [[ -z "$golden_image" ]]; then
+                err "Usage: machinactl sprite create --golden-image NAME [--vcpus N] [--memory-mb N] [--ttl-seconds N] [--backend libvirt|cloudhypervisor|firecracker] [--network-egress]"
+                exit 1
+            fi
+            local body
+            body=$(jq -n \
+                --arg golden_image "$golden_image" \
+                --argjson vcpus "$vcpus" \
+                --argjson memory_mb "$memory_mb" \
+                --argjson ttl_seconds "$ttl_seconds" \
+                --arg backend "$backend" \
+                --argjson network_egress "$network_egress" \
+                '{golden_image: $golden_image, vcpus: $vcpus, memory_mb: $memory_mb, ttl_seconds: $ttl_seconds, backend: $backend, network_egress: $network_egress}')
+            curl -sk -X POST "${auth_header[@]}" -H "Content-Type: application/json" -d "$body" \
+                "$API_URL/api/$API_VERSION/sprites" | jq '.' 2>/dev/null || echo "(no response)"
+            ;;
+        delete)
+            local id="${1:?Usage: machinactl sprite delete <id>}"
+            curl -sk -X DELETE "${auth_header[@]}" "$API_URL/api/$API_VERSION/sprites/$id" | jq '.' 2>/dev/null || echo "(no response)"
+            ;;
+        *)
+            echo "Usage: machinactl sprite <list|get|create|delete|golden-images>"
+            echo ""
+            echo "  machinactl sprite list"
+            echo "  machinactl sprite get <id>"
+            echo "  machinactl sprite golden-images"
+            echo "  machinactl sprite create --golden-image NAME [--vcpus N] [--memory-mb N] \\"
+            echo "                            [--ttl-seconds N] [--backend libvirt|cloudhypervisor|firecracker] [--network-egress]"
+            echo "  machinactl sprite delete <id>"
+            echo ""
+            echo "Create/delete need write access — set MACHINA_API_TOKEN to a Bearer token"
+            echo "(mint one via POST $API_URL/api/$API_VERSION/tokens as an admin, or sign in to the web UI)."
+            ;;
+    esac
+}
+
+# ── VM network policy / labels / flows ───────────────────────────────────
+# Args: the remaining CLI args; consumes a leading or trailing --fleet.
+np_setup() {
+    # shellcheck source=scripts/lib/netpol-ctl.sh
+    source "$SCRIPT_DIR/scripts/lib/netpol-ctl.sh"
+    # shellcheck source=scripts/lib/metal-ctl.sh
+    source "$SCRIPT_DIR/scripts/lib/metal-ctl.sh"
+    NP_BASE="$API_URL/api/$API_VERSION"
+    if [[ "${NP_FLEET:-0}" == 1 ]]; then
+        NP_BASE="$API_URL/api/$API_VERSION/platform/controller/api/$API_VERSION"
+    fi
+    NP_AUTH=()
+    if [[ -n "${MACHINA_API_TOKEN:-}" ]]; then
+        NP_AUTH=(-H "Authorization: Bearer ${MACHINA_API_TOKEN}")
+    elif [[ -n "${MACHINA_USER:-}" && -n "${MACHINA_PASS:-}" ]]; then
+        # Reuse one session across invocations: /auth/login is rate limited.
+        NP_JAR="${MACHINA_COOKIE_JAR:-$HOME/.machina/cli-session}"
+        mkdir -p "$(dirname "$NP_JAR")"
+        local code
+        code=$(curl -sk -b "$NP_JAR" -o /dev/null -w '%{http_code}' "$API_URL/api/$API_VERSION/auth/session" 2>/dev/null) || code=000
+        if [[ "$code" != 200 ]]; then
+            (umask 077 && : >"$NP_JAR")
+            # Password over stdin so it never shows up in argv.
+            code=$(MACHINA_USER="$MACHINA_USER" MACHINA_PASS="$MACHINA_PASS" jq -n '{username: env.MACHINA_USER, password: env.MACHINA_PASS}' |
+                curl -sk -c "$NP_JAR" -o /dev/null -w '%{http_code}' -X POST "$API_URL/api/$API_VERSION/auth/login" \
+                    -H 'Content-Type: application/json' --data-binary @-) || code=000
+            if [[ "$code" != 200 ]]; then
+                local hint=""
+                [[ "$code" == 429 ]] && hint=", rate limited — wait a minute"
+                err "login as $MACHINA_USER failed (HTTP $code$hint)"
+                exit 1
+            fi
+        fi
+        NP_AUTH=(-b "$NP_JAR")
+    fi
+}
+
+np_run() {
+    local fn=$1
+    shift
+    local args=() a
+    NP_FLEET=0
+    for a in "$@"; do
+        if [[ "$a" == "--fleet" ]]; then NP_FLEET=1; else args+=("$a"); fi
+    done
+    np_setup
+    "$fn" "${args[@]+"${args[@]}"}"
+}
+
+cmd_vm() {
+    local sub="${1:-}"
+    shift || true
+    case "$sub" in
+        label|labels) np_run np_label_main "$@" ;;
+        quarantine|isolate) np_run np_quarantine_main "$@" ;;
+        release|unquarantine) np_run np_release_main "$@" ;;
+        sleep|wake) np_run np_sleep_main "$sub" "$@" --fleet ;;
+        sleep-policy) np_run np_sleep_policy_main "$@" --fleet ;;
+        sleeping) np_run np_sleeping_main "$@" --fleet ;;
+        restore-points) np_run np_tt_main list "$@" --fleet ;;
+        restore-point) np_run np_tt_main create "$@" --fleet ;;
+        rewind) np_run np_tt_main rewind "$@" --fleet ;;
+        fork) np_run np_tt_main fork "$@" --fleet ;;
+        fork-detach) np_run np_tt_main detach "$@" --fleet ;;
+        *)
+            echo "Usage: machinactl vm label VM [key=value ...] [key- ...] [--fleet]"
+            echo "       machinactl vm quarantine VM [--for 1h] [--allow-host-ssh] [--reason TEXT] [--fleet]"
+            echo "       machinactl vm release VM [--fleet]"
+            echo "       machinactl vm sleep|wake VM                 Scale to zero / restore (controller)"
+            echo "       machinactl vm sleep-policy VM [MIN|inherit|never]   Auto-sleep after idle"
+            echo "       machinactl vm sleep-policy --project P [MIN|never|clear]"
+            echo "       machinactl vm sleeping                      Sleeping VMs and RAM handed back"
+            echo "       machinactl vm restore-points VM [--every MIN|off] [--keep N]"
+            echo "       machinactl vm restore-point VM [--note TEXT] [--wait]"
+            echo "       machinactl vm rewind VM POINT [--wait]      Discard everything after POINT"
+            echo "       machinactl vm fork VM NEW [--at POINT] [--memory] [--isolate] [--wait]"
+            echo "       machinactl vm fork-detach VM [--wait]"
+            exit 1 ;;
+    esac
+}
+
+# ── help ────────────────────────────────────────────────────────────────
+# Controller database: machinactl db setup pod|package|external|sqlite, status, url, backup, restore
+cmd_db() {
+    local tool
+    tool="$(command -v machina-db 2>/dev/null || true)"
+    [[ -n "$tool" ]] || tool="$SCRIPT_DIR/scripts/db/machina-db.sh"
+    [[ -x "$tool" ]] || { err "machina-db not found (expected on PATH or at scripts/db/machina-db.sh)"; exit 1; }
+    case "${1:-}" in
+        setup|restore) exec sudo -E "$tool" "$@" ;;   # these write /etc and restart services
+        *) exec "$tool" "$@" ;;
+    esac
+}
+
+cmd_help() {
+    echo ""
+    echo "machinactl — machina management tool"
+    echo ""
+    echo "📋 Usage: ./machinactl <command> [options]"
+    echo ""
+    echo "📦 Setup:"
+    echo "  deps              Install all system dependencies (auto-sudo)"
+    echo "  build [--no-web]  Build backend (and web UI unless --no-web)"
+    echo "  test              Run the test suite (cargo test)"
+    echo "  install           Install machina to the system (auto-sudo)"
+    echo "  uninstall         Remove machina from the system (auto-sudo)"
+    echo ""
+    echo "🔄 Lifecycle:"
+    echo "  deploy            Full deployment: deps → build → install → start → verify (auto-sudo)"
+    echo "  reinstall         Rebuild + reinstall + verify (auto-sudo)"
+    echo "  upgrade           --from DIR | --pull  [--dry-run]: backup, then controller, daemon, agent with health gates and rollback"
+    echo ""
+    echo "⚙️  Service:"
+    echo "  start             Start the machina-daemon service"
+    echo "  stop              Stop the service"
+    echo "  restart           Restart the service"
+    echo "  status            Show service status"
+    echo "  logs              Follow service logs (journalctl)"
+    echo ""
+    echo "🗄️  Controller database (SQLite by default; PostgreSQL for large fleets):"
+    echo "  db status         Backend, connection and size"
+    echo "  db setup pod|package|external --url URL|sqlite   Choose and set up the database"
+    echo "  db backup         Dump the database (daily timer is installed with PostgreSQL)"
+    echo "  db restore FILE --yes   Restore a PostgreSQL dump"
+    echo ""
+    echo "💾 Backup:"
+    echo "  backup now        Run VM backup immediately (auto-sudo)"
+    echo "  backup enable     Enable daily backup timer (2:00 AM)"
+    echo "  backup disable    Disable backup timer"
+    echo "  backup status     Show backup timer and storage info"
+    echo "  backup logs       Follow backup logs"
+    echo ""
+    echo "🛠️  Utilities:"
+    echo "  verify            Post-install smoke test (API, VMs, libvirt, backup)"
+    echo "  health            Deep health check (service, API, disk, libvirt, timers)"
+    echo "  backup all        One archive: controller database + config + secrets + certificates (--out DIR, --keep N)"
+    echo "  restore FILE      Restore such an archive (verifies checksums, keeps the current state aside; --yes)"
+    echo "  doctor            Check system readiness (deps, tools, services)"
+    echo "  preflight         Can this machine run Machina? KVM, libvirt, QEMU, ports, disk, clock; --role, --fix, --json"
+    echo "  host              list | add USER@HOST | drain NAME | undrain NAME | remove NAME  (run on the controller as root)"
+    echo "  dist              publish | publish-metal | status: let new nodes install the agent from this controller"
+    echo "  bootstrap         Set the public URL and join listener, publish the agent, wait until ready"
+    echo "  host add          USER@HOST... | --file hosts.txt [--parallel N --site S --rack R --tag T --network N --pool P]"
+    echo "  show-login        Where to sign in and the generated admin password (root)"
+    echo "  tls               Generate self-signed TLS certificate (auto-sudo)"
+    echo "  demo              Run interactive API demo"
+    echo "  audit verify      Verify audit.log sha256 signatures (API or local)"
+    echo "  integrations      Integration status (KubeVirt, k8s, automation, …)"
+    echo "  sprite            Manage disposable sandbox VMs (list/get/create/delete/golden-images)"
+    echo "  help              Show this help"
+    echo ""
+    echo "🛡️  VM network policy (CiliumNetworkPolicy schema; add --fleet for the controller):"
+    echo "  metal list|add|import|discover|commission|inventory|power|allocate|release|deploy|zones"
+    echo "                                     Bare-metal provisioning: BMCs to joined hosts (metal help)"
+    echo "  metal image list|catalog|add|rm    OS images (ubuntu-26.04, debian-12, rocky-9, ...), checksum-verified"
+    echo "  metal profile list|add|rm          What a machine of a kind gets; metal provision --profile P --count N"
+    echo "  netpol apply -f FILE [--dry-run]   Create/replace policies (CNP / CCNP / VmNetworkPolicy YAML)"
+    echo "  netpol get|delete|validate         List / show (-o yaml|json|wide) / delete / lint"
+    echo "  netpol test --from A --to B --port N   Trace a connection (like cilium policy trace)"
+    echo "  netpol selectors|endpoints|status  Selector matches, VM identities, sync state"
+    echo "  netpol fqdn                        toFQDNs names learned from VM DNS replies"
+    echo "  netpol auth                        Mutual-authentication table (authentication.mode)"
+    echo "  netpol test … --http-method GET --path /x | --sni NAME | --dns-name NAME | --kafka-topic T"
+    echo "  vm label VM k=v [k-]               Show or edit VM labels"
+    echo "  vm quarantine VM [--for 1h]        Cut every flow of a VM until the deadline"
+    echo "  vm release VM | netpol quarantines Lift a quarantine / list quarantined VMs"
+    echo "  vm sleep|wake VM                   Scale to zero (managed save); traffic wakes it"
+    echo "  vm sleep-policy VM [MIN|never]     Auto-sleep after MIN idle minutes (--project P for a default)"
+    echo "  vm sleeping                        Sleeping VMs, RAM handed back, recent wakes"
+    echo "  vm restore-point VM / rewind VM N  Restore points and rewind (--every MIN schedules them)"
+    echo "  vm fork VM NEW [--memory]          Fork a running VM (disk, or disk + RAM isolated)"
+    echo "  netpol jit grant --from A --to B   Temporary access that removes itself (--port, --for 1h)"
+    echo "  netpol threat set NAME --url U     DNS threat feed: alert on listed domains (--block denies them)"
+    echo "  flow observe [-f] [filters]        Colorful packet flows (like hubble observe)"
+    echo "  flow top [--by pair|src|dst|port|policy|l7] | flow stats"
+    echo "  flow edges [--vm X] | flow alerts  7-day history (who talks to whom) / scan + sweep alerts"
+    echo "  netpol learn [--vm X]              Least-privilege policy YAML from the flow history"
+    echo "  netpol replay -f FILE              What a draft would break over the last 7 days"
+    echo "  netpol draft \"TEXT\" [--propose]    Plain English → policy YAML (dry-run, approval)"
+    echo ""
+    echo "🚀 Quick start:"
+    echo "  ./machinactl deploy          # Does everything in one command"
+    echo ""
+    echo "🌍 Environment:"
+    echo "  MACHINA_URL    API URL (default: https://127.0.0.1:5092; self-signed — use curl -k from scripts)"
+    echo "  MACHINA_API_TOKEN, or MACHINA_USER + MACHINA_PASS   Auth for netpol / flow / vm label"
+    echo "  MACHINA_COOKIE_JAR   Session cache for the above (default ~/.machina/cli-session)"
+    echo "  NO_COLOR       Disable colors in flow output"
+    echo ""
+}
+
+# ── Main ────────────────────────────────────────────────────────────────
+main() {
+    ORIGINAL_ARGS=("$@")
+    local lead_fleet=0
+    if [[ "${1:-}" == --fleet ]]; then
+        lead_fleet=1
+        shift
+    fi
+    local cmd="${1:-help}"
+    shift || true
+    if [[ $lead_fleet == 1 ]]; then
+        case "$cmd" in
+            netpol|networkpolicy|cnp|flow|flows|hubble|vm) set -- "$@" --fleet ;;
+            *) err "--fleet applies to netpol, flow and vm"; exit 1 ;;
+        esac
+    fi
+
+    case "$cmd" in
+        deps)       cmd_deps "$@" ;;
+        build)      cmd_build "$@" ;;
+        test)       cmd_test "$@" ;;
+        install)    cmd_install "$@" ;;
+        uninstall)  cmd_uninstall "$@" ;;
+        deploy)     cmd_deploy "$@" ;;
+        reinstall)  cmd_reinstall "$@" ;;
+        upgrade)    cmd_upgrade "$@" ;;
+        backup)     cmd_backup "$@" ;;
+        restore)    cmd_restore_all "$@" ;;
+        verify)     cmd_verify "$@" ;;
+        health)     cmd_health "$@" ;;
+        start)      cmd_start "$@" ;;
+        stop)       cmd_stop "$@" ;;
+        restart)    cmd_restart "$@" ;;
+        status)     cmd_status "$@" ;;
+        logs)       cmd_logs "$@" ;;
+        doctor)     cmd_doctor "$@" ;;
+        preflight)  cmd_preflight "$@" ;;
+        dist)       cmd_dist "$@" ;;
+        bootstrap)  cmd_bootstrap "$@" ;;
+        host|hosts) cmd_host "$@" ;;
+        show-login|login) cmd_show_login "$@" ;;
+        db)         cmd_db "$@" ;;
+        tls)        cmd_tls "$@" ;;
+        demo)       cmd_demo "$@" ;;
+        audit)
+            sub="${1:-}"
+            shift || true
+            case "$sub" in
+                verify) cmd_audit_verify "$@" ;;
+                *) err "Usage: machinactl audit verify [max_lines]"; exit 1 ;;
+            esac
+            ;;
+        integrations) cmd_integrations "$@" ;;
+        sprite)     cmd_sprite "$@" ;;
+        netpol|networkpolicy|cnp) np_run np_netpol_main "$@" ;;
+        metal|baremetal) np_run metal_main "$@" --fleet ;;
+        flow|flows|hubble) np_run np_flow_main "$@" ;;
+        vm)         cmd_vm "$@" ;;
+        help|--help|-h) cmd_help ;;
+        *)
+            err "Unknown command: $cmd"
+            cmd_help
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"

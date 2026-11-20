@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Machina database</title>
+<!-- SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+     1600x700. Rendered by ./build.sh to docs/ux/readme-database.jpg. Source of truth: docs/guides/database.md and claim C24. -->
+<link rel="stylesheet" href="card.css">
+<style>
+  body { height:700px; }
+  h1 { font-size:54px; }
+  .cols { margin-top:24px; display:grid; grid-template-columns:1fr 150px 1fr; gap:0 18px; align-items:stretch; }
+  .card { min-height:330px; } .card h3 { font-size:30px; }
+  .mid { display:flex; flex-direction:column; justify-content:center; align-items:center; gap:10px; text-align:center; font-family:var(--mono); font-size:14px; color:var(--soft); }
+  .mid .ar { font-size:46px; color:var(--signal); line-height:1; } .mid code { color:var(--cyan); font-size:13px; }
+  .cmd { margin-top:14px; font-family:var(--mono); font-size:15.5px; color:var(--cyan); background:rgba(0,0,0,.45); border:1px solid var(--line); border-radius:10px; padding:8px 12px; }
+  .note { margin-top:18px; background:rgba(0,113,227,.14); border:1px solid rgba(41,151,255,.4); border-radius:14px; padding:12px 18px; font-size:19px; line-height:1.38; color:#cfe6ff; }
+</style></head><body>
+<div class="bar"></div>
+<div class="wrap">
+  <div class="top"><img src="../../../web/public/zyvor-favicon.svg" alt=""><b>Zyvor</b><span>&middot;</span><span>Machina</span><span class="r">Controller database</span></div>
+  <h1>Start on SQLite. <em>Grow into PostgreSQL.</em></h1>
+  <div class="cols">
+    <div class="card o"><span class="lane">DEFAULT</span><h3>SQLite</h3><ul>
+      <li>Embedded, one file, zero setup</li><li>Best for 1 or 2 hosts and evaluations</li><li>One writer, one controller</li></ul>
+      <div class="cmd">DATABASE_URL=sqlite:///var/lib/machina/controller.db</div></div>
+    <div class="mid"><span>machinactl db setup</span><span class="ar">&rarr;</span><code>--migrate copies your rows</code><span class="ar" style="font-size:30px">&larr;</span><span>setup sqlite is the way back</span></div>
+    <div class="card k"><span class="lane">LARGE FLEETS</span><h3>PostgreSQL</h3><ul>
+      <li>Hundreds of machines, no single-writer limit</li><li>Several controllers share one state store</li><li>Leader election with hand-over inside the lease</li></ul>
+      <div class="cmd">machinactl db setup pod | package | external --url postgres://&hellip;</div></div>
+  </div>
+  <div class="note">One source tree, chosen at build time: <b>every schema change ships twice</b> (SQLite and PostgreSQL migrations), and CI prepares every SQL statement against PostgreSQL. A managed Postgres pod, daily dumps, <span style="font-family:var(--mono)">machinactl db status|backup|restore</span> and the <span style="font-family:var(--mono)">machina-dbtool</span> importer are included.</div>
+  <div class="foot"><b>docs/guides/database.md</b><span class="r">Verified on PostgreSQL 16 on the lab host; not yet managing real hosts (claim C24)</span></div>
+</div>
+</body></html>

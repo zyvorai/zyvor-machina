@@ -1,0 +1,64 @@
+{
+  "uploaded": {
+    "06-snapshot-restore.mp4": {
+      "id": "MEj_3f_ikUs",
+      "url": "https://youtu.be/MEj_3f_ikUs",
+      "title": "Machina Snapshots \u2014 create and protect a running VM",
+      "clipId": "06"
+    },
+    "07-nat-ssh-expose.mp4": {
+      "id": "QDLpInbXSzc",
+      "url": "https://youtu.be/QDLpInbXSzc",
+      "title": "Machina \u2014 expose guest SSH on the hypervisor",
+      "clipId": "07"
+    },
+    "08-ask-zeus-spotlight.mp4": {
+      "id": "SINrwzgu5Pg",
+      "url": "https://youtu.be/SINrwzgu5Pg",
+      "title": "Machina Ask Zeus / Spotlight \u2014 ops AI at your fingertips",
+      "clipId": "08"
+    },
+    "09-network-canvas.mp4": {
+      "id": "35F7B75Jews",
+      "url": "https://youtu.be/35F7B75Jews",
+      "title": "Machina Network Canvas \u2014 service topology at a glance",
+      "clipId": "09"
+    },
+    "02-mission-control-live-wall.mp4": {
+      "id": "XB_eFHVEFpY",
+      "url": "https://youtu.be/XB_eFHVEFpY",
+      "title": "Machina Mission Control \u2014 Live Preview Wall",
+      "clipId": "02"
+    },
+    "01-machina-cinema.mp4": {
+      "id": "-k4dkxatuR0",
+      "url": "https://youtu.be/-k4dkxatuR0",
+      "title": "Machina Cinema \u2014 full-screen VM like a player",
+      "clipId": "01"
+    },
+    "03-machine-finder-gallery.mp4": {
+      "id": "krEDy8Rcld4",
+      "url": "https://youtu.be/krEDy8Rcld4",
+      "title": "Machina Machine Finder Gallery \u2192 Open Cinema",
+      "clipId": "03"
+    },
+    "04-studio-ops-shelf.mp4": {
+      "id": "UYZERrfZVZc",
+      "url": "https://youtu.be/UYZERrfZVZc",
+      "title": "Machina Studio + Ops Shelf \u2014 engineer console mode",
+      "clipId": "04"
+    },
+    "05-vm-detail-connect-cinema.mp4": {
+      "id": "wH2beiXvyKw",
+      "url": "https://youtu.be/wH2beiXvyKw",
+      "title": "Machina VM Detail \u2014 Connect hub to Cinema in one motion",
+      "clipId": "05"
+    },
+    "10-create-vm-cinema.mp4": {
+      "id": "wTk99xEtpSs",
+      "url": "https://youtu.be/wTk99xEtpSs",
+      "title": "Machina \u2014 Create Ubuntu VM and open Cinema",
+      "clipId": "10"
+    }
+  }
+}

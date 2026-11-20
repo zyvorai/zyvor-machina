@@ -1,0 +1,57 @@
+{
+  "common": {
+    "refresh": "Actualizar",
+    "language": "Idioma"
+  },
+  "login": {
+    "title": "Iniciar sesión",
+    "username": "Usuario",
+    "password": "Contraseña",
+    "submit": "Entrar",
+    "ldapHint": "La autenticación LDAP está activa en este servidor."
+  },
+  "fleet": {
+    "title": "Flota",
+    "subtitle": "Varios demonios Machina — salud, inventario de MV y ciclo de vida remoto",
+    "disabledHint": "Active [fleet] en machina.toml con URLs de peers para agregar hipervisores remotos.",
+    "peers": "Peers",
+    "allVms": "Todas las MV",
+    "reachable": "En línea",
+    "unreachable": "Fuera de línea",
+    "vmCount": "{{count}} MV",
+    "colName": "Nombre",
+    "colPeer": "Host",
+    "colState": "Estado",
+    "colActions": "Acciones",
+    "localHost": "Ver MV local",
+    "noVms": "Sin MV.",
+    "start": "Iniciar en peer",
+    "stop": "Apagar forzado en peer",
+    "shutdown": "Apagar en peer",
+    "actionOk": "{{action}} enviado a {{vm}} en {{peer}}",
+    "primaryPeer": "Peer principal: {{name}}",
+    "standbyPeer": "Reserva: {{name}}"
+  },
+  "rdp": {
+    "builtin": "RDP",
+    "builtinTitle": "Túnel RDP integrado (WebSocket → invitado :3389)",
+    "download": "Archivo .rdp",
+    "downloadTitle": "Descargar archivo de Escritorio remoto",
+    "downloaded": ".rdp guardado para {{host}}:{{port}}",
+    "pageTitle": "RDP — {{name}}",
+    "back": "Volver a la MV",
+    "endpoint": "Endpoint invitado",
+    "tunnelNote": "Machina hace proxy RDP por WebSocket seguro. Use el .rdp con Escritorio remoto de Microsoft o mantenga esta página para el túnel.",
+    "wsStatus": "Túnel",
+    "missingVm": "Se requiere el nombre de la MV"
+  },
+  "nav": {
+    "fleet": "Flota",
+    "dashboard": "Panel",
+    "vms": "Máquinas virtuales",
+    "audit": "Registro de auditoría"
+  },
+  "audit": {
+    "exportNdjson": "Exportar NDJSON (SIEM)"
+  }
+}

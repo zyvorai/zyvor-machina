@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Machina EC2 API</title>
+<!-- SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+     1600x720. Rendered by ./build.sh to docs/ux/readme-ec2.jpg. Counts come from scripts/ec2/action_table.py (204+48+30+6). -->
+<link rel="stylesheet" href="card.css">
+<style>
+  body { height:720px; }
+  h1 { font-size:54px; }
+  .flow { margin-top:26px; display:grid; grid-template-columns:1fr 54px 1fr 54px 1fr; align-items:stretch; }
+  .ar { display:flex; align-items:center; justify-content:center; color:var(--signal); font-size:40px; }
+  .card { min-height:252px; } .card h3 { font-size:26px; }
+  pre { margin:10px 0 0; font-family:var(--mono); font-size:15.5px; line-height:1.5; color:var(--cyan); white-space:pre-wrap; }
+  .svc { margin-top:22px; display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+  .svc div { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:11px 16px; font-size:18px; color:#d1d1d6; }
+  .svc b { display:block; font-family:var(--mono); font-size:15px; color:var(--signal); margin-bottom:2px; } .svc em { font-style:normal; color:var(--ink); font-weight:700; }
+  .rule { margin-top:16px; font-size:19px; color:var(--soft); } .rule b { color:var(--ink); }
+</style></head><body>
+<div class="bar"></div>
+<div class="wrap">
+  <div class="top"><img src="../../../web/public/zyvor-favicon.svg" alt=""><b>Zyvor</b><span>&middot;</span><span>Machina</span><span class="r">EC2-compatible API</span></div>
+  <h1>Point <em>awscli, boto3 and Terraform</em> at your own hardware.</h1>
+  <div class="flow">
+    <div class="card k"><span class="lane">YOUR TOOLS</span><h3>Stock AWS clients</h3><pre>aws ec2 run-instances \
+  --endpoint-url \
+  http://127.0.0.1:5093/ec2 \
+  --image-id &hellip; --count 3</pre></div>
+    <div class="ar">&rarr;</div>
+    <div class="card m"><span class="lane">CONTROLLER :5093</span><h3>SigV4 query endpoint</h3><p>One handler verifies the signature and picks the service from the credential scope. Project scoping and roles stay in the REST handlers.</p></div>
+    <div class="ar">&rarr;</div>
+    <div class="card o"><span class="lane">YOUR HOSTS</span><h3>Real VMs</h3><p>Agents run libvirt/KVM. Security groups are enforced, volumes attach with I/O limits, Elastic IPs and NAT work.</p></div>
+  </div>
+  <div class="svc">
+    <div><b>ec2</b><em>204</em> actions: instances, images, volumes, VPC, tags</div>
+    <div><b>autoscaling</b><em>48</em> actions on instance groups</div>
+    <div><b>elbv2</b><em>30</em> actions on the native L4 balancer</div>
+    <div><b>monitoring</b><em>6</em> alarm and statistics actions</div>
+  </div>
+  <div class="rule"><b>Applied, recorded or refused, never silently dropped.</b> Each action's status is published; unit-tested, not yet exercised with every client.</div>
+  <div class="foot"><b>docs/cloud-ec2-api.md</b><span class="r">Compatibility layer over Machina's objects, not AWS</span></div>
+</div>
+</body></html>

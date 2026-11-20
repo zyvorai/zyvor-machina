@@ -1,0 +1,186 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><title>Getting Started — Machina</title>
+<style>
+@page{size:A4;margin:15mm 16mm}*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:'Segoe UI',system-ui,sans-serif;color:#1f2937;line-height:1.58;font-size:10.5pt}
+.cover{height:262mm;margin:-15mm -16mm 0;background:linear-gradient(135deg,#7c2d12,#9a3412,#0d1b2a);color:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;page-break-after:always;position:relative}
+.cover .kicker{letter-spacing:5px;text-transform:uppercase;opacity:.72;margin-bottom:1.4em}
+.cover h1{font-size:3.2em;font-weight:800;letter-spacing:-2px}
+.cover h1 span{color:#fb923c}
+.cover .sub{font-size:1.3em;font-weight:300;opacity:.93;margin:1em 0;max-width:24em}
+.cover .badge{display:inline-block;background:rgba(96,165,250,.2);border:1px solid #fb923c;padding:8px 22px;border-radius:20px;margin-top:2em}
+.cover .foot{position:absolute;bottom:34px;font-size:.82em;opacity:.6}
+h2{page-break-before:always;margin:0 0 .35em;font-size:1.55em;font-weight:750;color:#12203a;border-bottom:2px solid #e5edfb;padding-bottom:.28em}
+h2:first-of-type{page-break-before:avoid}
+h3{margin:1.1em 0 .4em;font-size:1.12em;font-weight:700}
+p,li{margin:.4em 0}ul,ol{margin:.5em 0 .9em 1.4em}
+a{color:#2563eb;text-decoration:none}
+code{background:#eef2f7;padding:1px 6px;border-radius:4px;font-size:.86em;font-family:ui-monospace,Menlo,monospace}
+pre{background:#0f172a;color:#e2e8f0;padding:12px 15px;border-radius:9px;overflow-x:auto;margin:.8em 0}
+table{width:100%;border-collapse:collapse;margin:.8em 0 1.1em;font-size:9.5pt}
+th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left;vertical-align:top}th{background:#f1f5f9}
+hr{border:none;border-top:1px solid #e5e7eb;margin:1.2em 0}
+</style></head><body>
+<section class="cover"><div class="kicker">ZyvorAI Labs · Customer Documentation</div>
+<h1>Mach<span>ina</span></h1>
+<div class="sub">Getting Started</div>
+<div class="badge">2026-10-03</div>
+<div class="foot">zyvor.dev · Confidential — for licensed customers</div></section>
+<main><h2>What you need</h2>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Linux host with KVM/libvirt</td>
+<td>Machina daemon builds/runs on Linux</td>
+</tr>
+<tr>
+<td>URL</td>
+<td><strong><code>https://&lt;host&gt;:5092</code></strong> (TLS on by default)</td>
+</tr>
+<tr>
+<td>Login</td>
+<td>PAM (host Linux account) or LDAP/OIDC when configured</td>
+</tr>
+<tr>
+<td>Browser</td>
+<td>Modern Chromium, Firefox, or Safari</td>
+</tr>
+</tbody></table>
+<h2>1. Open the dashboard</h2>
+<p>Open <code>https://&lt;host&gt;:5092</code>. Accept the self-signed certificate in labs, or install your org cert in production.</p>
+<p>Health check:</p>
+<pre><code class="language-bash">curl -sk https://localhost:5092/api/v1/health
+</code></pre>
+<h2>2. Sign in</h2>
+<table>
+<thead>
+<tr>
+<th>Mode</th>
+<th>What you do</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PAM</td>
+<td>Use your Linux username/password on the host</td>
+</tr>
+<tr>
+<td>LDAP</td>
+<td>Directory credentials when LDAP is enabled</td>
+</tr>
+<tr>
+<td>OIDC</td>
+<td>SSO via <code>/auth/oidc/login</code> when configured</td>
+</tr>
+</tbody></table>
+<p>RBAC roles: Admin / Operator / ReadOnly via <code>roles.json</code>, OIDC groups, or API tokens. Empty <code>roles.json</code> means everyone is Admin — fix that before production.</p>
+<h2>3. Orient yourself</h2>
+<p>After sign-in you get a <strong>Mac-style desktop</strong>: menubar (Zyvor mark + Machina / View / Window / Help), left <strong>icon rail</strong> sidebar, and Spotlight (<code>⌘K</code> or Window menu).</p>
+<ol>
+<li><strong>Sidebar</strong> — pinned icons (Mission Control, VMs, Machine Finder, Hosts, Settings) plus Workloads / Infra / Ops / Secure / Admin section flyouts. Hover a section icon for its routes; chevron at the bottom expands labels.</li>
+<li><strong>Platform</strong> (<code>/platform</code>) — Mission Control for the fleet.</li>
+<li><strong>Classic home</strong> (<code>/</code>) — this hypervisor’s guests and host health.</li>
+<li><strong>Fleet Cloud</strong> (<code>/fleet-cloud</code>) — native instances; use the pill nav (Overview / Instances / … / <strong>More</strong>).</li>
+<li>Settings → Appearance → <strong>Desktop density</strong> (Normal / Power / Advanced) controls how much of the fleet surface is unlocked; <strong>Apple</strong> light theme is the default.</li>
+</ol>
+<h2>4. First workflows</h2>
+<h3>A. List and open a VM console</h3>
+<p><code>/vms</code> → select a VM → Console (VNC/SPICE/SSH/serial/RDP as available).</p>
+<h3>B. Create a VM</h3>
+<p><code>/create</code> or Platform → VM Builder / Advanced Create.</p>
+<h3>C. Check host health</h3>
+<p><code>/node</code> or Platform → Hosts.</p>
+<h3>D. Fleet Cloud</h3>
+<p><code>/fleet-cloud</code> pages work out of the box — instances, images, volumes, security groups, networking, load balancers, and keypairs are all native, no external cloud connection or credentials required.</p>
+<h3>E. Containers (Vessel)</h3>
+<p><strong>Infrastructure → Containers</strong> (<code>/containers</code>) when Podman/Docker is connected — see <a href="admin-basics.md">Admin basics</a>.</p>
+<h2>Next steps</h2>
+<ul>
+<li><a href="using-the-dashboard.md">Using the Dashboard</a></li>
+<li><a href="admin-basics.md">Admin basics</a></li>
+<li><a href="pages/README.md">Page guides</a></li>
+</ul>
+<hr>
+<p>Machina’s UI has a <strong>classic host shell</strong> (Core / Infrastructure / Fleet Cloud / Monitoring) and a <strong>Platform</strong> Mission Control experience for fleets.</p>
+<h2>Surfaces</h2>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Core nav</strong></td>
+<td>This-host VMs, create/import, fleet list</td>
+</tr>
+<tr>
+<td><strong>Infrastructure</strong></td>
+<td>Storage, networks, <strong>Containers</strong> (Vessel / Podman or Docker), Podman pods</td>
+</tr>
+<tr>
+<td><strong>Platform</strong></td>
+<td>Multi-host Mission Control, <strong>Zyra AI</strong>, <strong>Zeus Security</strong>, backups, SOC</td>
+</tr>
+<tr>
+<td><strong>Top-bar quick links</strong></td>
+<td>Settings, Host SSH, API Docs</td>
+</tr>
+<tr>
+<td><strong>Consoles</strong></td>
+<td>VNC, SPICE, SSH PTY, serial, RDP from VM detail</td>
+</tr>
+</tbody></table>
+<h2>Browse vs act</h2>
+<p>Inventory pages are safe to explore. Create/delete VM, firewall, and Fleet Cloud mutations require Operator/Admin roles.</p>
+<h2>Related</h2>
+<ul>
+<li><a href="getting-started.md">Getting Started</a></li>
+<li><a href="pages/README.md">Page-by-page guides</a></li>
+</ul>
+<hr>
+<p>End-to-end jobs across Machina Core, Mission Control, and Fleet Cloud. Prefer console click-paths.</p>
+<h2>Create and console into a VM (this host)</h2>
+<ol>
+<li><strong>Core → Create VM</strong> (<code>/create</code>) — install media or golden clone</li>
+<li><strong>Core → Virtual Machines</strong> (<code>/vms</code>) → open guest → <strong>Console</strong> / SSH</li>
+<li>Optional: <strong>Infrastructure → Containers</strong> if you need Vessel containers on the same host</li>
+</ol>
+<h2>Fleet day-2 (Mission Control)</h2>
+<ol>
+<li><strong>Platform → Mission Control</strong> (<code>/platform</code>) — Launchpad tiles live here (no separate <code>/platform/launchpad</code>)</li>
+<li><strong>Hosts</strong> (<code>/platform/hosts</code>) / <strong>Machine Finder</strong> (<code>/platform/vms</code>)</li>
+<li><strong>Time Machine</strong> backups (<code>/platform/backups</code>) as needed</li>
+<li><strong>Zyra AI</strong> (<code>/platform/zyra</code>) for fleet intelligence; <strong>Zeus Security</strong> (<code>/platform/zeus/security</code>) for Security Center</li>
+</ol>
+<h2>Fleet Cloud</h2>
+<ol>
+<li><strong>Fleet Cloud → Overview</strong> (<code>/fleet-cloud</code>)</li>
+<li><strong>Create Instance</strong> → pick image / flavor / network / keypair / security groups</li>
+<li>Manage <strong>Volumes</strong>, <strong>Networking</strong>, <strong>Load Balancers</strong> as required — native Machina APIs (no external cloud wiring)</li>
+</ol>
+<h2>Migrate a VM in</h2>
+<ol>
+<li><strong>Migration Assistant</strong> (<code>/platform/migration</code>) — scan vCenter/ESXi/OVF/VMDK</li>
+<li>Import wizard → confirm in <strong>Machine Finder</strong> (<code>/platform/vms?lens=migration</code>)</li>
+<li>Placement / HA (<code>/platform/placement</code>) if you need DRS-style move</li>
+</ol>
+<h2>First-hour health check</h2>
+<ol>
+<li>Open <code>https://&lt;host&gt;:5092</code> — PAM/OIDC sign-in</li>
+<li><strong>System Check</strong> (<code>/system-check</code>)</li>
+<li><strong>Dashboard</strong> or <strong>Mission Control</strong> if enrolled</li>
+<li>Create a test VM and open console</li>
+</ol>
+<h2>Related</h2>
+<ul>
+<li><a href="getting-started.md">Getting Started</a></li>
+<li><a href="using-the-dashboard.md">Using the Dashboard</a></li>
+<li><a href="pages/README.md">Page-by-page guides</a></li>
+<li><a href="admin-basics.md">Admin basics</a></li>
+</ul>
+</main></body></html>

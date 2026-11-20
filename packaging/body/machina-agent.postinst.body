@@ -1,0 +1,7 @@
+mkdir -p /var/lib/machina/bpf /etc/machina
+if [ ! -f /etc/default/machina-platform ]; then
+    echo "machina-agent: on a compute node set MACHINA_AGENT_TOKEN in /etc/default/machina-platform to the controller's value," >&2
+    echo "               or enrol with: machina-agent join --controller URL --token TOKEN" >&2
+fi
+machina_services machina-bpfd.service machina-agent.service
+exit 0

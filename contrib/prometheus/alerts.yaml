@@ -1,0 +1,66 @@
+# Example Prometheus alert rules for Machina (scrape /api/v1/prometheus with Bearer token).
+groups:
+  - name: machina-host
+    rules:
+      - alert: MachinaHostCpuHigh
+        expr: machina_host_cpu_percent > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host CPU above 90% ({{ $labels.instance }})"
+      - alert: MachinaHostMemoryHigh
+        expr: machina_host_memory_percent > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host memory above 90% ({{ $labels.instance }})"
+      - alert: MachinaHostDiskHigh
+        expr: machina_host_disk_percent > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Root filesystem above 85% ({{ $labels.instance }})"
+
+  - name: machina-daemon
+    rules:
+      - alert: MachinaDaemonAuthFailures
+        expr: increase(machina_daemon_auth_failures_total[15m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Repeated API auth failures on {{ $labels.instance }}"
+      - alert: MachinaAlertsUnacknowledged
+        expr: machina_alerts_unacknowledged > 0
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "Unacknowledged Machina automation alerts"
+      - alert: MachinaAutomationWorkerStale
+        expr: (time() - machina_automation_last_tick_unix) > 300
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Automation worker has not ticked in 5+ minutes ({{ $labels.instance }})"
+      - alert: MachinaK8sMetricsUnavailable
+        expr: machina_k8s_metrics_available == 0
+        for: 15m
+        labels:
+          severity: info
+        annotations:
+          summary: "kubectl top / metrics-server unavailable ({{ $labels.instance }})"
+
+  - name: machina-vm
+    rules:
+      - alert: MachinaVmMemoryHigh
+        expr: machina_vm_memory_percent > 95
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "VM {{ $labels.vm }} memory above 95%"

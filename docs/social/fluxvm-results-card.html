@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Machina + FluxVM results</title>
+<!-- SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+     1600x900 (LinkedIn and X). Rendered by ./build-social-card.sh to fluxvm-results-card.jpg.
+     Every number is from scripts/regression/RESULTS.md (2026-10-08 runs on 175.110.122.71 and 212.8.248.187). -->
+<link rel="stylesheet" href="readme/card.css">
+<style>
+  body { height:900px; }
+  .wrap { top:44px; bottom:38px; }
+  h1 { font-size:74px; margin-top:22px; }
+  .lede { margin:14px 0 0; font-size:25px; color:var(--soft); max-width:1180px; line-height:1.35; }
+  .grid { margin-top:34px; grid-template-columns:1.25fr 1fr 1fr; gap:26px; }
+  .card .lane { align-self:flex-start; }
+  .card { padding:24px 26px; min-height:440px; display:flex; flex-direction:column; }
+  .big { font-size:96px; font-weight:800; letter-spacing:-.04em; line-height:1; margin-top:18px;
+    background:linear-gradient(90deg,var(--c),#fff 140%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .big small { font-size:40px; letter-spacing:-.02em; }
+  .card h3 { font-size:28px; margin-top:10px; }
+  .bars { margin-top:auto; display:flex; flex-direction:column; gap:14px; }
+  .b { font-family:var(--mono); font-size:16px; color:var(--soft); }
+  .b .t { height:30px; border-radius:9px; margin-top:6px; display:flex; align-items:center; justify-content:flex-end; padding-right:12px;
+    font-weight:700; color:#000; font-size:17px; }
+  .b.hi .t { background:linear-gradient(90deg,var(--blue),var(--cyan)); box-shadow:0 0 26px rgba(41,151,255,.55); }
+  .b.lo .t { background:#3a3a3f; color:var(--ink); }
+  .hosts { margin-top:auto; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .host { flex:0 0 120px; height:120px; border-radius:22px; border:1px solid color-mix(in srgb,var(--c) 55%,transparent);
+    background:color-mix(in srgb,var(--c) 12%,transparent); display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-family:var(--mono); font-size:15px; color:var(--soft); box-shadow:0 0 40px color-mix(in srgb,var(--c) 25%,transparent); }
+  .host b { font-size:30px; color:var(--ink); font-family:var(--sans); }
+  .arrows { flex:1; display:flex; flex-direction:column; gap:12px; font-family:var(--mono); font-size:14px; color:var(--soft); text-align:center; }
+  .arrows i { display:block; height:3px; border-radius:2px; background:linear-gradient(90deg,transparent,var(--c),transparent); margin-top:5px; }
+  .mem { margin-top:auto; display:flex; align-items:flex-end; gap:22px; height:150px; }
+  .col { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; font-family:var(--mono); font-size:15px; color:var(--soft); gap:8px; height:100%; }
+  .col .v { width:100%; border-radius:12px 12px 6px 6px; display:flex; align-items:flex-start; justify-content:center; padding-top:8px; font-weight:700; font-size:18px; }
+  .col.lo .v { background:#3a3a3f; color:var(--ink); }
+  .col.hi .v { background:linear-gradient(180deg,var(--c),color-mix(in srgb,var(--c) 40%,#000)); color:#000; box-shadow:0 0 28px color-mix(in srgb,var(--c) 45%,transparent); }
+  .strip { margin-top:24px; display:flex; gap:16px; }
+  .chip { font-family:var(--mono); font-size:18px; padding:10px 16px; border-radius:12px; border:1px solid var(--line); background:var(--panel2); color:#d1d1d6; }
+  .chip b { color:var(--green); }
+</style></head><body>
+<div class="bar"></div>
+<div class="wrap">
+  <div class="top"><img src="../../web/public/zyvor-favicon.svg" alt=""><b>Zyvor</b><span>&middot;</span><span>Machina + FluxVM</span><span class="r">Measured on real hosts</span></div>
+  <h1>Faster network. <em>VMs that survive a host.</em></h1>
+  <p class="lede">The FluxVM backend for Machina, run end to end on two bare-metal KVM hosts.</p>
+  <div class="row grid">
+    <div class="card k"><span class="lane">NETWORK</span>
+      <div class="big">2.6<small>&times;</small></div>
+      <h3>vhost-net in the kernel datapath</h3>
+      <p>Bulk TCP into the guest, 8 MiB download, 1 vCPU.</p>
+      <div class="bars">
+        <div class="b hi">vhost-net<div class="t" style="width:100%">348 MiB/s</div></div>
+        <div class="b lo">userspace pump<div class="t" style="width:38%">133 MiB/s</div></div>
+      </div></div>
+    <div class="card o"><span class="lane">HIGH AVAILABILITY</span>
+      <div class="big">A&#8644;B</div>
+      <h3>HA re-create across hosts</h3>
+      <p>A VM on shared NFS storage comes back on the other host, in both directions.</p>
+      <div class="hosts">
+        <div class="host o"><b>A</b>QEMU 8.2</div>
+        <div class="arrows o"><span>re-create<i></i></span><span>and back<i></i></span></div>
+        <div class="host o"><b>B</b>QEMU 10.2</div>
+      </div></div>
+    <div class="card v"><span class="lane">DENSITY</span>
+      <div class="big">&minus;46<small>%</small></div>
+      <h3>Idle balloon</h3>
+      <p>Per idle 256 MiB VM, 20 VMs per host.</p>
+      <div class="mem">
+        <div class="col lo"><div class="v" style="height:100%">239 MiB</div>off</div>
+        <div class="col hi"><div class="v" style="height:54%">129 MiB</div>balloon on</div>
+      </div></div>
+  </div>
+  <div class="strip">
+    <span class="chip"><b>38/38</b> FluxVM regression, both hosts</span>
+    <span class="chip"><b>5/5</b> forks</span>
+    <span class="chip"><b>~3 s</b> boot to first guest command</span>
+  </div>
+  <div class="foot"><b>github.com/zyvorai/zyvor-machina</b><span class="r">libvirt &middot; QEMU/KVM &middot; FluxVM</span></div>
+</div>
+</body></html>

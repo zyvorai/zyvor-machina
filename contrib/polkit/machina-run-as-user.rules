@@ -1,0 +1,41 @@
+// PolicyKit rules for Machina OIDC run-as-user (mode = "polkit").
+// Install: sudo cp contrib/polkit/machina-run-as-user.rules /etc/polkit-1/rules.d/50-machina-run-as-user.rules
+//
+// Allows the machina-daemon UNIX user to run pkexec --user <mapped_user> for allow-listed
+// account-management commands when invoked by machina-core run_as_user.
+//
+// NOTE: pkexec's "org.freedesktop.policykit.exec" action does NOT expose an "argv" array
+// detail -- it only sets "user" (the --user target), "program" (the fully resolved path
+// of the target executable, resolved via pkexec's own trusted PATH, never the caller's
+// environment), and optionally "command_line". A rule keyed on "argv" always sees
+// action.lookup("argv") as null/undefined and therefore always falls through to
+// NOT_HANDLED, i.e. it never actually authorizes anything. Key off "program" instead.
+
+polkit.addRule(function(action, subject) {
+    if (action.id != "org.freedesktop.policykit.exec") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (subject.user != "machina" && subject.user != "root") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    var program = action.lookup("program");
+    if (!program) {
+        return polkit.Result.NOT_HANDLED;
+    }
+    // Exact match only -- core/src/run_as_user.rs::program_allowed() rejects any
+    // path separator, so machina itself only ever asks pkexec to resolve a bare
+    // command name (e.g. "useradd") via pkexec's own trusted PATH, which yields an
+    // absolute path under one of the standard bin dirs here. Extracting just the
+    // basename (as this rule used to) would let anyone else invoking pkexec as the
+    // "machina"/"root" subject smuggle an attacker-controlled absolute path (e.g.
+    // "/tmp/evil/useradd") past this check, since its basename still matches the
+    // allow-list -- defeating the whole point of this rule being a separate,
+    // independent trust boundary from the Rust-side check. Require the full
+    // resolved path to be exactly one of the known-good locations instead.
+    var allowed = ["useradd", "userdel", "usermod", "homectl", "chpasswd", "id", "getent"];
+    var m = program.match(/^\/(usr\/)?(s?bin)\/([a-zA-Z0-9_-]+)$/);
+    if (!m || allowed.indexOf(m[3]) === -1) {
+        return polkit.Result.NOT_HANDLED;
+    }
+    return polkit.Result.YES;
+});

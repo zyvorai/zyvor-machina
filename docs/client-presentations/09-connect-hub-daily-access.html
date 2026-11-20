@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>machina — Connect Hub &amp; Daily Access</title>
+<style>
+@page { size: A4; margin: 0; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; color: #1a1a2e; background: #fff; line-height: 1.6; }
+.cover { height: 100vh; background: linear-gradient(135deg, #0f172a, #065f46, #0f172a); color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; page-break-after: always; }
+.cover h1 { font-size: 3em; font-weight: 800; letter-spacing: -2px; margin-bottom: 0.2em; }
+.cover h1 span { color: #34d399; }
+.cover p { font-size: 1.1em; opacity: 0.85; max-width: 620px; }
+.cover .badge { display: inline-block; background: rgba(52,211,153,0.15); border: 1px solid rgba(52,211,153,0.35); padding: 0.3em 1em; border-radius: 20px; font-size: 0.9em; margin-top: 1.5em; }
+.page { min-height: 100vh; padding: 60px 80px; page-break-after: always; position: relative; }
+.page-dark { background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; }
+.page-light { background: #f8fafc; }
+.page h2 { font-size: 2.1em; font-weight: 700; margin-bottom: 0.15em; }
+.page h2 span { color: #34d399; }
+.page-light h2 span { color: #059669; }
+.page .subtitle { font-size: 1.05em; opacity: 0.7; margin-bottom: 2em; }
+.card-grid { display: grid; gap: 20px; }
+.card-grid-2 { grid-template-columns: 1fr 1fr; }
+.card { background: #fff; border-radius: 12px; padding: 24px; border: 1px solid #e2e8f0; }
+.card-dark { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #e2e8f0; }
+.card h3 { font-size: 1.05em; font-weight: 700; margin-bottom: 0.5em; color: #059669; }
+.card p, .card li { font-size: 0.9em; line-height: 1.65; }
+table { width: 100%; border-collapse: collapse; font-size: 0.88em; margin-top: 1em; }
+th { background: #059669; color: #fff; padding: 12px 16px; text-align: left; }
+td { padding: 11px 16px; border-bottom: 1px solid #e2e8f0; }
+.page-dark td { border-bottom-color: rgba(255,255,255,0.08); }
+.section-label { display: inline-block; background: rgba(52,211,153,0.12); color: #34d399; padding: 4px 14px; border-radius: 20px; font-size: 0.78em; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1em; }
+.flow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 1em 0; }
+.flow .step { background: rgba(5,150,105,0.12); border: 1px solid rgba(5,150,105,0.25); padding: 10px 14px; border-radius: 8px; font-size: 0.82em; font-weight: 600; }
+.flow .arrow { color: #34d399; font-weight: 700; }
+.page-footer { position: absolute; bottom: 30px; left: 80px; right: 80px; display: flex; justify-content: space-between; font-size: 0.75em; opacity: 0.4; }
+ul { margin: 0.4em 0 0.8em 1.3em; } li { margin-bottom: 0.35em; font-size: 0.92em; }
+code { background: rgba(5,150,105,0.1); padding: 2px 6px; border-radius: 4px; font-size: 0.88em; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="badge">Daily Access · Connect Hub</div>
+  <h1>Connect <span>Hub</span></h1>
+  <p style="font-size:1.4em;font-weight:700;margin-bottom:0.4em;">One card for Cinema, SSH, NAT, and laptop path</p>
+  <p>Replaces scattered Daily access panels with a single operator surface on VM detail Overview and a deep Access tab.</p>
+</div>
+
+<div class="page page-dark">
+  <span class="section-label">Overview</span>
+  <h2>Connect <span>Sections</span></h2>
+  <p class="subtitle">Platform and classic VM detail share the same hub (<code>data-testid="vm-daily-access"</code>).</p>
+  <table>
+    <tr><th>Section</th><th>Actions</th></tr>
+    <tr><td><strong>Connect</strong></td><td>Open Cinema, SSH in-browser, copy guest IP, copy NAT-aware laptop <code>ssh</code> command</td></tr>
+    <tr><td><strong>Laptop path</strong></td><td>Inline checklist for libvirt NAT guests (e.g. 192.168.122.x)</td></tr>
+    <tr><td><strong>Expose service</strong></td><td>Presets SSH/HTTP/HTTPS + custom port; compact NAT rules table</td></tr>
+    <tr><td><strong>Export</strong></td><td>Download spec JSON, domain XML, both — full panel on Access tab</td></tr>
+  </table>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Connect Hub &amp; Daily Access</span></div>
+</div>
+
+<div class="page page-light">
+  <span class="section-label">NAT path</span>
+  <h2>Laptop <span>Path</span> Checklist</h2>
+  <p class="subtitle">Progress bar + steps when the guest sits on hypervisor NAT.</p>
+  <div class="flow">
+    <div class="step">VM running</div><span class="arrow">→</span>
+    <div class="step">Guest IP known</div><span class="arrow">→</span>
+    <div class="step">Expose SSH (2222→22)</div><span class="arrow">→</span>
+    <div class="step">Copy laptop command</div>
+  </div>
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <h3>Automation hooks</h3>
+      <ul>
+        <li><code>vm-laptop-access-checklist</code> test id</li>
+        <li>Copy feedback flash on IP and SSH command</li>
+        <li>SSH user prefers cloud-init user (e.g. ubuntu)</li>
+        <li>NAT banner in SSH connect dialog</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Where NAT is configured</h3>
+      <ul>
+        <li>Connect hub presets (Overview / Access)</li>
+        <li>Network tab → Hypervisor NAT</li>
+        <li>ConsoleHub Ops Shelf → Network lens</li>
+        <li>API: <code>POST /port-forwards</code></li>
+      </ul>
+    </div>
+  </div>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Connect Hub &amp; Daily Access</span></div>
+</div>
+
+<div class="page page-dark">
+  <span class="section-label">Access tab</span>
+  <h2>Access <span>Tab</span> Deep Work</h2>
+  <p class="subtitle">Primary tab for connectivity — <code>?tab=access</code> or tab bar **Access**.</p>
+  <div class="card-grid card-grid-2">
+    <div class="card card-dark">
+      <h3>Expanded on Access</h3>
+      <ul>
+        <li>Full Connect hub with NAT panel open</li>
+        <li>Export buttons (JSON, XML, both, copy spec)</li>
+        <li>Guest port listeners inline</li>
+        <li>Hypervisor NAT rules table</li>
+      </ul>
+    </div>
+    <div class="card card-dark">
+      <h3>Cross-links</h3>
+      <ul>
+        <li>Guest security &amp; ports tab</li>
+        <li>Guest health tab (doctor signals)</li>
+        <li>Console tab for Cinema / Studio guidance</li>
+        <li>Doctor tab for migrate plans</li>
+      </ul>
+    </div>
+  </div>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Connect Hub &amp; Daily Access</span></div>
+</div>
+
+<div class="page page-light">
+  <span class="section-label">SSH</span>
+  <h2>SSH &amp; <span>Resolved</span> Connect</h2>
+  <p class="subtitle">Unified SSH dialog across VM detail, Machine Finder, Mission Control.</p>
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <h3>VmResolvedSshConnectDialog</h3>
+      <p>Single dialog component wired from action bar, Connect hub, fleet cards, and Finder table/gallery.</p>
+    </div>
+    <div class="card">
+      <h3>Hypervisor keys</h3>
+      <p>In-browser terminal via daemon PTY — no laptop SSH required for quick ops; laptop command still copyable for power users.</p>
+    </div>
+  </div>
+  <p style="margin-top:1.2em;"><strong>Docs:</strong> docs/guides/vm-daily-access.md · docs/guides/vm-lifecycle-ssh.md</p>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Connect Hub · zyvor.dev</span></div>
+</div>
+
+</body>
+</html>

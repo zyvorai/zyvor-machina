@@ -1,0 +1,10 @@
+# A controller-only demo image from a release binary (built on Ubuntu 22.04: needs glibc 2.35).
+# Put the release's machina-controller next to this file, then `docker compose build`.
+FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl libvirt0 libssl3 \
+    && rm -rf /var/lib/apt/lists/*
+COPY machina-controller /usr/local/bin/machina-controller
+RUN chmod 0755 /usr/local/bin/machina-controller && mkdir -p /var/lib/machina
+VOLUME /var/lib/machina
+EXPOSE 5093 5094
+ENTRYPOINT ["/usr/local/bin/machina-controller"]

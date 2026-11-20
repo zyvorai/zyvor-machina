@@ -1,0 +1,16 @@
+[Unit]
+Description=Daily Machina VM backup
+Documentation=https://github.com/zyvorai/machina
+
+[Timer]
+# Run daily at 2:00 AM
+OnCalendar=*-*-* 02:00:00
+
+# Randomize start by up to 30 minutes to avoid thundering herd
+RandomizedDelaySec=1800
+
+# Run missed backups on next boot if the machine was off
+Persistent=true
+
+[Install]
+WantedBy=timers.target

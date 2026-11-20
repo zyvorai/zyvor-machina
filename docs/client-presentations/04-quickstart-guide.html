@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>machina — Quick Start Guide</title>
+<style>
+@page { size: A4; margin: 0; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; color: #1a1a2e; background: #fff; line-height: 1.6; }
+
+/* ── Cover ─────────────────────────────────────────────────────────── */
+.cover { height: 100vh; background: linear-gradient(135deg, #0f0c29, #1e3a5f, #0f172a); color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; page-break-after: always; position: relative; overflow: hidden; }
+.cover::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle at 30% 50%, rgba(59,130,246,0.15) 0%, transparent 50%), radial-gradient(circle at 70% 80%, rgba(99,102,241,0.1) 0%, transparent 50%); }
+.cover h1 { font-size: 3.5em; font-weight: 800; letter-spacing: -2px; margin-bottom: 0.2em; position: relative; }
+.cover h1 span { color: #3b82f6; }
+.cover p { font-size: 1.3em; opacity: 0.85; position: relative; max-width: 600px; }
+.cover .badge { display: inline-block; background: rgba(59,130,246,0.2); border: 1px solid rgba(59,130,246,0.4); padding: 0.3em 1em; border-radius: 20px; font-size: 0.9em; margin-top: 1.5em; position: relative; }
+
+/* ── Pages ─────────────────────────────────────────────────────────── */
+.page { min-height: 100vh; padding: 60px 80px; page-break-after: always; position: relative; }
+.page-dark { background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; }
+.page-light { background: #f8fafc; }
+.page-accent { background: linear-gradient(135deg, #1e3a5f, #0f172a); color: #e2e8f0; }
+.page h2 { font-size: 2.2em; font-weight: 700; margin-bottom: 0.15em; letter-spacing: -1px; }
+.page-dark h2, .page-accent h2 { color: #fff; }
+.page h2 span { color: #3b82f6; }
+.page .subtitle { font-size: 1.05em; opacity: 0.7; margin-bottom: 2em; }
+
+/* ── Cards ─────────────────────────────────────────────────────────── */
+.card-grid { display: grid; gap: 20px; }
+.card-grid-2 { grid-template-columns: 1fr 1fr; }
+.card-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+.card-grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.card { background: #fff; border-radius: 12px; padding: 28px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
+.card-dark { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #e2e8f0; }
+.card h3 { font-size: 1.15em; font-weight: 700; margin-bottom: 0.5em; color: #1e293b; }
+.card-dark h3 { color: #3b82f6; }
+.card p, .card li { font-size: 0.92em; line-height: 1.7; }
+.card .icon { font-size: 2em; margin-bottom: 0.4em; display: block; }
+
+/* ── Stats ─────────────────────────────────────────────────────────── */
+.stat-row { display: flex; gap: 20px; margin-bottom: 2em; }
+.stat { flex: 1; text-align: center; padding: 24px 16px; background: rgba(59,130,246,0.08); border-radius: 12px; border: 1px solid rgba(59,130,246,0.15); }
+.stat .number { font-size: 2.5em; font-weight: 800; color: #3b82f6; line-height: 1; }
+.stat .label { font-size: 0.85em; opacity: 0.7; margin-top: 0.3em; }
+.page-dark .stat { background: rgba(59,130,246,0.12); border-color: rgba(59,130,246,0.25); }
+
+/* ── Table ─────────────────────────────────────────────────────────── */
+table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+th { background: #3b82f6; color: #fff; padding: 14px 20px; text-align: left; font-weight: 600; font-size: 0.95em; }
+th:first-child { border-radius: 8px 0 0 0; }
+th:last-child { border-radius: 0 8px 0 0; }
+td { padding: 13px 20px; border-bottom: 1px solid #e2e8f0; font-size: 0.93em; }
+tr:nth-child(even) { background: #f8fafc; }
+tr:last-child td:first-child { border-radius: 0 0 0 8px; }
+tr:last-child td:last-child { border-radius: 0 0 8px 0; }
+.page-dark td { border-bottom-color: rgba(255,255,255,0.08); }
+.page-dark tr:nth-child(even) { background: rgba(255,255,255,0.03); }
+
+/* ── Checks / Crosses ─────────────────────────────────────────────── */
+.check { color: #22c55e; font-weight: 700; }
+.cross { color: #ef4444; font-weight: 700; }
+
+/* ── Code block ────────────────────────────────────────────────────── */
+.code { background: #0f172a; color: #a5f3fc; padding: 18px 22px; border-radius: 10px; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.88em; line-height: 1.8; overflow-x: auto; margin: 10px 0; }
+.code .comment { color: #64748b; }
+.code .keyword { color: #7dd3fc; }
+.code .string { color: #86efac; }
+.code .prompt { color: #f59e0b; }
+.code .output { color: #94a3b8; }
+
+/* ── CTA box ───────────────────────────────────────────────────────── */
+.cta-box { background: linear-gradient(135deg, #1e3a5f, #0f172a); color: #fff; border-radius: 16px; padding: 40px; text-align: center; margin-top: 2em; }
+.cta-box h3 { font-size: 1.5em; margin-bottom: 0.5em; }
+.cta-box p { opacity: 0.8; max-width: 500px; margin: 0 auto; }
+
+/* ── Section label ─────────────────────────────────────────────────── */
+.section-label { display: inline-block; background: rgba(59,130,246,0.1); color: #3b82f6; padding: 4px 14px; border-radius: 20px; font-size: 0.8em; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1.2em; }
+.page-dark .section-label { background: rgba(59,130,246,0.2); }
+
+/* ── Steps ─────────────────────────────────────────────────────────── */
+.step-number { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: #3b82f6; color: #fff; border-radius: 50%; font-weight: 700; font-size: 1em; margin-right: 12px; flex-shrink: 0; }
+.step-item { display: flex; align-items: flex-start; margin-bottom: 20px; }
+.step-item .step-content { flex: 1; }
+.step-item .step-content h4 { font-size: 1.05em; font-weight: 700; margin-bottom: 4px; }
+.step-item .step-content p { font-size: 0.9em; opacity: 0.8; }
+.page-dark .step-item .step-content h4 { color: #fff; }
+
+/* ── Pill ──────────────────────────────────────────────────────────── */
+.pill { display: inline-block; background: rgba(34,197,94,0.15); color: #4ade80; padding: 3px 12px; border-radius: 12px; font-size: 0.78em; font-weight: 600; margin: 2px 4px; }
+.pill-blue { background: rgba(59,130,246,0.15); color: #60a5fa; }
+
+/* ── Keyboard shortcut ─────────────────────────────────────────────── */
+kbd { display: inline-block; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.85em; }
+.page-light kbd { background: #e2e8f0; border-color: #cbd5e1; color: #1e293b; }
+
+/* ── Requirement list ──────────────────────────────────────────────── */
+.req-list { list-style: none; padding: 0; }
+.req-list li { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 0.93em; display: flex; align-items: center; gap: 10px; }
+.req-list li:last-child { border-bottom: none; }
+.req-icon { color: #3b82f6; font-size: 1.1em; flex-shrink: 0; }
+
+/* ── Flow ──────────────────────────────────────────────────────────── */
+.flow { display: flex; align-items: center; gap: 0; margin: 12px 0; flex-wrap: wrap; }
+.flow .step { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25); padding: 10px 16px; border-radius: 8px; font-size: 0.85em; font-weight: 600; white-space: nowrap; }
+.flow .arrow { color: #3b82f6; font-size: 1.2em; padding: 0 6px; font-weight: 700; }
+.page-dark .flow .step { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.3); color: #e2e8f0; }
+
+/* ── Footer ────────────────────────────────────────────────────────── */
+.page-footer { position: absolute; bottom: 30px; left: 80px; right: 80px; display: flex; justify-content: space-between; font-size: 0.75em; opacity: 0.4; }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     PAGE 1 — COVER
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="badge">HyperSDK</div>
+  <h1>ma<span>china</span></h1>
+  <p style="font-size:1.6em; font-weight:700; margin-bottom:0.3em;">Quick Start Guide</p>
+  <p>Get running in 5 minutes on a Linux host with KVM and libvirt — bare-metal or lab worker — with the web UI and API; optional KubeVirt workflows when you configure cluster access.</p>
+  <div class="badge" style="margin-top:2em; font-size:0.85em; opacity:0.7;">Default port: 5092 &bull; Config: /etc/machina/config.toml</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     PAGE 2 — PREREQUISITES
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="page page-dark">
+  <span class="section-label">Prerequisites</span>
+  <h2>System <span>Requirements</span></h2>
+  <p class="subtitle">What you need before installing machina</p>
+
+  <div class="card-grid card-grid-2">
+    <div class="card card-dark">
+      <h3>Hardware</h3>
+      <ul class="req-list">
+        <li><span class="req-icon">&#9679;</span> x86_64 processor with VT-x / AMD-V (hardware virtualization)</li>
+        <li><span class="req-icon">&#9679;</span> 2 GB RAM minimum (4 GB+ recommended for running VMs)</li>
+        <li><span class="req-icon">&#9679;</span> 20 GB free disk space for images and backups</li>
+        <li><span class="req-icon">&#9679;</span> KVM kernel module loaded (<code>lsmod | grep kvm</code>)</li>
+      </ul>
+    </div>
+    <div class="card card-dark">
+      <h3>Software</h3>
+      <ul class="req-list">
+        <li><span class="req-icon">&#9679;</span> Linux with KVM support (kernel 5.x+)</li>
+        <li><span class="req-icon">&#9679;</span> libvirt + QEMU installed and running</li>
+        <li><span class="req-icon">&#9679;</span> Rust toolchain (rustup, cargo)</li>
+        <li><span class="req-icon">&#9679;</span> Node.js 18+ and npm (for web UI build)</li>
+        <li><span class="req-icon">&#9679;</span> make, gcc, pkg-config, libvirt-dev</li>
+      </ul>
+    </div>
+  </div>
+
+  <div style="margin-top:28px;">
+    <h3 style="color:#fff; margin-bottom:14px;">Supported Distributions</h3>
+    <div class="card-grid card-grid-4">
+      <div class="card card-dark" style="text-align:center; padding:18px;">
+        <div style="font-size:1.8em; margin-bottom:4px;">&#127872;</div>
+        <h3>Fedora</h3>
+        <p>38, 39, 40, 41+</p>
+      </div>
+      <div class="card card-dark" style="text-align:center; padding:18px;">
+        <div style="font-size:1.8em; margin-bottom:4px;">&#128039;</div>
+        <h3>Ubuntu</h3>
+        <p>22.04, 24.04 LTS</p>
+      </div>
+      <div class="card card-dark" style="text-align:center; padding:18px;">
+        <div style="font-size:1.8em; margin-bottom:4px;">&#9881;</div>
+        <h3>RHEL / CentOS</h3>
+        <p>8, 9 Stream</p>
+      </div>
+      <div class="card card-dark" style="text-align:center; padding:18px;">
+        <div style="font-size:1.8em; margin-bottom:4px;">&#128187;</div>
+        <h3>Debian</h3>
+        <p>11 Bullseye, 12 Bookworm</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="code" style="margin-top:24px;">
+    <span class="comment"># Verify KVM support</span><br>
+    <span class="prompt">$</span> lsmod | grep kvm<br>
+    <span class="output">kvm_intel    389120  0</span><br>
+    <span class="output">kvm         1146880  1 kvm_intel</span><br><br>
+    <span class="comment"># Verify libvirt is running</span><br>
+    <span class="prompt">$</span> systemctl status libvirtd<br>
+    <span class="output">● libvirtd.service - Virtualization daemon</span><br>
+    <span class="output">   Active: active (running)</span>
+  </div>
+
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Quick Start Guide</span></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     PAGE 3 — INSTALLATION
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="page page-light">
+  <span class="section-label">Install</span>
+  <h2><span>Installation</span></h2>
+  <p class="subtitle">Four paths &mdash; pick the one that fits your workflow</p>
+
+  <div class="card" style="margin-bottom:24px; border-left: 4px solid #3b82f6;">
+    <h3 style="display:flex; align-items:center; gap:10px;">
+      <span class="step-number" style="width:28px; height:28px; font-size:0.8em;">1</span>
+      Automated Install (Recommended)
+    </h3>
+    <p>Single command that detects your distro, installs dependencies, builds from source, and runs 15 verification tests.</p>
+    <div class="code">
+      <span class="prompt">$</span> git clone https://github.com/zyvorai/machina.git<br>
+      <span class="prompt">$</span> cd machina<br>
+      <span class="prompt">$</span> <span class="keyword">sudo</span> ./install.sh<br><br>
+      <span class="output">&#10003; Rust toolchain found</span><br>
+      <span class="output">&#10003; Node.js 20.x detected</span><br>
+      <span class="output">&#10003; Building core library...</span><br>
+      <span class="output">&#10003; Building daemon...</span><br>
+      <span class="output">&#10003; Building web frontend...</span><br>
+      <span class="output">&#10003; 15/15 verification tests passed</span><br>
+      <span class="output">&#10003; machina-daemon.service started on port 5092</span>
+    </div>
+  </div>
+
+  <div class="card-grid card-grid-2">
+    <div class="card" style="border-left: 4px solid #3b82f6;">
+      <h3 style="display:flex; align-items:center; gap:10px;">
+        <span class="step-number" style="width:28px; height:28px; font-size:0.8em;">2</span>
+        Make Build + Deploy
+      </h3>
+      <p>Standard Makefile workflow for developers who want more control.</p>
+      <div class="code">
+        <span class="comment"># Build release binaries + web</span><br>
+        <span class="prompt">$</span> <span class="keyword">make</span> all<br><br>
+        <span class="comment"># Install and start service</span><br>
+        <span class="prompt">$</span> <span class="keyword">sudo make</span> deploy
+      </div>
+    </div>
+    <div class="card" style="border-left: 4px solid #3b82f6;">
+      <h3 style="display:flex; align-items:center; gap:10px;">
+        <span class="step-number" style="width:28px; height:28px; font-size:0.8em;">3</span>
+        Deploy Tool
+      </h3>
+      <p>Use the machinactl utility for build and deployment in one step.</p>
+      <div class="code">
+        <span class="comment"># Build and deploy</span><br>
+        <span class="prompt">$</span> ./machinactl deploy<br><br>
+        <span class="comment"># Check status</span><br>
+        <span class="prompt">$</span> systemctl status machina-daemon
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:24px; border-left: 4px solid #22d3ee;">
+    <h3 style="display:flex; align-items:center; gap:10px;">
+      <span class="step-number" style="width:28px; height:28px; font-size:0.8em;">4</span>
+      Remote host (rsync + build on server)
+    </h3>
+    <p>Nothing compiles on your laptop: <code>scripts/deploy-remote.sh</code> rsyncs the repo to the host and runs <code>sudo install.sh</code> there (Rust + npm on the server). Always pass <strong>USER then HOST</strong> or <code>user@host</code>.</p>
+    <div class="code">
+      <span class="prompt">$</span> ./scripts/deploy-remote.sh operator@10.0.0.5 --bind 0.0.0.0 --open-firewall<br><br>
+      <span class="comment"># Optional: after rsync, compile only (fast smoke before full install)</span><br>
+      <span class="prompt">$</span> ./scripts/deploy-remote.sh operator@10.0.0.5 --remote-check<br>
+      <span class="prompt">$</span> ./scripts/deploy-remote.sh operator@10.0.0.5 --remote-build
+    </div>
+  </div>
+
+  <div style="margin-top:24px; display:flex; gap:20px;">
+    <div class="stat" style="flex:1;">
+      <div class="number" style="font-size:1.8em;">&lt; 5 min</div>
+      <div class="label">Install Time</div>
+    </div>
+    <div class="stat" style="flex:1;">
+      <div class="number" style="font-size:1.8em;">15</div>
+      <div class="label">Verification Tests</div>
+    </div>
+    <div class="stat" style="flex:1;">
+      <div class="number" style="font-size:1.8em;">1</div>
+      <div class="label">Binary to Deploy</div>
+    </div>
+    <div class="stat" style="flex:1;">
+      <div class="number" style="font-size:1.8em;">5092</div>
+      <div class="label">Default Port</div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Quick Start Guide</span></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     PAGE 4 — FIRST STEPS
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="page page-dark">
+  <span class="section-label">Getting Started</span>
+  <h2>First <span>Steps</span></h2>
+  <p class="subtitle">From install to your first running VM in four steps</p>
+
+  <div class="step-item">
+    <span class="step-number">1</span>
+    <div class="step-content">
+      <h4>Open the Web UI</h4>
+      <p>Navigate to <strong>http://localhost:5092</strong> in your browser. The web interface loads instantly -- no additional services needed.</p>
+      <div class="code" style="margin-top:8px;">
+        <span class="comment"># Or from a remote machine</span><br>
+        http://&lt;your-host-ip&gt;:5092
+      </div>
+    </div>
+  </div>
+
+  <div class="step-item">
+    <span class="step-number">2</span>
+    <div class="step-content">
+      <h4>Login with System Credentials</h4>
+      <p>machina uses PAM authentication. Log in with your Linux username and password. No separate accounts to create.</p>
+      <div class="card card-dark" style="margin-top:8px; padding:16px;">
+        <p><strong>Username:</strong> Your Linux user &bull; <strong>Password:</strong> Your system password</p>
+        <p style="opacity:0.6; font-size:0.85em; margin-top:4px;">Sessions persist via secure cookies. API tokens (<code>mach_</code> prefix; legacy <code>vs_</code> until rotated) available for automation.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="step-item">
+    <span class="step-number">3</span>
+    <div class="step-content">
+      <h4>Create Your First VM</h4>
+      <p>Open <strong>Create VM</strong>: install from ISO, URL, PXE, or curated <strong>virt-install</strong> OS presets; clone from a golden qcow2; or run <strong>Golden Forge</strong> to build a reusable image on the host — Linux via Packer/QEMU, Windows 10/11 via dockur/Podman when enabled (logs + timeline, same pattern as <strong>Jobs</strong>). Use <strong>Disk images</strong> to list pools and start <strong>virt-image-build</strong> jobs. machina validates inputs in real time.</p>
+      <div class="code" style="margin-top:8px;">
+        <span class="comment"># Or via API</span><br>
+        <span class="prompt">$</span> curl -X POST http://localhost:5092/api/v1/vms \<br>
+        &nbsp;&nbsp;-H <span class="string">"Content-Type: application/json"</span> \<br>
+        &nbsp;&nbsp;-d <span class="string">'{"name": "my-first-vm", "vcpus": 2, "memory_mb": 2048, "disk_gb": 20}'</span><br><br>
+        <span class="output">{"status": "created", "name": "my-first-vm"}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="step-item">
+    <span class="step-number">4</span>
+    <div class="step-content">
+      <h4>Access the VM Console</h4>
+      <p>Click the console icon on your VM. machina auto-detects the graphics type and opens the appropriate viewer (VNC, SPICE, or serial).</p>
+      <div class="card-grid card-grid-3" style="margin-top:10px;">
+        <div class="card card-dark" style="padding:14px; text-align:center;">
+          <div style="color:#3b82f6; font-weight:700;">VNC</div>
+          <p style="font-size:0.82em;">Graphical desktop via noVNC</p>
+        </div>
+        <div class="card card-dark" style="padding:14px; text-align:center;">
+          <div style="color:#3b82f6; font-weight:700;">Serial</div>
+          <p style="font-size:0.82em;">Text console via xterm.js</p>
+        </div>
+        <div class="card card-dark" style="padding:14px; text-align:center;">
+          <div style="color:#3b82f6; font-weight:700;">SSH</div>
+          <p style="font-size:0.82em;">Remote shell via xterm.js</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Quick Start Guide</span></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     PAGE 5 — WEB UI OVERVIEW
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="page page-light">
+  <span class="section-label">Web UI</span>
+  <h2>Web UI <span>Overview</span></h2>
+  <p class="subtitle">Full-featured management interface built with React 19 and Tailwind CSS 4</p>
+
+  <div class="card-grid card-grid-3">
+    <div class="card">
+      <div class="icon">&#128187;</div>
+      <h3>Dashboard</h3>
+      <p>Real-time host metrics: CPU, memory, disk usage. VM count by state. Recharts time-series graphs. System alerts.</p>
+    </div>
+    <div class="card">
+      <div class="icon">&#9881;</div>
+      <h3>VM Management</h3>
+      <p>List, create, start, stop, reboot, delete, resize, clone. Inline actions with confirmation dialogs. Batch operations.</p>
+    </div>
+    <div class="card">
+      <div class="icon">&#128247;</div>
+      <h3>Snapshots</h3>
+      <p>Create, list, revert, delete snapshots per VM. Scheduled snapshot support. Snapshot comparison view.</p>
+    </div>
+    <div class="card">
+      <div class="icon">&#127760;</div>
+      <h3>Networks</h3>
+      <p>Virtual networks with NAT, bridge, isolated modes. DHCP configuration. IP range management. Lease viewer.</p>
+    </div>
+    <div class="card">
+      <div class="icon">&#128190;</div>
+      <h3>Storage</h3>
+      <p>Storage pools and volumes. Create qcow2/raw disks. Resize volumes. Pool capacity bars with usage breakdown.</p>
+    </div>
+    <div class="card">
+      <div class="icon">&#128230;</div>
+      <h3>Backups</h3>
+      <p>Full VM backup and restore. Per-VM filtering. NFS target support. Scheduled backups via systemd timer.</p>
+    </div>
+    <div class="card">
+      <div class="icon">&#128203;</div>
+      <h3>Jobs</h3>
+      <p>Background work: virt-image-build, Golden Forge (Packer Linux or dockur Windows golden qcow2), streamed VM create. Live logs, step timelines, and <code>/jobs/{id}</code> detail.</p>
+    </div>
+    <div class="card">
+      <div class="icon">&#9889;</div>
+      <h3>Disk images</h3>
+      <p>Scanned qcow2/ISO inventory on the hypervisor; start <strong>virt-image-build</strong> from the UI with folder picker and the same Jobs + SSE experience.</p>
+    </div>
+  </div>
+
+  <div style="margin-top:28px;">
+    <h3 style="margin-bottom:12px;">Keyboard Shortcuts</h3>
+    <table>
+      <thead>
+        <tr><th>Shortcut</th><th>Action</th><th>Context</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><kbd>Ctrl</kbd> + <kbd>K</kbd></td><td>Open command palette</td><td>Global</td></tr>
+        <tr><td><kbd>N</kbd></td><td>Create new VM</td><td>VM list page</td></tr>
+        <tr><td><kbd>R</kbd></td><td>Refresh current view</td><td>Global</td></tr>
+        <tr><td><kbd>/</kbd></td><td>Focus search field</td><td>List pages</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Close dialog / cancel</td><td>Global</td></tr>
+        <tr><td><kbd>?</kbd></td><td>Show keyboard help</td><td>Global</td></tr>
+        <tr><td><kbd>g</kbd> then <kbd>j</kbd></td><td>Open Jobs</td><td>Global</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Quick Start Guide</span></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     PAGE 6 — TUI OVERVIEW
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="page page-accent">
+  <span class="section-label">Terminal</span>
+  <h2>TUI <span>Overview</span></h2>
+  <p class="subtitle">Full-featured terminal interface -- manage VMs without leaving your terminal</p>
+
+  <div class="card-grid card-grid-2">
+    <div class="card card-dark">
+      <h3>Launch</h3>
+      <div class="code" style="margin-top:8px;">
+        <span class="comment"># Start the TUI</span><br>
+        <span class="prompt">$</span> machina<br><br>
+        <span class="comment"># Or with a custom config</span><br>
+        <span class="prompt">$</span> machina --config /path/to/config.toml<br><br>
+        <span class="comment"># Connect to remote daemon</span><br>
+        <span class="prompt">$</span> machina --host 192.168.1.100 --port 5092
+      </div>
+    </div>
+    <div class="card card-dark">
+      <h3>Interface Layout</h3>
+      <p>Sidebar navigation on the left with section categories. Main content area shows the selected view. Status bar at the bottom with mode indicator and context help.</p>
+      <div style="margin-top:12px; font-size:0.9em;">
+        <strong style="color:#3b82f6;">Sections:</strong> Dashboard, VMs, Networks, Storage, Snapshots, Node Info, Logs
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:24px;">
+    <h3 style="color:#fff; margin-bottom:14px;">Key Bindings</h3>
+    <div class="card-grid card-grid-3">
+      <div class="card card-dark">
+        <h3>Navigation</h3>
+        <table style="margin:0;">
+          <tbody>
+            <tr><td style="color:#94a3b8;"><kbd>j</kbd> / <kbd>k</kbd></td><td style="color:#e2e8f0;">Move down / up</td></tr>
+            <tr><td style="color:#94a3b8;"><kbd>Tab</kbd></td><td style="color:#e2e8f0;">Switch sidebar section</td></tr>
+            <tr><td style="color:#94a3b8;"><kbd>Enter</kbd></td><td style="color:#e2e8f0;">Select / confirm</td></tr>
+            <tr><td style="color:#94a3b8;"><kbd>Esc</kbd></td><td style="color:#e2e8f0;">Back / cancel</td></tr>
+            <tr><td style="color:#94a3b8;"><kbd>q</kbd></td><td style="color:#e2e8f0;">Quit</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card card-dark">
+        <h3>VM Actions</h3>
+        <table style="margin:0;">
+          <tbody>
+            <tr><td style="color:#94a3b8;"><kbd>s</kbd></td><td style="color:#e2e8f0;">Start VM</td></tr>
+            <tr><td style="color:#94a3b8;"><kbd>S</kbd></td><td style="color:#e2e8f0;">Shutdown VM</td></tr>
+            <tr><td style="color:#94a3b8;"><kbd>d</kbd></td><td style="color:#e2e8f0;">Delete VM</td></tr>
+            <tr><td style="color:#94a3b8;"><kbd>r</kbd></td><td style="color:#e2e8f0;">Reboot VM</td></tr>
+            <tr><td style="color:#94a3b8;"><kbd>c</kbd></td><td style="color:#e2e8f0;">Create new VM</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card card-dark">
+        <h3>Command Mode</h3>
+        <table style="margin:0;">
+          <tbody>
+            <tr><td style="color:#94a3b8;"><kbd>:</kbd></td><td style="color:#e2e8f0;">Enter command mode</td></tr>
+            <tr><td style="color:#94a3b8;"><kbd>/</kbd></td><td style="color:#e2e8f0;">Search / filter</td></tr>
+            <tr><td style="color:#94a3b8;"><kbd>?</kbd></td><td style="color:#e2e8f0;">Help</td></tr>
+            <tr><td style="color:#94a3b8;"><kbd>R</kbd></td><td style="color:#e2e8f0;">Refresh</td></tr>
+            <tr><td style="color:#94a3b8;"><kbd>L</kbd></td><td style="color:#e2e8f0;">View logs</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Quick Start Guide</span></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     PAGE 7 — CONFIGURATION
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="page page-dark">
+  <span class="section-label">Config</span>
+  <h2><span>Configuration</span></h2>
+  <p class="subtitle">TOML-based configuration with sensible defaults and CLI overrides</p>
+
+  <div class="card card-dark" style="margin-bottom:20px;">
+    <h3>Config File: /etc/machina/config.toml</h3>
+    <div class="code" style="margin-top:10px;">
+      <span class="comment"># General settings</span><br>
+      [general]<br>
+      refresh_interval_secs = <span class="string">5</span><br><br>
+      <span class="comment"># Daemon HTTP server</span><br>
+      [daemon]<br>
+      host = <span class="string">"0.0.0.0"</span><br>
+      port = <span class="string">5092</span><br><br>
+      <span class="comment"># Libvirt connection</span><br>
+      [libvirt]<br>
+      uri = <span class="string">"qemu:///system"</span><br><br>
+      <span class="comment"># TLS (optional)</span><br>
+      [tls]<br>
+      enabled = <span class="string">false</span><br>
+      cert_path = <span class="string">"/etc/machina/cert.pem"</span><br>
+      key_path = <span class="string">"/etc/machina/key.pem"</span><br><br>
+      <span class="comment"># Backup settings</span><br>
+      [backup]<br>
+      backup_dir = <span class="string">"/var/lib/machina/backups"</span><br>
+      retain_count = <span class="string">5</span>
+    </div>
+  </div>
+
+  <div class="card-grid card-grid-2">
+    <div class="card card-dark">
+      <h3>File Locations</h3>
+      <table style="margin-top:8px;">
+        <tbody>
+          <tr><td style="color:#94a3b8;">Main config</td><td style="color:#e2e8f0;">/etc/machina/config.toml</td></tr>
+          <tr><td style="color:#94a3b8;">Backup config</td><td style="color:#e2e8f0;">/etc/machina/backup.conf</td></tr>
+          <tr><td style="color:#94a3b8;">Data directory</td><td style="color:#e2e8f0;">/var/lib/machina/</td></tr>
+          <tr><td style="color:#94a3b8;">Systemd unit</td><td style="color:#e2e8f0;">/etc/systemd/system/machina-daemon.service</td></tr>
+          <tr><td style="color:#94a3b8;">Backup timer</td><td style="color:#e2e8f0;">/etc/systemd/system/machina-backup.timer</td></tr>
+          <tr><td style="color:#94a3b8;">Web assets</td><td style="color:#e2e8f0;">/usr/local/share/machina/web/</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card card-dark">
+      <h3>Key Settings</h3>
+      <table style="margin-top:8px;">
+        <thead>
+          <tr><th>Setting</th><th>Default</th></tr>
+        </thead>
+        <tbody>
+          <tr><td style="color:#94a3b8;">Port</td><td style="color:#e2e8f0;">5092</td></tr>
+          <tr><td style="color:#94a3b8;">Host bind</td><td style="color:#e2e8f0;">0.0.0.0</td></tr>
+          <tr><td style="color:#94a3b8;">Libvirt URI</td><td style="color:#e2e8f0;">qemu:///system</td></tr>
+          <tr><td style="color:#94a3b8;">Refresh interval</td><td style="color:#e2e8f0;">5 seconds</td></tr>
+          <tr><td style="color:#94a3b8;">TLS</td><td style="color:#e2e8f0;">Disabled</td></tr>
+          <tr><td style="color:#94a3b8;">Backup retention</td><td style="color:#e2e8f0;">5 backups</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Quick Start Guide</span></div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     PAGE 8 — NEXT STEPS
+     ════════════════════════════════════════════════════════════════════ -->
+<div class="page page-light">
+  <span class="section-label">Next Steps</span>
+  <h2>What's <span>Next</span></h2>
+  <p class="subtitle">Go deeper with advanced features and integrations</p>
+
+  <div class="card-grid card-grid-2">
+    <div class="card" style="border-left: 4px solid #3b82f6;">
+      <div class="icon">&#128218;</div>
+      <h3>API Reference</h3>
+      <p>Explore all 100+ REST endpoints with curl examples. Covers VMs, snapshots, networks, storage, advanced operations, guest agent, migration, and more.</p>
+      <div class="code" style="margin-top:10px;">
+        <span class="comment"># List all VMs</span><br>
+        <span class="prompt">$</span> curl http://localhost:5092/api/v1/vms<br><br>
+        <span class="comment"># Get VM metrics</span><br>
+        <span class="prompt">$</span> curl http://localhost:5092/api/v1/vms/my-vm/metrics
+      </div>
+    </div>
+    <div class="card" style="border-left: 4px solid #3b82f6;">
+      <div class="icon">&#128230;</div>
+      <h3>Backup Setup</h3>
+      <p>Configure automated backups with systemd timers. Per-VM backups, NFS target support, disk image inclusion, and retention policies.</p>
+      <div class="code" style="margin-top:10px;">
+        <span class="comment"># Manual backup</span><br>
+        <span class="prompt">$</span> ./scripts/backup.sh --vm my-vm --with-disks<br><br>
+        <span class="comment"># Enable scheduled backups</span><br>
+        <span class="prompt">$</span> <span class="keyword">sudo</span> systemctl enable machina-backup.timer
+      </div>
+    </div>
+    <div class="card" style="border-left: 4px solid #3b82f6;">
+      <div class="icon">&#128101;</div>
+      <h3>RBAC Configuration</h3>
+      <p>Set up role-based access control with three roles: Admin (full control), Operator (VM lifecycle), and ReadOnly (monitoring only). Assigned via system groups.</p>
+      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+        <span class="pill pill-blue">Admin: full access</span>
+        <span class="pill pill-blue">Operator: lifecycle ops</span>
+        <span class="pill pill-blue">ReadOnly: view only</span>
+      </div>
+    </div>
+    <div class="card" style="border-left: 4px solid #3b82f6;">
+      <div class="icon">&#128200;</div>
+      <h3>Prometheus Integration</h3>
+      <p>Scrape metrics from the built-in Prometheus endpoint. Import the included Grafana dashboard for real-time VM monitoring.</p>
+      <div class="code" style="margin-top:10px;">
+        <span class="comment"># Prometheus scrape config</span><br>
+        - job_name: <span class="string">'machina'</span><br>
+        &nbsp;&nbsp;static_configs:<br>
+        &nbsp;&nbsp;- targets: [<span class="string">'localhost:5092'</span>]<br>
+        &nbsp;&nbsp;metrics_path: <span class="string">'/api/v1/prometheus'</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-grid card-grid-2" style="margin-top:20px;">
+    <div class="card" style="border-left: 4px solid #3b82f6;">
+      <div class="icon">&#128295;</div>
+      <h3>Demo Scripts</h3>
+      <p>Run the included demo and utility scripts to explore all features.</p>
+      <div style="margin-top:8px; font-size:0.9em;">
+        <strong>scripts/demo.sh</strong> -- 30-step API walkthrough<br>
+        <strong>scripts/status.sh</strong> -- One-screen system overview<br>
+        <strong>scripts/backup.sh</strong> -- Backup and restore utility<br>
+        <strong>scripts/bulk.sh</strong> -- Batch VM operations
+      </div>
+    </div>
+    <div class="card" style="border-left: 4px solid #3b82f6;">
+      <div class="icon">&#128274;</div>
+      <h3>TLS Setup</h3>
+      <p>Enable HTTPS for production deployments.</p>
+      <div class="code" style="margin-top:8px;">
+        <span class="comment"># In /etc/machina/config.toml</span><br>
+        [tls]<br>
+        enabled = <span class="string">true</span><br>
+        cert_path = <span class="string">"/etc/machina/cert.pem"</span><br>
+        key_path = <span class="string">"/etc/machina/key.pem"</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="cta-box" style="margin-top:28px;">
+    <h3>You're All Set</h3>
+    <p>machina is running on your host. Create VMs, manage networks, take snapshots, and monitor everything from the browser or terminal. Need help? Check the API reference or run scripts/demo.sh for a guided tour.</p>
+  </div>
+
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Quick Start Guide</span></div>
+</div>
+
+</body>
+</html>

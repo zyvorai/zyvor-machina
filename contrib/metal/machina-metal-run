@@ -1,0 +1,68 @@
+#!/bin/sh
+# Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+#
+# Runs inside the Machina bare-metal ramdisk. Reads the kernel command line:
+#   machina.script=URL      script to fetch and run (commission.sh, deploy.sh)
+#   machina.ca_sha256=FP    pin the controller CA (SHA-256 fingerprint, hex); optional
+#   machina.report, machina.token, machina.plan  passed to the script as environment
+# Exports MACHINA_CACERT (path) when a CA is pinned so scripts can verify the controller.
+# Never leaves the machine running something the controller did not serve: on any error
+# it prints why and powers off after a pause so the failure is visible on the console.
+set -u
+
+cmdline_value() {
+    for w in $(cat /proc/cmdline); do
+        case "$w" in "$1="*) echo "${w#*=}"; return 0 ;; esac
+    done
+    return 1
+}
+
+fail() {
+    echo "machina-metal: $*" >&2
+    sleep "${MACHINA_METAL_FAIL_PAUSE:-300}"
+    poweroff -f 2>/dev/null || true
+    exit 1
+}
+
+SCRIPT_URL=$(cmdline_value machina.script) || fail "no machina.script on the kernel command line"
+CA_FP=$(cmdline_value machina.ca_sha256 || true)
+MACHINA_REPORT=$(cmdline_value machina.report || true)
+MACHINA_TOKEN=$(cmdline_value machina.token || true)
+MACHINA_PLAN=$(cmdline_value machina.plan || true)
+export MACHINA_REPORT MACHINA_TOKEN MACHINA_PLAN
+
+# Wait for an address (systemd-networkd, DHCP); the initramfs one is gone after switch-root.
+i=0
+until ip -4 route show default 2>/dev/null | grep -q default; do
+    i=$((i + 1))
+    [ "$i" -gt 90 ] && fail "no default route after 90 s"
+    sleep 1
+done
+
+WORK=$(mktemp -d)
+CURL="curl -fsSL --retry 5 --retry-delay 2"
+case "$SCRIPT_URL" in
+    https://*)
+        if [ -n "$CA_FP" ]; then
+            ORIGIN=$(echo "$SCRIPT_URL" | sed -E 's#^(https://[^/]+).*#\1#')
+            $CURL -k "$ORIGIN/api/v1/pki/ca.pem" -o "$WORK/ca.pem" || fail "cannot fetch the controller CA"
+            have=$(openssl x509 -in "$WORK/ca.pem" -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr 'A-F' 'a-f')
+            [ "$have" = "$(echo "$CA_FP" | tr 'A-F' 'a-f')" ] || fail "controller CA fingerprint mismatch"
+            MACHINA_CACERT="$WORK/ca.pem"
+            export MACHINA_CACERT
+            CURL="$CURL --cacert $MACHINA_CACERT"
+        fi
+        ;;
+esac
+
+$CURL "$SCRIPT_URL" -o "$WORK/run.sh" || fail "cannot fetch $SCRIPT_URL"
+chmod 0700 "$WORK/run.sh"
+"$WORK/run.sh"
+rc=$?
+if [ "$rc" -ne 0 ]; then
+    fail "script exited with status $rc"
+fi
+# A script that succeeded decides what happens next (deploy.sh reboots itself;
+# commission.sh powers off by returning here).
+poweroff -f 2>/dev/null || true

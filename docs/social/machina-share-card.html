@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Machina share card</title>
+<!--
+  SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+  1200x630 card: GitHub social preview and README hero. The screenshots are live
+  dark-theme captures in docs/ux/ (not mockups). Build: ./docs/social/build-social-card.sh
+-->
+<style>
+  :root { --blue:#0071e3; --signal:#2997ff; --cyan:#64d2ff; --sans:'SF Pro Display','Helvetica Neue',Helvetica,Arial,sans-serif; --mono:'SF Mono',Menlo,Consolas,monospace; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; }
+  body { width:1200px; height:630px; overflow:hidden; color:#f5f5f7; font-family:var(--sans); position:relative; background:#000; }
+  .aurora { position:absolute; inset:0;
+    background:radial-gradient(760px 460px at 78% 18%, rgba(41,151,255,.42), transparent 62%),
+               radial-gradient(620px 420px at 102% 96%, rgba(100,210,255,.22), transparent 60%),
+               radial-gradient(520px 380px at 8% 108%, rgba(0,113,227,.30), transparent 60%),
+               linear-gradient(170deg,#000 0%,#05070c 60%,#000 100%); }
+  .grid { position:absolute; inset:0; opacity:.09;
+    background-image:linear-gradient(rgba(120,180,255,.9) 1px,transparent 1px),linear-gradient(90deg,rgba(120,180,255,.9) 1px,transparent 1px);
+    background-size:44px 44px; -webkit-mask-image:radial-gradient(900px 520px at 70% 40%, #000 20%, transparent 75%); }
+  .left { position:absolute; left:60px; top:52px; width:540px; z-index:3; }
+  .brand { display:flex; align-items:center; gap:12px; font-family:var(--mono); font-size:14px; letter-spacing:.18em; text-transform:uppercase; color:#a1a1a6; }
+  .brand img { height:30px; }
+  .word { margin:20px 0 0; font-size:112px; line-height:.92; font-weight:800; letter-spacing:-.055em;
+    background:linear-gradient(92deg,#fff 0%,#e3f0ff 38%,var(--signal) 72%,var(--cyan) 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .tag { margin:18px 0 0; font-size:31px; line-height:1.15; font-weight:700; letter-spacing:-.02em; }
+  .tag em { font-style:normal; color:var(--signal); }
+  .lede { margin:12px 0 0; font-size:18px; line-height:1.45; color:#b8b8bf; width:500px; }
+  .stats { margin-top:26px; display:flex; gap:30px; }
+  .stat b { display:block; font-size:36px; font-weight:800; letter-spacing:-.03em; color:#fff; }
+  .stat span { font-family:var(--mono); font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:#8e8e93; }
+  .pill { position:absolute; left:60px; bottom:40px; display:flex; gap:10px; z-index:3; }
+  .pill span { font-family:var(--mono); font-size:13.5px; font-weight:700; padding:7px 13px; border-radius:18px; border:1.5px solid rgba(255,255,255,.2); color:#e5e5ea; background:rgba(255,255,255,.04); }
+  .pill span.b { background:var(--blue); border-color:var(--blue); color:#fff; box-shadow:0 0 24px rgba(0,113,227,.55); }
+
+  .frame { position:absolute; border-radius:14px; overflow:hidden; background:#0b0b0d;
+    box-shadow:0 50px 100px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.14), 0 0 80px rgba(41,151,255,.18); }
+  .frame img { display:block; width:100%; }
+  .chrome { height:28px; display:flex; align-items:center; gap:7px; padding:0 12px; background:#1c1c1e; border-bottom:1px solid rgba(255,255,255,.06); }
+  .chrome i { width:10px; height:10px; border-radius:50%; background:#ff5f57; } .chrome i:nth-child(2){background:#febc2e} .chrome i:nth-child(3){background:#28c840}
+  .chrome em { margin-left:14px; font-style:normal; font-family:var(--mono); font-size:11.5px; color:#8e8e93; }
+  .main { left:628px; top:78px; width:780px; transform:perspective(1700px) rotateY(-16deg) rotateX(5deg); transform-origin:left center; z-index:1; }
+  .float { left:840px; top:372px; width:420px; transform:perspective(1400px) rotateY(-12deg) rotateX(4deg); transform-origin:left center; z-index:2;
+    box-shadow:0 40px 80px rgba(0,0,0,.85), 0 0 0 1px rgba(41,151,255,.45), 0 0 60px rgba(41,151,255,.35); }
+  .badge { position:absolute; left:812px; top:342px; z-index:4; font-family:var(--mono); font-size:11.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    padding:6px 11px; border-radius:14px; background:rgba(10,20,35,.85); border:1px solid rgba(41,151,255,.6); color:#cfe6ff; }
+  .badge i { display:inline-block; width:7px; height:7px; border-radius:50%; background:#30d158; margin-right:7px; box-shadow:0 0 10px #30d158; }
+</style>
+</head>
+<body>
+<div class="aurora"></div>
+<div class="grid"></div>
+<div class="left">
+  <div class="brand"><img src="../../web/public/zyvor-favicon.svg" alt=""><span>Zyvor &middot; Private cloud on KVM</span></div>
+  <div class="word">machina</div>
+  <div class="tag">Your metal. Your cloud.<br><em>One control plane.</em></div>
+  <div class="lede">VMs, browser consoles, fleet HA, native eBPF security and Zyra AI ops. One command to install.</div>
+  <div class="stats">
+    <div class="stat"><b>4</b><span>Rust services</span></div>
+    <div class="stat"><b>1,000+</b><span>REST routes</span></div>
+    <div class="stat"><b>1</b><span>command install</span></div>
+  </div>
+</div>
+<div class="pill"><span class="b">github.com/zyvorai/zyvor-machina</span><span>Commercial license required</span></div>
+<div class="frame main"><div class="chrome"><i></i><i></i><i></i><em>https://machina:5092</em></div><img src="../ux/machina-dashboard-dark.png" alt=""></div>
+<div class="badge"><i></i>eBPF datapath loaded</div>
+<div class="frame float"><img src="../ux/machina-native-ebpf-dark.png" alt=""></div>
+</body>
+</html>

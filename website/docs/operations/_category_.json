@@ -1,0 +1,8 @@
+{
+  "label": "Operations",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "description": "Configure, observe and secure a Machina deployment."
+  }
+}

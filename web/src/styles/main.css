@@ -1,0 +1,2034 @@
+@import "tailwindcss";
+@import "./platform-tahoe.css";
+@import "./machina-daylight.css";
+@import "./machina-apple-ux.css";
+/* Zeus OS 1:1 SoT — must load last so Mist/Tahoe Light win over System Blue forks */
+@import "./zeus-parity.css";
+@import "./nav-global-bar.css";
+@import "./zyvor-premium-login.css";
+@import "./zyvor-macos-login.css";
+
+@theme inline {
+  --radius-liquid: 22px;
+  --radius-liquid-lg: 28px;
+}
+
+/* Layout width — zyvor.dev / apple.com product rhythm (not a wide admin console) */
+:root {
+  --dock-height: 4.25rem;
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'SF Pro', Inter, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'SFMono-Regular', Menlo, Consolas, 'JetBrains Mono', monospace;
+
+  /* Apple.com / iPhone-style system tokens */
+  --radius-liquid: 12px;
+  --radius-liquid-lg: 20px;
+  --blur-liquid: 20px;
+  /* Shared easing for everyday hover/press transitions (buttons, nav items,
+     sidebar links) — same curve already used for card/panel motion
+     (main.css glass-card rules), just applied consistently everywhere
+     instead of falling back to the browser's default `ease`. The bouncier
+     overshoot curve used for a few entrance animations stays separate and
+     is not this token. */
+  --ease-standard: cubic-bezier(0.23, 1, 0.32, 1);
+  /* apple.com blue — before zeus-parity overrides */
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --accent-soft: color-mix(in srgb, #0071e3 14%, transparent);
+  --link: #2997ff;
+  --link-hover: #55aeff;
+  --apple-fill-secondary: rgba(255, 255, 255, 0.12);
+  --apple-fill-tertiary: rgba(255, 255, 255, 0.06);
+  --apple-surface: #161617;
+  --apple-surface-elevated: #1d1d1f;
+  --apple-hairline: rgba(255, 255, 255, 0.08);
+
+  --glass-bg: rgba(22, 22, 23, 0.72);
+  --glass-bg-elevated: rgba(29, 29, 31, 0.88);
+  --glass-bg-strong: rgba(29, 29, 31, 0.96);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-strong: rgba(255, 255, 255, 0.12);
+  --glass-shadow: none;
+  --glass-highlight: rgba(255, 255, 255, 0.06);
+  --text-primary: #f5f5f7;
+  --text-secondary: #a1a1a6;
+  --text-muted: #86868b;
+  --page-bg: #000000;
+
+  /* Daylight token names also exist on carbon so components can share vars */
+  --surface-0: #0c0e12;
+  --surface-1: #14181f;
+  --surface-2: #1a1f28;
+  --surface-3: #222833;
+  --surface-hover: rgba(255, 255, 255, 0.04);
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --shadow-1: none;
+  --shadow-2: none;
+  --shadow-3: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --plasma: hsl(200 85% 52%);
+  --plasma-strong: hsl(200 85% 56%);
+  --plasma-tint: hsl(200 85% 52% / 0.14);
+  --amber: #ff9f0a;
+  --ember: #ff3b30;
+  --verdant: #34c759;
+  --mark-nominal: #8e8e93;
+  --mark-track: rgba(255, 255, 255, 0.1);
+  --text-faint: #636366;
+  --text-on-accent: #ffffff;
+}
+
+.light-glass {
+  --glass-bg: rgba(255, 255, 255, 0.07);
+  --glass-bg-elevated: rgba(255, 255, 255, 0.12);
+  --glass-bg-strong: rgba(255, 255, 255, 0.18);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border-strong: rgba(255, 255, 255, 0.18);
+  --glass-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  --glass-highlight: rgba(255, 255, 255, 0.25);
+  /* Apple shop .form-selector box type */
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-muted: #86868b;
+}
+
+html {
+  scroll-padding-top: 6.5rem;
+  scroll-padding-bottom: 5rem;
+}
+
+body {
+  margin: 0;
+  overflow-y: auto;
+  font-family: var(--font-display, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', sans-serif);
+  font-size: 17px;
+  line-height: 1.47059;
+  letter-spacing: -0.022em;
+  font-feature-settings: 'kern' 1, 'liga' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--page-bg, #000000);
+  color: var(--text-primary);
+}
+
+h1, h2, h3, .page-title, .section-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.page-title {
+  font-size: clamp(1.375rem, 2.2vw, 1.75rem);
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
+}
+
+.page-lede {
+  margin-top: 0.35rem;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  color: var(--text-secondary);
+  max-width: 42rem;
+}
+
+.section-title {
+  font-size: clamp(1.0625rem, 1.6vw, 1.25rem);
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+
+code, .font-mono, pre {
+  font-family: var(--font-mono);
+}
+
+/* Light theme tokens + Law 0/1 surfaces live in machina-daylight.css (Zeus Daylight Contract).
+   Do not re-declare competing --page-bg / --text-* here. */
+
+.apple-light-shell {
+  background: var(--page-bg);
+  color: var(--text-primary);
+}
+
+/* Shared Apple surface / table helpers */
+.apple-surface {
+  background: var(--apple-surface);
+  border: 1px solid var(--apple-hairline);
+  border-radius: var(--radius-liquid-lg);
+}
+.apple-surface-elevated {
+  background: var(--apple-surface-elevated);
+  border: 1px solid var(--apple-hairline);
+  border-radius: var(--radius-liquid-lg);
+}
+.apple-link {
+  color: var(--link);
+  text-decoration: none;
+}
+.apple-link:hover {
+  color: var(--link-hover);
+  text-decoration: underline;
+}
+.apple-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.apple-table th {
+  text-align: left;
+  font-weight: 510;
+  color: var(--text-muted);
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--apple-hairline);
+}
+.apple-table td {
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--apple-hairline);
+  color: var(--text-primary);
+}
+.apple-table tr:hover td {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+/* Animations */
+@keyframes slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Native macOS alert sheets pop the panel with a subtle scale, distinct from
+   the backdrop's plain fade — see ConfirmDialog.tsx. */
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-scale-in { animation: scale-in 0.16s var(--ease-standard); }
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-in { animation: fade-in 0.4s ease-out; }
+.animate-pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-20px) scale(1.02); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.25; }
+}
+
+/* ── Liquid Glass utilities ── */
+.glass {
+  background-color: var(--glass-bg);
+  background-image: linear-gradient(to bottom, var(--glass-highlight), transparent 45%);
+  backdrop-filter: blur(var(--blur-liquid)) saturate(1.15);
+  -webkit-backdrop-filter: blur(var(--blur-liquid)) saturate(1.15);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius-liquid);
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.glass::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: linear-gradient(to bottom, var(--glass-highlight), transparent);
+  opacity: 0.35;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.glass-elevated {
+  background-color: var(--glass-bg-elevated);
+  border-color: var(--glass-border-strong);
+}
+
+.glass-strong {
+  background-color: var(--glass-bg-strong);
+  border-color: var(--glass-border-strong);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.glass:hover,
+.glass-elevated:hover {
+  border-color: var(--glass-border-strong);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.55);
+}
+
+.glass-hover-lift {
+  transition: transform 0.2s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.2s ease;
+}
+.glass-hover-lift:hover {
+  transform: scale(1.005);
+}
+
+.rounded-liquid { border-radius: var(--radius-liquid); }
+.rounded-liquid-lg { border-radius: var(--radius-liquid-lg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-hover-lift:hover {
+    transform: none;
+  }
+}
+
+.platform-launchpad-grid {
+  padding: 0.5rem 0 1.5rem;
+}
+
+.platform-mac-panel,
+.platform-mac-stat {
+  backdrop-filter: blur(16px);
+  background: var(--glass-panel);
+}
+
+.platform-vm-card,
+.platform-action-card {
+  backdrop-filter: blur(12px);
+}
+
+.platform-vm-card.machina-vm-card-accent {
+  border-left-width: 4px;
+}
+
+/* ── Machina Platform: macOS Tahoe / Liquid Glass (aligned with v9s) ── */
+.mac-desktop-root {
+  --glass-panel: linear-gradient(155deg, var(--glass-highlight) 0%, var(--glass-bg) 100%);
+}
+
+.mac-desktop-root[data-wallpaper='tahoe'] {
+  background:
+    radial-gradient(ellipse 120% 80% at 50% -20%, rgba(30, 58, 95, 0.35), transparent 55%),
+    linear-gradient(180deg, rgb(8, 12, 22) 0%, rgb(6, 10, 18) 100%);
+}
+
+.mac-desktop-root[data-wallpaper='aurora'] {
+  background:
+    radial-gradient(ellipse 100% 70% at 20% -10%, rgba(124, 58, 237, 0.28), transparent 50%),
+    radial-gradient(ellipse 80% 60% at 90% 10%, rgba(14, 165, 233, 0.18), transparent 45%),
+    linear-gradient(180deg, rgb(10, 8, 24) 0%, rgb(6, 10, 18) 100%);
+}
+
+.mac-popout-root .platform-mac-scroll-body {
+  scroll-padding-top: 3.5rem;
+  scroll-padding-bottom: 2rem;
+}
+
+.platform-detail-tabs-sticky {
+  position: sticky;
+  top: var(--platform-chrome-top, 6.5rem);
+  z-index: 25;
+  margin: 0 -0.25rem 0.75rem;
+  padding: 0.35rem 0.25rem 0.65rem;
+  background: hsl(var(--card) / 0.88);
+  backdrop-filter: blur(calc(var(--blur-liquid) + 6px)) saturate(1.3);
+  -webkit-backdrop-filter: blur(calc(var(--blur-liquid) + 6px)) saturate(1.3);
+  border-bottom: 1px solid hsl(var(--foreground) / 0.08);
+}
+
+.mac-popout-root .platform-detail-tabs-sticky {
+  top: 2.75rem;
+}
+
+.tahoe-mobile-jump {
+  top: calc(var(--platform-menubar-height, 2.75rem) + var(--platform-context-height, 0px));
+}
+
+.classic-detail-chrome-sticky {
+  position: sticky;
+  top: var(--classic-nav-height, 3.5rem);
+  z-index: 20;
+}
+
+.tahoe-canvas {
+  position: relative;
+  /* Was a hardcoded dark navy wash regardless of theme; let the actual page
+     background (already theme-correct) show through instead of tinting the
+     whole content area. */
+  background: transparent;
+}
+
+.tahoe-mesh {
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  background:
+    radial-gradient(ellipse 70% 50% at 10% 0%, rgba(255, 255, 255, 0.04), transparent 55%),
+    radial-gradient(ellipse 60% 45% at 90% 20%, rgba(0, 113, 227, 0.04), transparent 50%);
+  pointer-events: none;
+}
+
+.tahoe-mesh-subtle {
+  opacity: 0.2;
+}
+
+.mac-desktop-main {
+  min-height: auto;
+}
+
+.tahoe-glass-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-liquid);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-panel);
+  backdrop-filter: blur(var(--blur-liquid)) saturate(1.25);
+  -webkit-backdrop-filter: blur(var(--blur-liquid)) saturate(1.25);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    var(--glass-shadow);
+  transition: transform 0.2s cubic-bezier(0.23, 1, 0.32, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tahoe-glass-card:hover {
+  border-color: var(--apple-hairline, rgba(255, 255, 255, 0.12));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    var(--glass-shadow);
+}
+
+.tahoe-segment-active {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset;
+}
+
+.machine-finder-page {
+}
+
+.machine-finder-root {
+  min-height: 0;
+}
+
+.machine-finder-command-bar {
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.machine-finder-card {
+  background: var(--apple-fill-tertiary);
+  border: 1px solid var(--apple-hairline, rgba(0, 0, 0, 0.08));
+}
+
+.machine-finder-migrate-zone {
+  margin-top: 0.5rem;
+}
+
+.machine-finder-command-center {
+  /* Flow with the page (single page scroll) instead of a nested inner
+     scrollbar. A sticky panel taller than the viewport re-introduces the
+     cutoff/scroll, so it stays top-aligned but not sticky. */
+  align-self: flex-start;
+}
+
+.mission-control-page,
+.mission-control-root {
+  --mc-glass: rgba(15, 23, 42, 0.55);
+  width: 100%;
+  max-width: none;
+}
+
+.mc-hero {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.mac-desktop-root .mission-control-page,
+.mac-desktop-main .mission-control-root {
+  width: 100%;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.mc-host-fleet-card {
+  background: var(--mc-glass);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.platform-rail-active {
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.35), 0 0 12px rgba(56, 189, 248, 0.15);
+}
+
+@media (max-width: 1023px) {
+  .mac-desktop-main {
+    padding-bottom: 5.5rem;
+  }
+}
+
+/* Normal tier — dock-first desktop; use full width (sidebar toggled via ⌘⌥S) */
+.mac-desktop-root[data-desktop-tier='normal'] .mac-desktop-main {
+  padding-bottom: 5rem;
+}
+
+.tahoe-page-root h1.text-2xl {
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+@media (min-width: 1024px) {
+  .mac-desktop-main {
+    max-width: none;
+    width: 100%;
+  }
+}
+
+/* Machina semantic status tokens — quiet Apple system colors (no neon purple/cyan) */
+:root {
+  --machina-status-ok: #34c759;
+  --machina-status-warn: #ff9f0a;
+  --machina-status-error: #ff3b30;
+  --machina-status-info: #0071e3;
+  --machina-status-neutral: #8e8e93;
+  --machina-accent: #0071e3;
+  --machina-accent-ai: #0071e3;
+
+  --machina-vm-running: #34c759;
+  --machina-vm-stopped: #8e8e93;
+  --machina-vm-paused: #ff9f0a;
+  --machina-vm-creating: #0071e3;
+  --machina-vm-failed: #ff3b30;
+  --machina-vm-migrating: #0071e3;
+  --machina-vm-unknown: #8e8e93;
+}
+
+/* Usage: network/nav → --machina-accent-network; AI/copilot → --machina-accent-ai; risk → --machina-accent-security */
+
+/* VM status badges (glass-friendly soft + optional solid) */
+.machina-vm-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.machina-vm-status--running {
+  background: color-mix(in srgb, var(--machina-vm-running) 18%, transparent);
+  color: color-mix(in srgb, var(--machina-vm-running) 88%, white);
+  border: 1px solid color-mix(in srgb, var(--machina-vm-running) 32%, transparent);
+}
+
+.machina-vm-status--stopped {
+  background: color-mix(in srgb, var(--machina-vm-stopped) 18%, transparent);
+  color: color-mix(in srgb, var(--machina-vm-stopped) 92%, white);
+  border: 1px solid color-mix(in srgb, var(--machina-vm-stopped) 32%, transparent);
+}
+
+.machina-vm-status--paused {
+  background: color-mix(in srgb, var(--machina-vm-paused) 18%, transparent);
+  color: color-mix(in srgb, var(--machina-vm-paused) 88%, white);
+  border: 1px solid color-mix(in srgb, var(--machina-vm-paused) 32%, transparent);
+}
+
+.machina-vm-status--creating {
+  background: color-mix(in srgb, var(--machina-vm-creating) 18%, transparent);
+  color: color-mix(in srgb, var(--machina-vm-creating) 88%, white);
+  border: 1px solid color-mix(in srgb, var(--machina-vm-creating) 32%, transparent);
+}
+
+.machina-vm-status--failed {
+  background: color-mix(in srgb, var(--machina-vm-failed) 18%, transparent);
+  color: color-mix(in srgb, var(--machina-vm-failed) 88%, white);
+  border: 1px solid color-mix(in srgb, var(--machina-vm-failed) 32%, transparent);
+}
+
+.machina-vm-status--migrating,
+.machina-vm-status--suspended {
+  background: color-mix(in srgb, var(--machina-vm-migrating) 18%, transparent);
+  color: color-mix(in srgb, var(--machina-vm-migrating) 88%, white);
+  border: 1px solid color-mix(in srgb, var(--machina-vm-migrating) 32%, transparent);
+}
+
+.machina-vm-status--unknown {
+  background: color-mix(in srgb, var(--machina-vm-unknown) 18%, transparent);
+  color: color-mix(in srgb, var(--machina-vm-unknown) 92%, white);
+  border: 1px solid color-mix(in srgb, var(--machina-vm-unknown) 32%, transparent);
+}
+
+.machina-vm-status--solid.machina-vm-status--running { background: var(--machina-vm-running); color: #fff; border-color: transparent; }
+.machina-vm-status--solid.machina-vm-status--stopped { background: var(--machina-vm-stopped); color: #fff; border-color: transparent; }
+.machina-vm-status--solid.machina-vm-status--paused { background: var(--machina-vm-paused); color: #fff; border-color: transparent; }
+.machina-vm-status--solid.machina-vm-status--creating { background: var(--machina-vm-creating); color: #fff; border-color: transparent; }
+.machina-vm-status--solid.machina-vm-status--failed { background: var(--machina-vm-failed); color: #fff; border-color: transparent; }
+.machina-vm-status--solid.machina-vm-status--migrating,
+.machina-vm-status--solid.machina-vm-status--suspended { background: var(--machina-vm-migrating); color: #fff; border-color: transparent; }
+.machina-vm-status--solid.machina-vm-status--unknown { background: var(--machina-vm-unknown); color: #fff; border-color: transparent; }
+
+.machina-vm-dot {
+  display: inline-block;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.machina-vm-dot--running { background: var(--machina-vm-running); }
+.machina-vm-dot--stopped { background: var(--machina-vm-stopped); }
+.machina-vm-dot--paused { background: var(--machina-vm-paused); }
+.machina-vm-dot--creating { background: var(--machina-vm-creating); }
+.machina-vm-dot--failed { background: var(--machina-vm-failed); }
+.machina-vm-dot--migrating,
+.machina-vm-dot--suspended { background: var(--machina-vm-migrating); }
+.machina-vm-dot--unknown { background: var(--machina-vm-unknown); }
+
+.machina-vm-dot--pulse {
+  animation: machina-vm-pulse 2s ease-in-out infinite;
+}
+
+@keyframes machina-vm-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--machina-vm-running) 45%, transparent); }
+  50% { opacity: 0.85; box-shadow: 0 0 0 4px color-mix(in srgb, var(--machina-vm-running) 0%, transparent); }
+}
+
+.machina-vm-card-accent {
+  border-left: 4px solid var(--machina-vm-unknown);
+}
+
+.machina-vm-card-accent--running { border-left-color: var(--machina-vm-running); }
+.machina-vm-card-accent--stopped { border-left-color: var(--machina-vm-stopped); }
+.machina-vm-card-accent--paused { border-left-color: var(--machina-vm-paused); }
+.machina-vm-card-accent--creating { border-left-color: var(--machina-vm-creating); }
+.machina-vm-card-accent--failed { border-left-color: var(--machina-vm-failed); }
+.machina-vm-card-accent--migrating,
+.machina-vm-card-accent--suspended { border-left-color: var(--machina-vm-migrating); }
+.machina-vm-card-accent--unknown { border-left-color: var(--machina-vm-unknown); }
+
+/* Quieter cards — Apple product surfaces */
+.tahoe-page-root .card,
+.liquid-glass-app .card {
+  border-radius: var(--radius-liquid-lg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(29, 29, 31, 0.92);
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+  box-shadow: none;
+}
+
+/* Apple.com / iPhone-style buttons — global (all themes) */
+.btn-primary,
+.tahoe-btn-primary,
+.tahoe-page-root .btn-primary,
+.liquid-glass-app .btn-primary,
+.machina-clean .btn-primary,
+.apple-light .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.625rem 1.125rem;
+  min-height: 2.75rem;
+  font-size: 0.9375rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: #fff !important;
+  border-radius: 980px !important;
+  background: #0071e3 !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none;
+  transition: background 0.2s var(--ease-standard), opacity 0.15s var(--ease-standard), transform 0.1s var(--ease-standard);
+  cursor: pointer;
+  text-decoration: none !important;
+  -webkit-font-smoothing: antialiased;
+}
+.btn-primary:hover:not(:disabled),
+.tahoe-btn-primary:hover:not(:disabled),
+.liquid-glass-app .btn-primary:hover:not(:disabled),
+.tahoe-page-root .btn-primary:hover:not(:disabled),
+.machina-clean .btn-primary:hover:not(:disabled) {
+  background: #0077ed !important;
+  box-shadow: none !important;
+  filter: none;
+}
+.btn-primary:active:not(:disabled),
+.tahoe-btn-primary:active:not(:disabled),
+.liquid-glass-app .btn-primary:active:not(:disabled),
+.tahoe-page-root .btn-primary:active:not(:disabled) {
+  background: #006edb !important;
+  transform: scale(0.98);
+}
+.btn-primary:disabled,
+.tahoe-btn-primary:disabled,
+.liquid-glass-app .btn-primary:disabled,
+.tahoe-page-root .btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-secondary,
+.tahoe-page-root .btn-secondary,
+.liquid-glass-app .btn-secondary,
+.machina-clean .btn-secondary,
+.apple-light .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.625rem 1.125rem;
+  min-height: 2.75rem;
+  font-size: 0.9375rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--text-primary, #f5f5f7) !important;
+  border-radius: 980px !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: none !important;
+  backdrop-filter: none;
+  box-shadow: none !important;
+  transition: background 0.2s var(--ease-standard), opacity 0.15s var(--ease-standard), transform 0.1s var(--ease-standard);
+  cursor: pointer;
+  text-decoration: none !important;
+}
+.liquid-glass-app .btn-secondary:hover:not(:disabled),
+.machina-clean:not(.apple-light):not(.light-theme) .btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+.btn-secondary:active:not(:disabled) { transform: scale(0.98); }
+.btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1.1rem;
+  min-height: 2.2rem;
+  font-size: 0.875rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--link, #2997ff) !important;
+  border-radius: 980px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  text-decoration: none !important;
+  transition: background 0.15s var(--ease-standard), color 0.15s var(--ease-standard);
+}
+.apple-light .btn-ghost,
+.light-theme .btn-ghost {
+  color: #0066cc !important;
+}
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(0, 113, 227, 0.12) !important;
+  text-decoration: none !important;
+}
+.btn-ghost:active:not(:disabled) { transform: scale(0.98); }
+
+.btn-destructive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1.25rem;
+  min-height: 2.2rem;
+  font-size: 0.875rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: #fff !important;
+  border-radius: 980px !important;
+  background: var(--nl-danger, #ff3b30) !important;
+  border: none !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  text-decoration: none !important;
+  transition: background 0.18s var(--ease-standard), transform 0.1s var(--ease-standard);
+}
+.btn-destructive:hover:not(:disabled) { filter: brightness(1.08); }
+.btn-destructive:active:not(:disabled) { transform: scale(0.98); }
+
+.btn-primary.text-xs, .btn-secondary.text-xs, .btn-ghost.text-xs, .btn-destructive.text-xs, .tahoe-btn-primary.text-xs {
+  padding: 0.3rem 0.85rem;
+  min-height: 1.75rem;
+  font-size: 0.75rem;
+}
+.btn-primary.text-sm, .btn-secondary.text-sm, .btn-ghost.text-sm, .btn-destructive.text-sm, .tahoe-btn-primary.text-sm {
+  padding: 0.45rem 1.15rem;
+  min-height: 2.05rem;
+  font-size: 0.8125rem;
+}
+
+/* Kill leftover rounded-/shadow utilities fighting Apple pills */
+.btn-primary.rounded-lg, .btn-primary.rounded-xl, .btn-primary.rounded-md,
+.btn-secondary.rounded-lg, .btn-secondary.rounded-xl,
+.btn-destructive.rounded-lg, .btn-ghost.rounded-lg,
+.tahoe-btn-primary.rounded-lg {
+  border-radius: 980px !important;
+}
+.btn-primary.shadow-lg, .btn-primary.shadow-md, .btn-primary.shadow-xl,
+.btn-secondary.shadow-lg {
+  box-shadow: none !important;
+}
+
+/* Apple.com text-link CTA (Learn more →) */
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  min-height: auto;
+  font-size: 0.9375rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--link, #2997ff);
+  background: none;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn-link:hover {
+  text-decoration: underline;
+  color: var(--link-hover, #64b5ff);
+}
+.apple-light .btn-link,
+.light-theme .btn-link {
+  color: #0066cc;
+}
+.apple-light .btn-link:hover,
+.light-theme .btn-link:hover {
+  color: #0077ed;
+}
+
+/* Page rhythm — apple.com-like breathing room */
+.tahoe-page-root,
+.machina-clean .tahoe-page-root {
+}
+.tahoe-page-root > * + * {
+  margin-top: 0;
+}
+.tahoe-page-root .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-y-reverse: 0;
+  margin-top: calc(1.75rem * calc(1 - var(--tw-space-y-reverse)));
+}
+
+.tahoe-page-root table thead {
+  color: var(--text-muted, rgb(148, 163, 184));
+}
+
+.tahoe-page-root table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tahoe-page-root .input,
+.tahoe-page-root select,
+.tahoe-page-root textarea:not(.term-body) {
+  border-radius: var(--radius-liquid-sm, 0.75rem);
+  border-color: var(--glass-border, rgba(255, 255, 255, 0.08));
+  background: var(--apple-fill-tertiary);
+}
+
+.platform-route-main {
+  padding: 0 !important;
+  max-width: none !important;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+}
+
+/* Platform pages grow with content; the window/body scrolls like a normal web app. */
+.mac-desktop-root.platform-mac-desktop {
+  min-height: 100dvh;
+  height: auto;
+  --platform-menubar-height: 2.75rem;
+  --platform-context-height: 0px;
+  --platform-mobile-jump-height: 0px;
+  --platform-chrome-top: var(--platform-menubar-height);
+  --classic-nav-height: 3.5rem;
+}
+
+.mac-desktop-root.platform-mac-desktop[data-context-bar='visible'] {
+  --platform-context-height: 3rem;
+}
+
+@media (max-width: 1023px) {
+  .mac-desktop-root.platform-mac-desktop {
+    --platform-mobile-jump-height: 3.25rem;
+  }
+}
+
+.mac-desktop-root.platform-mac-desktop {
+  --platform-chrome-top: calc(
+    var(--platform-menubar-height) + var(--platform-context-height) + var(--platform-mobile-jump-height)
+  );
+}
+
+.platform-mac-scroll-body {
+  flex: 1 1 auto;
+  scroll-padding-bottom: 6rem;
+}
+
+.platform-mac-desktop,
+.platform-readable {
+  font-feature-settings: 'kern' 1, 'liga' 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.platform-mac-desktop .text-xs,
+.platform-readable .text-xs {
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+}
+
+.platform-mac-desktop .text-sm,
+.platform-readable .text-sm {
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+/* Finder inspector panels — readable labels on Tahoe glass */
+.platform-finder-inspector {
+  color: rgb(241 245 249);
+}
+
+.platform-finder-inspector .platform-finder-inspector-label,
+.platform-finder-inspector dt {
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  color: rgb(148 163 184);
+  font-weight: 500;
+}
+
+.platform-finder-inspector .platform-finder-inspector-empty {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: rgb(148 163 184);
+}
+
+.platform-finder-inspector .platform-finder-inspector-subtitle {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: rgb(148 163 184);
+}
+
+.platform-finder-inspector .platform-finder-inspector-cta {
+  font-weight: 600;
+}
+
+.mac-settings-detail label {
+  color: var(--text-primary);
+}
+
+.mac-settings-detail .input,
+.mac-settings-detail select,
+.mac-settings-detail textarea {
+  color: var(--text-primary);
+}
+
+.platform-mac-desktop .mac-menu-panel button {
+  font-size: 0.8125rem;
+}
+
+.mac-menu-item {
+  color: var(--text-primary, hsl(var(--foreground) / 0.88));
+  transition: background 0.15s ease;
+}
+
+.mac-menu-item:hover,
+.mac-menu-item-active {
+  background: var(--surface-hover, hsl(var(--foreground) / 0.08));
+  color: var(--text-primary, hsl(var(--foreground)));
+}
+
+.mac-menu-panel {
+  background: hsl(var(--card) / 0.96);
+  backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid hsl(var(--foreground) / 0.1);
+  border-radius: 0.625rem;
+  box-shadow: var(--shadow-3, 0 16px 48px -12px rgba(0, 0, 0, 0.35));
+  color: var(--text-primary, hsl(var(--foreground)));
+}
+
+.mac-menu-row {
+  color: var(--text-secondary, hsl(var(--foreground) / 0.78));
+}
+
+.mac-menu-row:hover {
+  background: var(--surface-hover, hsl(var(--foreground) / 0.08));
+  color: var(--text-primary, hsl(var(--foreground)));
+}
+
+.mac-menu-row-active {
+  background: var(--accent-soft, rgba(0, 113, 227, 0.1));
+  color: var(--text-primary, hsl(var(--foreground)));
+  font-weight: 500;
+}
+
+.mac-finder-toolbar {
+  background: hsl(var(--card) / 0.72);
+  backdrop-filter: blur(12px);
+  color: hsl(var(--foreground));
+}
+
+.mac-finder-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.375rem;
+  color: hsl(var(--foreground) / 0.7);
+}
+
+.mac-finder-nav-btn:hover:not(:disabled) {
+  background: hsl(var(--foreground) / 0.08);
+  color: hsl(var(--foreground));
+}
+
+.mac-finder-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.mac-finder-search {
+  background: hsl(var(--foreground) / 0.06);
+  border: 1px solid hsl(var(--foreground) / 0.1);
+  color: hsl(var(--foreground) / 0.92);
+}
+
+.mac-finder-search:focus {
+  border-color: hsl(var(--primary) / 0.4);
+}
+
+.mac-finder-path {
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.375rem;
+  background: hsl(var(--foreground) / 0.06);
+  color: hsl(var(--foreground) / 0.7);
+}
+
+.tahoe-segment-item {
+  border-radius: 0.375rem;
+}
+
+.mac-wallpaper-swatch-tahoe {
+  background: linear-gradient(135deg, rgb(8, 12, 22), rgb(30, 58, 95));
+}
+
+.mac-wallpaper-swatch-aurora {
+  background: linear-gradient(135deg, rgb(10, 8, 24), rgb(124, 58, 237));
+}
+
+.mac-wallpaper-swatch-midnight {
+  background: linear-gradient(135deg, rgb(0, 0, 0), rgb(15, 23, 42));
+}
+
+.mac-wallpaper-swatch-ocean {
+  background: linear-gradient(135deg, rgb(2, 10, 18), rgb(6, 78, 120));
+}
+
+.mac-popout-root {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mac-popout-titlebar {
+  backdrop-filter: blur(16px);
+}
+
+.mac-popout-traffic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 9999px;
+}
+
+.mac-popout-traffic-close {
+  background: #ff5f57;
+  border: none;
+  cursor: pointer;
+}
+
+.mac-popout-traffic-close:hover {
+  filter: brightness(1.08);
+}
+
+.mac-popout-traffic-minimize {
+  background: #febc2e;
+}
+
+.mac-popout-traffic-maximize {
+  background: #28c840;
+}
+
+.mac-desktop-root[data-wallpaper='midnight'] {
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 0%, rgba(15, 23, 42, 0.5), transparent 55%),
+    linear-gradient(180deg, rgb(2, 6, 14) 0%, rgb(0, 0, 0) 100%);
+}
+
+.mac-desktop-root[data-wallpaper='ocean'] {
+  background:
+    radial-gradient(ellipse 110% 75% at 50% -15%, rgba(6, 78, 120, 0.35), transparent 52%),
+    linear-gradient(180deg, rgb(4, 16, 28) 0%, rgb(2, 10, 18) 100%);
+}
+
+/* Recharts portals default to a high z-index; keep charts under sticky #app-topnav (z-30). */
+.recharts-tooltip-wrapper,
+.recharts-cursor {
+  z-index: 20 !important;
+}
+
+.login-page {
+  isolation: isolate;
+}
+
+/* Zyvor brand — text only, never a dark footer bar */
+.zyvor-footer,
+.zyvor-brand-line {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+/* Owned by zyvor-premium-login.css — keep these as no-op fallbacks only */
+.login-input {
+  /* intentional: see .login-page .login-input in zyvor-premium-login.css */
+}
+.login-input:focus {
+  outline: none;
+}
+.login-field-icon {
+  position: absolute;
+  left: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  color: var(--login-ink-muted, #86868b);
+  transition: color 0.2s;
+}
+.group:focus-within .login-field-icon {
+  color: #0071e3;
+}
+.login-btn-primary {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 1.5rem;
+  padding: 0.85rem 1.25rem;
+  font-size: 1.0625rem;
+  font-weight: 510;
+  letter-spacing: -0.01em;
+  color: #fff;
+  border-radius: 980px;
+  border: none;
+  background: #0071e3;
+  box-shadow: none;
+  transition: background 0.18s ease, opacity 0.15s ease;
+}
+.login-btn-primary:hover:not(:disabled) {
+  transform: none;
+  background: #0077ed;
+  box-shadow: none;
+}
+.login-btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.login-btn-primary::after {
+  display: none;
+}
+
+/* Skeleton loading */
+.skeleton {
+  background: linear-gradient(90deg, var(--apple-fill-tertiary) 25%, var(--apple-fill-secondary, var(--apple-fill-tertiary)) 50%, var(--apple-fill-tertiary) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 0.5rem;
+}
+
+/* Scrollbar — thin, overlay-ish, macOS-style. Per-theme thumb colors are
+   intentional (each tuned to its palette, like --focus-ring); every theme
+   override below should pair its ::-webkit-scrollbar-thumb color with the
+   matching `scrollbar-color` so Firefox gets the same thin/tinted look. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* Focus ring */
+/* Focus ring: single system now lives in zeus-parity.css's universal
+   `:focus-visible { box-shadow: var(--focus-ring) }` rule (themed per theme
+   root), loaded after this file so it always wins — don't add a competing
+   rule here. */
+
+/* Table hover */
+.table-row-hover { transition: background-color 0.15s ease; }
+.table-row-hover:hover { background-color: rgba(59, 130, 246, 0.05); }
+
+/* Form input — Apple quiet fields.
+   `.input` is an alias for `.input-field` — a whole generation of platform/*
+   pages was built assuming a `.input` class existed (probably copied from a
+   pattern that used it before a rename), but it was never defined: those ~80
+   files' <input>/<select>/<textarea> elements rendered as bare unstyled
+   native controls. Every rule below applies to both class names so `.input`
+   gets full parity (base look, every theme override, every breakpoint),
+   rather than a partial fix that only looks right in the default theme. */
+.input-field,
+.input {
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  background-color: var(--apple-fill-tertiary, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--apple-hairline, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  font-size: 0.9375rem;
+  letter-spacing: -0.01em;
+  color: var(--text-primary, #f5f5f7);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.input-field:focus-visible,
+.input:focus-visible {
+  outline: none;
+  border-color: var(--accent, #0071e3);
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.2);
+}
+.input-field:focus:not(:focus-visible),
+.input:focus:not(:focus-visible) {
+  outline: none;
+  border-color: var(--accent, #0071e3);
+}
+.input-field:disabled,
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Liquid Glass app shell ── */
+.dashboard-liquid-glass {
+  position: relative;
+  background: var(--page-bg, #000000);
+}
+
+.liquid-glass-app .input-field,
+.liquid-glass-app .input {
+  background: var(--apple-fill-tertiary);
+  border: 1px solid var(--apple-hairline);
+  border-radius: 12px;
+  color: var(--text-primary);
+  backdrop-filter: none;
+}
+.liquid-glass-app .input-field:focus,
+.liquid-glass-app .input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.18);
+}
+
+/* Remap common slate admin panels → Apple surfaces (every theme via .machina-clean) */
+.machina-clean .rounded-xl.border.bg-slate-800\/50,
+.machina-clean .rounded-xl.border.border-slate-700\/50,
+.machina-clean .rounded-xl.border.border-slate-700\/60,
+.machina-clean [class*="bg-slate-800/50"].rounded-xl,
+.machina-clean [class*="bg-slate-900/40"].rounded-xl,
+.machina-clean .bg-slate-800\/50,
+.machina-clean .bg-slate-800\/40,
+.machina-clean .bg-slate-900\/50,
+.machina-clean .bg-slate-900\/40,
+.liquid-glass-app .rounded-xl.border.bg-slate-800\/50,
+.liquid-glass-app .rounded-xl.border.border-slate-700\/50,
+.liquid-glass-app .rounded-xl.border.border-slate-700\/60,
+.liquid-glass-app [class*="bg-slate-800/50"].rounded-xl,
+.liquid-glass-app [class*="bg-slate-900/40"].rounded-xl,
+.liquid-glass-app .bg-slate-800\/50,
+.liquid-glass-app .bg-slate-800\/40,
+.liquid-glass-app .bg-slate-900\/50,
+.liquid-glass-app .bg-slate-900\/40 {
+  border-radius: var(--radius-liquid-lg) !important;
+  border-color: var(--apple-hairline) !important;
+  background: var(--apple-surface) !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none !important;
+}
+
+/* Solid slate shells (modals, sticky bars, cards) */
+.machina-clean .bg-slate-800,
+.machina-clean .bg-slate-800\/95,
+.machina-clean .bg-slate-800\/90,
+.machina-clean .bg-slate-800\/80,
+.machina-clean .bg-slate-800\/70,
+.machina-clean .bg-slate-800\/60,
+.machina-clean .bg-slate-950\/90,
+.machina-clean .bg-slate-950\/80,
+.liquid-glass-app .bg-slate-800,
+.liquid-glass-app .bg-slate-800\/95,
+.liquid-glass-app .bg-slate-800\/90,
+.liquid-glass-app .bg-slate-800\/80,
+.liquid-glass-app .bg-slate-800\/70,
+.liquid-glass-app .bg-slate-800\/60,
+.liquid-glass-app .bg-slate-950\/90,
+.liquid-glass-app .bg-slate-950\/80 {
+  background-color: var(--apple-surface) !important;
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+}
+
+.machina-clean .hover\:bg-slate-700:hover,
+.machina-clean .hover\:bg-slate-700\/60:hover,
+.machina-clean .hover\:bg-slate-700\/40:hover,
+.machina-clean .hover\:bg-slate-800:hover,
+.machina-clean .hover\:bg-slate-800\/50:hover,
+.machina-clean .hover\:bg-slate-800\/40:hover,
+.liquid-glass-app .hover\:bg-slate-700:hover,
+.liquid-glass-app .hover\:bg-slate-700\/60:hover,
+.liquid-glass-app .hover\:bg-slate-700\/40:hover,
+.liquid-glass-app .hover\:bg-slate-800:hover,
+.liquid-glass-app .hover\:bg-slate-800\/50:hover,
+.liquid-glass-app .hover\:bg-slate-800\/40:hover {
+  background-color: color-mix(in srgb, var(--accent) 10%, transparent) !important;
+}
+
+.machina-clean .border-slate-600,
+.machina-clean .border-slate-600\/60,
+.machina-clean .border-slate-600\/50,
+.machina-clean .border-slate-700,
+.machina-clean .border-slate-700\/50,
+.machina-clean .border-slate-700\/60,
+.machina-clean .border-slate-700\/80,
+.machina-clean .border-slate-800,
+.machina-clean .border-slate-800\/50,
+.liquid-glass-app .border-slate-600,
+.liquid-glass-app .border-slate-600\/60,
+.liquid-glass-app .border-slate-600\/50,
+.liquid-glass-app .border-slate-700,
+.liquid-glass-app .border-slate-700\/50,
+.liquid-glass-app .border-slate-700\/60,
+.liquid-glass-app .border-slate-700\/80,
+.liquid-glass-app .border-slate-800,
+.liquid-glass-app .border-slate-800\/50,
+.machina-clean .divide-slate-800 > :not([hidden]) ~ :not([hidden]),
+.liquid-glass-app .divide-slate-800 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--apple-hairline) !important;
+}
+
+.machina-clean .text-slate-200,
+.liquid-glass-app .text-slate-200 {
+  color: var(--text-primary);
+}
+
+.machina-clean .text-slate-400,
+.liquid-glass-app .text-slate-400 {
+  color: var(--text-muted);
+}
+
+.machina-clean .text-emerald-400,
+.machina-clean .text-green-400,
+.liquid-glass-app .text-emerald-400,
+.liquid-glass-app .text-green-400 {
+  color: var(--machina-status-ok) !important;
+}
+.machina-clean .text-amber-400,
+.machina-clean .text-yellow-400,
+.machina-clean .text-orange-400,
+.liquid-glass-app .text-amber-400,
+.liquid-glass-app .text-yellow-400,
+.liquid-glass-app .text-orange-400 {
+  color: var(--machina-status-warn) !important;
+}
+.machina-clean .text-red-400,
+.machina-clean .text-rose-400,
+.liquid-glass-app .text-red-400,
+.liquid-glass-app .text-rose-400 {
+  color: var(--machina-status-error) !important;
+}
+.machina-clean .text-purple-400,
+.liquid-glass-app .text-purple-400 {
+  color: var(--text-secondary) !important;
+}
+
+.machina-clean .card,
+.liquid-glass-app .card {
+  border-radius: var(--radius-liquid-lg) !important;
+  border: 1px solid var(--apple-hairline) !important;
+  background: var(--apple-surface) !important;
+  box-shadow: none !important;
+  backdrop-filter: none;
+  padding: clamp(1.25rem, 2.5vw, 2rem);
+}
+
+.machina-clean .card.overflow-hidden,
+.liquid-glass-app .card.overflow-hidden {
+  padding: 0 !important;
+}
+
+/* Open page rhythm */
+.machina-clean .tahoe-page-root,
+.liquid-glass-app .tahoe-page-root {
+  letter-spacing: -0.016em;
+}
+
+/* Quieter micro-labels (was all-caps dense admin chrome) */
+.machina-clean .uppercase.tracking-wide,
+.machina-clean .uppercase.tracking-wider,
+.liquid-glass-app .uppercase.tracking-wide,
+.liquid-glass-app .uppercase.tracking-wider {
+  text-transform: none !important;
+  letter-spacing: -0.01em !important;
+  font-weight: 400 !important;
+  color: var(--text-muted) !important;
+}
+
+.machina-clean .bg-emerald-500,
+.machina-clean .bg-green-500,
+.liquid-glass-app .bg-emerald-500,
+.liquid-glass-app .bg-green-500 {
+  background-color: var(--machina-status-ok) !important;
+}
+.machina-clean .bg-amber-500,
+.machina-clean .bg-yellow-500,
+.machina-clean .bg-orange-500,
+.liquid-glass-app .bg-amber-500,
+.liquid-glass-app .bg-yellow-500,
+.liquid-glass-app .bg-orange-500 {
+  background-color: var(--machina-status-warn) !important;
+}
+.machina-clean .bg-red-500,
+.machina-clean .bg-rose-500,
+.liquid-glass-app .bg-red-500,
+.liquid-glass-app .bg-rose-500 {
+  background-color: var(--machina-status-error) !important;
+}
+.machina-clean .bg-violet-500,
+.machina-clean .bg-purple-500,
+.liquid-glass-app .bg-violet-500,
+.liquid-glass-app .bg-purple-500 {
+  background-color: color-mix(in srgb, var(--accent) 55%, white) !important;
+}
+
+.machina-clean table thead,
+.liquid-glass-app table thead {
+  color: var(--text-muted);
+}
+.machina-clean .bg-slate-900\/80,
+.machina-clean .bg-slate-900,
+.liquid-glass-app .bg-slate-900\/80,
+.liquid-glass-app .bg-slate-900 {
+  background-color: color-mix(in srgb, var(--apple-surface) 92%, black) !important;
+}
+
+.liquid-glass-app table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.liquid-glass-app thead {
+  background: transparent;
+}
+.liquid-glass-app thead th {
+  border-bottom: 1px solid var(--apple-hairline);
+  color: var(--text-muted);
+  font-weight: 510;
+}
+.liquid-glass-app tbody tr {
+  border-bottom: 1px solid var(--apple-hairline);
+  transition: background 0.15s ease;
+}
+.liquid-glass-app tbody tr:hover {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.liquid-glass-toast {
+  border-radius: var(--radius-liquid);
+  backdrop-filter: blur(var(--blur-liquid)) saturate(1.2);
+  -webkit-backdrop-filter: blur(var(--blur-liquid)) saturate(1.2);
+  box-shadow: var(--glass-shadow);
+}
+
+.liquid-glass-modal-backdrop {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.liquid-glass-modal-panel {
+  border-radius: var(--radius-liquid-lg);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border-strong);
+  backdrop-filter: blur(var(--blur-liquid)) saturate(1.2);
+  -webkit-backdrop-filter: blur(var(--blur-liquid)) saturate(1.2);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65);
+}
+
+@keyframes aurora-drift {
+  0%, 100% { opacity: 0.55; transform: translate(0, 0) scale(1); }
+  33% { opacity: 0.9; transform: translate(2%, -1%) scale(1.03); }
+  66% { opacity: 0.7; transform: translate(-1%, 1%) scale(0.99); }
+}
+
+@keyframes aurora-shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.nav-aurora-link {
+  position: relative;
+  text-decoration: none;
+}
+.nav-aurora-link-active {
+  color: #f5f3ff !important;
+}
+.nav-aurora-link-active::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent, #0071e3);
+  box-shadow: none;
+}
+
+.nav-aurora-dropdown {
+  background: var(--glass-bg-elevated, rgba(22, 22, 23, 0.96));
+  border: 1px solid var(--apple-hairline, rgba(255, 255, 255, 0.1));
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+}
+
+.nav-aurora-select {
+  background: var(--glass-bg, rgba(22, 22, 23, 0.95));
+  border-color: var(--apple-hairline, rgba(255, 255, 255, 0.12));
+  box-shadow: none;
+}
+
+.nav-steel-link {
+  position: relative;
+  text-decoration: none;
+}
+.nav-steel-link-active {
+  color: #eef3f8 !important;
+}
+.nav-steel-link-active::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, #8ea0b5, #5d90f7);
+}
+
+.nav-steel-dropdown {
+  background: linear-gradient(145deg, #1a1f27 0%, #222a35 50%, #141920 100%);
+}
+
+/* v9s-style icon cluster nav (all themes) */
+.machina-nav-wrap {
+  gap: 4px;
+}
+
+.machina-nav-group {
+  position: relative;
+  border: 1px solid transparent;
+}
+
+.machina-nav-group-icon.machina-nav-group-active::after {
+  bottom: 5px;
+  width: 52%;
+}
+
+.machina-nav-group-active::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 6px;
+  width: 60%;
+  height: 2px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+/* Dark (default) */
+.machina-nav-group {
+  color: #94a3b8;
+}
+.machina-nav-group:hover {
+  color: #fff;
+}
+.machina-nav-group-active::after {
+  background: linear-gradient(90deg, #60a5fa, #3b82f6);
+}
+.machina-nav-dropdown {
+  background: var(--apple-surface, #1d1d1f);
+  border: 1px solid var(--apple-hairline, rgba(255, 255, 255, 0.08));
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.machina-nav-dd-link {
+  color: var(--text-secondary, #cbd5e1);
+  text-decoration: none;
+}
+.machina-nav-dd-link:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--text-primary, #fff);
+}
+.machina-nav-dd-active {
+  color: var(--accent, #0071e3);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.nav-steel-select {
+  background: linear-gradient(180deg, #141a22 0%, #0e141c 100%);
+  border-color: rgba(140, 160, 190, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Steel: kill hardcoded and calc() blur on platform shell components */
+/* These use blur(Xpx) or calc(var(--blur-liquid) + Xpx) — variable override alone isn't enough */
+
+/* ── VM detail: machine cockpit polish ─────────────────────────── */
+
+.vm-detail-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-liquid-lg);
+  border: 1px solid var(--apple-hairline, rgba(255, 255, 255, 0.08));
+  background: var(--apple-surface, #1d1d1f);
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.vm-detail-hero-glow {
+  display: none;
+}
+
+.vm-detail-hero-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 1rem;
+  box-shadow: none;
+  flex-shrink: 0;
+}
+
+.vm-detail-hero-icon--live::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 1.15rem;
+  border: 2px solid rgba(16, 185, 129, 0.45);
+  animation: vm-live-ring 2.4s ease-out infinite;
+}
+
+@keyframes vm-live-ring {
+  0% { transform: scale(0.92); opacity: 0.9; }
+  70% { transform: scale(1.08); opacity: 0; }
+  100% { transform: scale(1.08); opacity: 0; }
+}
+
+.vm-detail-live-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--machina-vm-running);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--machina-vm-running) 70%, transparent);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.vm-detail-hero-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgb(226, 232, 240);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+button.vm-detail-hero-pill:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
+}
+
+.vm-detail-hero-pill--ok {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.1);
+  color: rgb(167, 243, 208);
+}
+
+.vm-detail-hero-pill--warn {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.08);
+  color: rgb(253, 230, 138);
+}
+
+.vm-cinema-cta {
+  /* Flat Apple primary — no shimmer / sky glow */
+  box-shadow: none !important;
+  transform: none !important;
+}
+.vm-cinema-cta:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+.vm-cinema-cta::after {
+  display: none !important;
+}
+
+.vm-connect-hub {
+  position: relative;
+  border-radius: 0;
+  border: none;
+  border-top: 1px solid var(--apple-hairline, rgba(255, 255, 255, 0.08));
+  background: transparent;
+  box-shadow: none;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.vm-connect-hub::before {
+  display: none;
+}
+
+.vm-laptop-progress {
+  height: 3px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.vm-laptop-progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgb(56, 189, 248), rgb(52, 211, 153));
+  transition: width 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.vm-laptop-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+}
+
+.vm-laptop-step--done .vm-laptop-step-label {
+  color: rgb(226, 232, 240);
+}
+
+.vm-attention-banner {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-liquid-lg);
+  animation: fade-in 0.35s ease-out;
+}
+
+.vm-attention-banner::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 4px 0 0 4px;
+}
+
+.vm-attention-banner--pending::before { background: linear-gradient(180deg, #fbbf24, #f59e0b); }
+.vm-attention-banner--guest::before { background: linear-gradient(180deg, #fb923c, #f97316); }
+.vm-attention-banner--laptop::before { background: linear-gradient(180deg, #38bdf8, #0ea5e9); }
+
+.vm-attention-chip {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.vm-attention-chip:hover {
+  transform: translateY(-1px);
+}
+
+.vm-attention-chip--active {
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.45);
+}
+
+.vm-copy-flash {
+  animation: vm-copy-flash 0.6s ease-out;
+}
+
+@keyframes vm-copy-flash {
+  0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.5); }
+  100% { box-shadow: 0 0 0 8px rgba(52, 211, 153, 0); }
+}
+
+.vm-detail-action-menu {
+  animation: fade-in 0.2s ease-out;
+  backdrop-filter: blur(16px) saturate(1.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vm-detail-hero-glow,
+  .vm-detail-hero-icon--live::after,
+  .vm-detail-live-dot,
+  .vm-cinema-cta::after {
+    animation: none;
+  }
+  .vm-cinema-cta:hover,
+  button.vm-detail-hero-pill:hover,
+  .vm-attention-chip:hover {
+    transform: none;
+  }
+}
+
+/* ── Mobile Responsive ─────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  /* Stack stat cards vertically */
+  .grid-cols-2,
+  .grid-cols-3,
+  .grid-cols-4,
+  .sm\:grid-cols-2,
+  .md\:grid-cols-3,
+  .md\:grid-cols-4,
+  .lg\:grid-cols-4 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Reduce padding */
+  .px-6 { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .py-6 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+  .p-6 { padding: 0.75rem; }
+  .p-4 { padding: 0.5rem; }
+  .gap-6 { gap: 0.75rem; }
+
+  /* Reduce font sizes */
+  h1, .text-2xl { font-size: 1.25rem !important; }
+  h2, .text-xl { font-size: 1.1rem !important; }
+  .text-lg { font-size: 0.95rem !important; }
+
+  /* Tables: hide non-essential columns */
+  table th:nth-child(n+4),
+  table td:nth-child(n+4) {
+    display: none;
+  }
+
+  .overflow-x-auto table th:nth-child(n+4):not(.hidden),
+  .overflow-x-auto table td:nth-child(n+4):not(.hidden) {
+    display: table-cell;
+  }
+
+  /* Make table cells compact */
+  table th, table td {
+    padding: 0.5rem 0.5rem;
+    font-size: 0.8rem;
+  }
+
+  /* Full-width dialogs */
+  [role="dialog"],
+  .fixed .bg-slate-800,
+  .fixed .bg-slate-900 {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    margin-left: auto;
+    margin-right: auto;
+    left: 2.5vw !important;
+    right: 2.5vw !important;
+  }
+
+  /* Stack form inputs vertically */
+  .flex.items-center.gap-2 {
+    flex-wrap: wrap;
+  }
+  .flex.items-center.gap-2 > .input-field,
+  .flex.items-center.gap-2 > select,
+  .flex.items-center.gap-2 > input {
+    min-width: 100%;
+  }
+
+  /* Sidebar adjustments */
+  .w-64 { width: 100% !important; }
+
+  /* Tabs scrollable */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .overflow-x-auto::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Even smaller screens */
+  h1, .text-2xl { font-size: 1.1rem !important; }
+  .text-sm { font-size: 0.75rem !important; }
+  .text-xs { font-size: 0.65rem !important; }
+
+  /* Hide even more table columns on very small screens */
+  table th:nth-child(n+3),
+  table td:nth-child(n+3) {
+    display: none;
+  }
+
+  /* Tables that scroll horizontally keep every column (State, Actions, ...). */
+  .overflow-x-auto table th:nth-child(n+3):not(.hidden),
+  .overflow-x-auto table td:nth-child(n+3):not(.hidden) {
+    display: table-cell;
+  }
+
+  .input-field,
+  .input {
+    font-size: 0.8rem;
+    padding: 0.375rem 0.5rem;
+  }
+}
+
+/* ── apple.com blue final reassert (must stay last in this file) ─────────── */
+:root {
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'SF Pro', Inter, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'SFMono-Regular', Menlo, Consolas, 'JetBrains Mono', monospace;
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --accent-soft: color-mix(in srgb, #0071e3 14%, transparent);
+  --plasma: #0071e3;
+  --link: #2997ff;
+  --link-hover: #55aeff;
+}
+html[data-theme='tahoe-light'] {
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --accent-soft: color-mix(in srgb, #0071e3 12%, transparent);
+  --plasma: #0071e3;
+  --link: #0066cc;
+  --link-hover: #0071e3;
+}
+
+/* Shared macOS Terminal.app look (pure black, colorful monospace) for any
+   config editor / log / JSON / YAML surface — independent of the light/dark
+   app theme. Originated in Cloud-Init Studio, generalized for reuse via
+   components/TerminalFrame.tsx + utils/terminalHighlight.tsx. */
+.term-titlebar {
+  background: linear-gradient(180deg, #3a3a3c, #2c2c2e);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.term-body {
+  background: #000;
+  color: #e8fce8;
+  caret-color: #30d158;
+  border: none;
+  outline: none;
+  padding: 1rem;
+  line-height: 1.6;
+  resize: vertical;
+  margin: 0;
+}
+.term-body::selection {
+  background: rgba(48, 209, 88, 0.35);
+}
+/* Editable terminal (Cloud-Init Studio): a native <textarea> can only ever
+   render one flat text color, so "colorful text" in an editable surface
+   needs the classic highlighted-overlay trick — a syntax-highlighted <pre>
+   sits behind a transparent-text <textarea> that only supplies the caret
+   and input handling. Both layers share .term-body's box model; only this
+   compound selector's background/color/resize differ per layer. */
+.term-editor {
+  position: relative;
+}
+.term-editor-highlight {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  pointer-events: none;
+}
+.term-body.term-editor-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  color: transparent;
+  resize: none;
+}
+.term-body.term-editor-input::selection {
+  background: rgba(48, 209, 88, 0.35);
+  color: transparent;
+}
+/* Token colors for the regex-based highlighter — deliberately simple, no
+   syntax-highlighting library. */
+.term-tok-key { color: #6edcff; }
+.term-tok-string { color: #7ee787; }
+.term-tok-text { color: #c9d1d9; }
+.term-tok-number { color: #ffb454; }
+.term-tok-literal { color: #d2a8ff; }
+.term-tok-punct { color: #8b949e; }
+.term-tok-comment { color: #8b949e; font-style: italic; }
+.term-tok-list-marker { color: #d2a8ff; }
+.term-tok-error { color: #ff7b72; }
+.term-tok-warn { color: #ffb454; }
+.term-tok-default { color: #7ee787; }
+
+/* macOS-style hover tooltip (components/Tooltip.tsx) — small dark rounded
+   bubble, no arrow (matches native NSToolTip), fades/nudges in. */
+.mac-tooltip-anchor {
+  position: relative;
+  display: inline-flex;
+}
+.mac-tooltip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: rgba(29, 29, 31, 0.96);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1;
+  padding: 0.375rem 0.5625rem;
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+  z-index: 200;
+  animation: mac-tooltip-in 0.12s var(--ease-standard);
+}
+.mac-tooltip-top { bottom: calc(100% + 6px); }
+.mac-tooltip-bottom { top: calc(100% + 6px); }
+@keyframes mac-tooltip-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(2px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}

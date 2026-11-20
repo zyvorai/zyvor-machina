@@ -1,0 +1,56 @@
+# Machina host daemon: REST/WebSocket API, web UI, PAM auth, libvirt access. Built by scripts/release/build-release.sh.
+name: machina
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+section: admin
+priority: optional
+maintainer: Zyvor AI Labs <noreply@zyvor.dev>
+description: |
+  Machina private-cloud host daemon and web UI.
+  Manages KVM/libvirt machines on this host: console proxy, backups, PAM and OIDC sign-in.
+  Install machina-controller for the multi-host control plane and machina-agent on each compute node.
+vendor: Zyvor AI Labs
+homepage: https://zyvor.dev
+license: LicenseRef-Zyvor-Production-1.0
+contents:
+  - src: ${STAGE}/bin/machina-daemon
+    dst: /usr/bin/machina-daemon
+    file_info: { mode: 0755 }
+  - src: ${STAGE}/bin/machinactl
+    dst: /usr/bin/machinactl
+    file_info: { mode: 0755 }
+  - src: ${STAGE}/bin/machina-preflight
+    dst: /usr/bin/machina-preflight
+    file_info: { mode: 0755 }
+  - src: ${STAGE}/web/
+    dst: /usr/share/machina/web/
+    type: tree
+  - src: ${STAGE}/units/machina-daemon.service
+    dst: /usr/lib/systemd/system/machina-daemon.service
+  - src: ${STAGE}/units/machina-backup.service
+    dst: /usr/lib/systemd/system/machina-backup.service
+  - src: ${STAGE}/units/machina-backup.timer
+    dst: /usr/lib/systemd/system/machina-backup.timer
+  - src: ${STAGE}/etc/machina.toml
+    dst: /etc/machina/config.toml
+    type: config|noreplace
+    file_info: { mode: 0644 }
+  - src: ${STAGE}/etc/machina-daemon.default
+    dst: /etc/default/machina-daemon
+    type: config|noreplace
+    file_info: { mode: 0600 }
+  - src: ${STAGE}/doc/LICENSE
+    dst: /usr/share/doc/machina/LICENSE
+  - src: ${STAGE}/doc/INSTALL.md
+    dst: /usr/share/doc/machina/INSTALL.md
+scripts:
+  postinstall: ${STAGE}/scripts/machina.postinst
+  preremove: ${STAGE}/scripts/machina.prerm
+overrides:
+  deb:
+    depends: [libvirt0, libvirt-daemon-system, qemu-system-x86, qemu-utils, libpam0g, libssl3, adduser]
+    recommends: [machina-controller, machina-agent]
+  rpm:
+    depends: [libvirt-libs, libvirt-daemon-kvm, qemu-img, pam, openssl-libs]
+    recommends: [machina-controller, machina-agent]

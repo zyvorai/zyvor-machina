@@ -1,0 +1,115 @@
+# machina daemon configuration — canonical path: /etc/machina/config.toml
+#
+# MachinaConfig::load() tries /etc/machina/config.toml then ~/.machina/config.toml.
+# systemd: ExecStart passes --config /etc/machina/config.toml so the daemon always uses /etc.
+# CLI (--host / --port / ...) overrides settings from the loaded file.
+
+[general]
+refresh_interval_secs = 5
+
+# Periodic hardware inventory JSON Lines under /var/lib/machina/hardware-inventory.jsonl (VMware-style audit trail).
+[inventory_history]
+enabled = true
+interval_secs = 3600
+max_file_mb = 64
+
+# Metrics ring buffer (GET /api/v1/metrics/history); persisted to JSON Lines when persist = true.
+[metrics_history]
+enabled = true
+interval_secs = 30
+max_points = 120
+persist = true
+max_file_mb = 32
+
+[audit]
+max_file_mb = 64
+rotate_keep = 5
+# syslog_enabled = true
+# http_webhook_url = "https://your-log-ingest.example/events"
+# webhook_authorization = "Bearer …"
+
+# OTLP/HTTP export (Grafana Alloy, OpenTelemetry Collector, etc.)
+# [observability.otlp]
+# enabled = true
+# endpoint = "http://127.0.0.1:4318"
+# interval_secs = 60
+# export_metrics = true
+# export_logs = true
+
+[observability.linux_audit]
+enabled = true
+max_events = 200
+# health_avc_threshold = 5
+
+# Append-only JSON Lines of GET /k8s/cluster-inventory under /var/lib/machina/k8s-cluster-inventory.jsonl (audit / drift).
+# [k8s_inventory_history]
+# enabled = false
+# max_file_mb = 32
+
+[daemon]
+host = "0.0.0.0"
+# Omit `port` to use default 5092 (see DEFAULT_DAEMON_PORT in core)
+port = 5092
+
+[libvirt]
+uri = "qemu:///system"
+# Install GuestKit agent (QGA on org.qemu.guest_agent.0) on every new VM: cloud-init seed, offline inject, virtio channel.
+# guest_agent_by_default = true
+# guestkit_agent_binary = "/usr/local/bin/guestkit"
+# extra_uris = ["qemu+ssh://other-host/system"]
+# VM create API default: "virt_install" or "libvirt_xml" (native). Clients can override per request with `create_backend`.
+create_backend = "virt_install"
+# Optional: mkosi image builds (`mkosi_workspace` API field). install.sh can install mkosi when absent.
+# mkosi_allowed = true
+# Legacy virt-builder API (`virt_builder_*`): off by default — set virt_builder_allowed = true only if needed (guestfs-tools).
+# virt_builder_allowed = false
+# virt_builder_default_ssh_pubkey_path = "/var/lib/machina/provision.pub"
+# virt_builder_update = true
+# virt_builder_default_packages = ["qemu-guest-agent"]
+# Async POST /jobs/virt-image-build: max concurrent builds and optional wall-clock timeout (0 = unlimited).
+# virt_image_build_max_concurrent = 2
+# virt_image_build_timeout_secs = 0
+# Minimum free disk (bytes) before starting virt-builder: output parent FS and TMPDIR (libguestfs scratch).
+# virt_image_build_min_free_parent_bytes = 536870912
+# virt_image_build_min_free_tmp_bytes = 268435456
+# Faster repeat virt-builder runs: set LIBGUESTFS_CACHEDIR to a persistent directory on the hypervisor (see libguestfs docs).
+
+[backup]
+backup_dir = "/var/lib/machina/backups"
+# nfs_target = "192.168.1.100:/backups/machina"
+with_disks = false
+retain = 7
+
+# Web UI / session login: PAM service in /etc/pam.d/ (sshd = same rules as SSH password; "login" is TTY-oriented and often blocks root over the web).
+[auth]
+pam_service = "sshd"
+# Browser sessions: 0 = unlimited concurrent logins per username (default). Set e.g. 10 to evict oldest same-user session.
+max_sessions_per_user = 0
+max_sessions_global = 1000
+# Optional browser SSO with OpenID Connect. PAM login remains available unless you hide it in your reverse proxy / UI policy.
+# [auth.oidc]
+# enabled = true
+# issuer_url = "https://sso.example.com/realms/machina"
+# client_id = "machina-web"
+# client_secret = "replace-me"
+# redirect_url = "https://machina.example.com/api/v1/auth/oidc/callback"
+# scopes = ["openid", "profile", "email"]
+# username_claim = "preferred_username"
+# groups_claim = "groups"
+# linux_username_claim = "preferred_username"
+# admin_groups = ["machina-admins"]
+# operator_groups = ["machina-operators"]
+# default_role = "readonly"
+# button_label = "Sign in with SSO"
+# require_local_user_for_session_libvirt = true
+
+# Future: execute libvirt/host helpers as the OIDC-mapped local user (not implemented — see docs/oidc-run-as-user.md).
+# [auth.run_as_user]
+# enabled = false
+# mode = "disabled"   # disabled | sudo | polkit | setuid_helper
+
+# HTTPS is enabled by default (self-signed cert created by install.sh if missing).
+[tls]
+enabled = true
+cert_path = "/etc/machina/ssl/cert.pem"
+key_path = "/etc/machina/ssl/key.pem"

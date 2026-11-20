@@ -1,0 +1,18 @@
+# Generated/local artifacts from running the pipeline (see README.md) — never commit.
+node_modules
+raw/
+png/
+png-guestkit/
+png-hw/
+png-sprites/
+png-egress-cli/
+png-firecracker/
+seg/
+seg-gk/
+seg-hw/
+seg-sprites/
+seg-egress-cli/
+seg-firecracker-batch/
+out/
+*.webm
+*.mp4

@@ -1,0 +1,1169 @@
+// Copyright 2026 Zyvor AI Labs · https://zyvor.dev
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+
+syntax = "proto3";
+package machina.agent.v1;
+
+service HostAgent {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc ListVms(ListVmsRequest) returns (ListVmsResponse);
+  rpc ListSprites(ListSpritesRequest) returns (ListSpritesResponse);
+  rpc ListNetworks(ListNetworksRequest) returns (ListNetworksResponse);
+  rpc ListStoragePools(ListStoragePoolsRequest) returns (ListStoragePoolsResponse);
+  rpc ApplyVm(ApplyVmRequest) returns (ApplyVmResponse);
+  rpc VmPower(VmPowerRequest) returns (VmPowerResponse);
+  rpc GetDomainXml(GetDomainXmlRequest) returns (GetDomainXmlResponse);
+  rpc DeleteVm(DeleteVmRequest) returns (DeleteVmResponse);
+  rpc MigrateVm(MigrateVmRequest) returns (MigrateVmResponse);
+  rpc GetMigrationStatus(GetMigrationStatusRequest) returns (GetMigrationStatusResponse);
+  rpc ControlMigration(ControlMigrationRequest) returns (ControlMigrationResponse);
+  rpc Maintenance(MaintenanceRequest) returns (MaintenanceResponse);
+  rpc GetConsole(GetConsoleRequest) returns (GetConsoleResponse);
+  rpc GetConsoleAccessPlan(GetConsoleAccessPlanRequest) returns (GetConsoleAccessPlanResponse);
+  rpc CloneVm(CloneVmRequest) returns (CloneVmResponse);
+  rpc GetHostInfo(GetHostInfoRequest) returns (GetHostInfoResponse);
+  rpc PrecheckMigrate(PrecheckMigrateRequest) returns (PrecheckMigrateResponse);
+  rpc FenceHost(FenceHostRequest) returns (FenceHostResponse);
+  rpc CreateSnapshot(CreateSnapshotRequest) returns (CreateSnapshotResponse);
+  rpc DeleteSnapshot(DeleteSnapshotRequest) returns (DeleteSnapshotResponse);
+  rpc ListSnapshots(ListSnapshotsRequest) returns (ListSnapshotsResponse);
+  rpc BackupVm(BackupVmRequest) returns (BackupVmResponse);
+  rpc RevertSnapshot(RevertSnapshotRequest) returns (RevertSnapshotResponse);
+  rpc RestoreVmBackup(RestoreVmBackupRequest) returns (RestoreVmBackupResponse);
+  rpc DeleteBackup(DeleteBackupRequest) returns (DeleteBackupResponse);
+  rpc VerifyBackup(VerifyBackupRequest) returns (VerifyBackupResponse);
+  rpc CloneFromSnapshot(CloneFromSnapshotRequest) returns (CloneFromSnapshotResponse);
+  rpc ProvisionStoragePool(ProvisionStoragePoolRequest) returns (ProvisionStoragePoolResponse);
+  rpc ProvisionNetwork(ProvisionNetworkRequest) returns (ProvisionNetworkResponse);
+  rpc AttachDisk(AttachDiskRequest) returns (AttachDiskResponse);
+  rpc DetachDisk(DetachDiskRequest) returns (DetachDiskResponse);
+  rpc ResizeDisk(ResizeDiskRequest) returns (ResizeDiskResponse);
+  rpc AttachNic(AttachNicRequest) returns (AttachNicResponse);
+  rpc DetachNic(DetachNicRequest) returns (DetachNicResponse);
+  rpc SetAutostart(SetAutostartRequest) returns (SetAutostartResponse);
+  rpc SetVcpus(SetVcpusRequest) returns (SetVcpusResponse);
+  rpc SetMemory(SetMemoryRequest) returns (SetMemoryResponse);
+  rpc GetVmDetails(GetVmDetailsRequest) returns (GetVmDetailsResponse);
+  rpc VmLibvirtQuery(VmLibvirtQueryRequest) returns (VmLibvirtQueryResponse);
+  rpc VmLibvirtInvoke(VmLibvirtInvokeRequest) returns (VmLibvirtInvokeResponse);
+  rpc HostLibvirtQuery(HostLibvirtQueryRequest) returns (HostLibvirtQueryResponse);
+  rpc HostLibvirtInvoke(HostLibvirtInvokeRequest) returns (HostLibvirtInvokeResponse);
+  rpc GetGuestHealth(GetGuestHealthRequest) returns (GetGuestHealthResponse);
+  rpc GetGuestObservability(GetGuestObservabilityRequest) returns (GetGuestObservabilityResponse);
+  rpc GuestAgentAction(GuestAgentActionRequest) returns (GuestAgentActionResponse);
+  rpc InstallGuestTools(InstallGuestToolsRequest) returns (InstallGuestToolsResponse);
+  rpc GetFirewallInventory(GetFirewallInventoryRequest) returns (GetFirewallInventoryResponse);
+  rpc ApplyFirewallPlan(ApplyFirewallPlanRequest) returns (ApplyFirewallPlanResponse);
+  rpc GetFirewallActivity(GetFirewallActivityRequest) returns (GetFirewallActivityResponse);
+  rpc GetGuestFirewallPorts(GetGuestFirewallPortsRequest) returns (GetGuestFirewallPortsResponse);
+  rpc GetLinuxObservability(GetLinuxObservabilityRequest) returns (GetLinuxObservabilityResponse);
+  rpc GetSystemdNetworkDiagnostics(GetSystemdNetworkDiagnosticsRequest) returns (GetSystemdNetworkDiagnosticsResponse);
+  rpc GetLinuxAudit(GetLinuxAuditRequest) returns (GetLinuxAuditResponse);
+  rpc GetLinuxPackageUpdates(GetLinuxPackageUpdatesRequest) returns (GetLinuxPackageUpdatesResponse);
+  rpc ApplyLinuxPackageUpgrade(ApplyLinuxPackageUpgradeRequest) returns (ApplyLinuxPackageUpgradeResponse);
+  rpc HostLinuxReboot(HostLinuxRebootRequest) returns (HostLinuxRebootResponse);
+  rpc GetLinuxFilesystems(GetLinuxFilesystemsRequest) returns (GetLinuxFilesystemsResponse);
+  rpc GetLinuxTopProcesses(GetLinuxTopProcessesRequest) returns (GetLinuxTopProcessesResponse);
+  // Native eBPF (machina-bpfd on the host). Requests/responses are the
+  // machina_bpf::api JSON wire types.
+  rpc BpfCall(BpfCallRequest) returns (BpfCallResponse);
+  rpc BpfSubscribe(BpfSubscribeRequest) returns (stream BpfEvent);
+  rpc BpfSyncPolicies(BpfSyncPoliciesRequest) returns (BpfSyncPoliciesResponse);
+  rpc ListPortForwards(ListPortForwardsRequest) returns (ListPortForwardsResponse);
+  rpc CreatePortForward(CreatePortForwardRequest) returns (CreatePortForwardResponse);
+  rpc DeletePortForward(DeletePortForwardRequest) returns (DeletePortForwardResponse);
+  rpc ListHostGpus(ListHostGpusRequest) returns (ListHostGpusResponse);
+  rpc SetLoadBalancer(SetLoadBalancerRequest) returns (SetLoadBalancerResponse);
+  rpc K3sNode(K3sNodeRequest) returns (K3sNodeResponse);
+  rpc ReplicateBackup(ReplicateBackupRequest) returns (ReplicateBackupResponse);
+  rpc DeleteLoadBalancer(DeleteLoadBalancerRequest) returns (DeleteLoadBalancerResponse);
+  // Restore points and forks on qcow2 backing chains (machina_core::libvirt::fork).
+  rpc ForkVm(ForkVmRequest) returns (ForkVmResponse);
+  rpc RestorePointCreate(RestorePointCreateRequest) returns (RestorePointCreateResponse);
+  rpc RestorePointRewind(RestorePointRewindRequest) returns (RestorePointRewindResponse);
+  rpc RestorePointMerge(RestorePointMergeRequest) returns (RestorePointMergeResponse);
+  rpc RestorePointDiscard(RestorePointDiscardRequest) returns (RestorePointDiscardResponse);
+  rpc DetachFork(DetachForkRequest) returns (DetachForkResponse);
+  // FluxVM live migration (QEMU on a shared disk). Target side: prepare + adopt;
+  // source side: export, start, status, finish. Ids are FluxVM VM ids.
+  rpc ExportFluxvmRecord(ExportFluxvmRecordRequest) returns (ExportFluxvmRecordResponse);
+  rpc PrepareFluxvmReceiver(PrepareFluxvmReceiverRequest) returns (PrepareFluxvmReceiverResponse);
+  rpc StartFluxvmMigration(StartFluxvmMigrationRequest) returns (StartFluxvmMigrationResponse);
+  rpc GetFluxvmMigrationStatus(GetFluxvmMigrationStatusRequest) returns (GetFluxvmMigrationStatusResponse);
+  rpc FinishFluxvmMigration(FinishFluxvmMigrationRequest) returns (FinishFluxvmMigrationResponse);
+  rpc AdoptFluxvmVm(AdoptFluxvmVmRequest) returns (AdoptFluxvmVmResponse);
+  rpc AbortFluxvmMigration(AbortFluxvmMigrationRequest) returns (AbortFluxvmMigrationResponse);
+}
+
+message RegisterRequest {
+  string hostname = 1;
+  string address = 2;
+  string agent_version = 3;
+  string libvirt_uri = 4;
+  string join_token = 5;
+}
+
+message RegisterResponse {
+  string host_id = 1;
+  bool accepted = 2;
+}
+
+message HeartbeatRequest {
+  string host_id = 1;
+}
+
+message HeartbeatResponse {
+  string state = 1;
+  uint32 vm_count = 2;
+  float cpu_percent = 3;
+  uint64 memory_used_mib = 4;
+  uint64 memory_total_mib = 5;
+  string agent_version = 6;
+}
+
+message VmSummary {
+  string name = 1;
+  string uuid = 2;
+  string state = 3;
+  uint32 vcpus = 4;
+  uint64 memory_mb = 5;
+  float cpu_percent = 6;
+  uint64 memory_used_mib = 7;
+  uint64 disk_read_iops = 8;
+  uint64 disk_write_iops = 9;
+  string guest_ip = 10;
+  // Every guest address seen (all NICs, IPv4 then IPv6).
+  repeated string guest_ips = 11;
+  // Cumulative rx+tx bytes across every guest NIC since the domain started.
+  uint64 net_bytes = 12;
+  // "" = libvirt, "fluxvm" = managed by this host's fluxvm-api.
+  string backend = 13;
+  // FluxVM engine (qemu, cloud-hypervisor, firecracker, flux-vm); `uuid` is the FluxVM id.
+  string fluxvm_engine = 14;
+  // FluxVM storage mode ("" = FluxVM-managed, "shared", ...) and the disk path.
+  string fluxvm_storage = 15;
+  string disk = 16;
+  // Full FluxVM VM record (JSON), kept by the controller so HA can re-create
+  // the VM elsewhere after this host is gone.
+  string fluxvm_record_json = 17;
+}
+
+message ListVmsRequest {}
+
+message ListVmsResponse {
+  repeated VmSummary vms = 1;
+  // True when this host's fluxvm-api answered; FluxVM rows are pruned only then.
+  bool fluxvm_ok = 2;
+}
+
+// Read-only sprite inventory, proxied from this host's co-located
+// machina-daemon (sprites live only in the daemon's in-memory registry —
+// see sprite_registry.rs — never in this agent or the controller's `vms`
+// table/reconciler).
+message SpriteSummary {
+  string sprite_id = 1;
+  string state = 2;
+  string backend = 3;
+  string created_at = 4;
+  string expires_at = 5;
+  uint32 vsock_cid = 6; // 0 = none
+  bool network_egress = 7;
+}
+
+message ListSpritesRequest {}
+
+message ListSpritesResponse {
+  repeated SpriteSummary sprites = 1;
+  // False when the local daemon couldn't be reached/authenticated — callers
+  // must not treat an empty `sprites` list as "no sprites running" in that case.
+  bool daemon_reachable = 2;
+  string error = 3;
+}
+
+message NetworkSummary {
+  string name = 1;
+  string uuid = 2;
+  bool active = 3;
+  bool persistent = 4;
+  bool autostart = 5;
+  string bridge = 6;
+}
+
+message ListNetworksRequest {}
+
+message ListNetworksResponse {
+  repeated NetworkSummary networks = 1;
+}
+
+message StoragePoolSummary {
+  string name = 1;
+  string uuid = 2;
+  string state = 3;
+  double capacity_gib = 4;
+  double used_gib = 5;
+  double available_gib = 6;
+  bool autostart = 7;
+  string path = 8;
+  string backend = 9;
+}
+
+message ListStoragePoolsRequest {}
+
+message ListStoragePoolsResponse {
+  repeated StoragePoolSummary pools = 1;
+}
+
+message ApplyVmRequest {
+  string spec_json = 1;
+  string disk_path = 2;
+  string template_source = 3;
+  string cloud_init_user = 4;
+  string cloud_init_password = 5;
+  string cloud_init_ssh_pubkey = 6;
+  // "fluxvm": create `fluxvm_create_json` (a fluxvm-api create body) instead of `spec_json`.
+  string backend = 7;
+  string fluxvm_create_json = 8;
+  // FluxVM shared disk: break a stale lock held by a dead host (HA re-create).
+  bool shared_takeover = 9;
+}
+
+message ApplyVmResponse {
+  string vm_name = 1;
+  string uuid = 2;
+  bool created = 3;
+}
+
+message VmPowerRequest {
+  string vm_name = 1;
+  string action = 2;
+  /// Optional: "agent" for guest-agent shutdown/reboot (virsh --mode=agent).
+  string mode = 3;
+  /// "fluxvm" routes to fluxvm-api; "" = libvirt.
+  string backend = 4;
+}
+
+message VmPowerResponse {
+  string vm_name = 1;
+  string state = 2;
+}
+
+message GetDomainXmlRequest {
+  string vm_name = 1;
+}
+
+message GetDomainXmlResponse {
+  string xml = 1;
+}
+
+message DeleteVmRequest {
+  string vm_name = 1;
+  /// "fluxvm" routes to fluxvm-api; "" = libvirt.
+  string backend = 2;
+  /// Also remove the VM's file-backed data disks (libvirt only).
+  bool delete_disks = 3;
+}
+
+message DeleteVmResponse {
+  bool deleted = 1;
+}
+
+message MigrateVmRequest {
+  string vm_name = 1;
+  string dest_uri = 2;
+  bool live = 3;
+  /// Max migration bandwidth (MiB/s); 0 = libvirt default.
+  uint64 bandwidth_mib = 4;
+  bool postcopy = 5;
+  /// Remove source domain after successful migration (Cockpit permanent migrate).
+  bool undefine_source = 6;
+  /// Use tunnelled migration instead of peer-to-peer.
+  bool tunnelled = 7;
+  /// Disk target paths to migrate with non-shared storage (libvirt migrate_disks).
+  repeated string migrate_disks = 8;
+  /// Destination storage URI for disk migration (e.g. qemu+ssh://dest/system).
+  string disks_uri = 9;
+  /// Copy disk storage during migration (VIR_MIGRATE_NON_SHARED_DISK).
+  bool copy_storage = 10;
+}
+
+message MigrateVmResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+// Status and control of a migration that is already running on the source host (virsh domjobinfo / migrate-set* / domjobabort).
+message GetMigrationStatusRequest {
+  string vm_name = 1;
+}
+
+message GetMigrationStatusResponse {
+  bool active = 1;
+  string job_type = 2;
+  uint64 time_elapsed_ms = 3;
+  uint64 data_total_bytes = 4;
+  uint64 data_processed_bytes = 5;
+  uint64 data_remaining_bytes = 6;
+  uint64 memory_total_bytes = 7;
+  uint64 memory_processed_bytes = 8;
+  uint64 memory_remaining_bytes = 9;
+  uint64 memory_bps = 10;
+  uint64 memory_dirty_rate_pages_s = 11;
+  uint64 downtime_ms = 12;
+  uint64 setup_time_ms = 13;
+}
+
+// action: set_speed (MiB/s), set_downtime (ms), postcopy, abort, throttle_vcpu (percent, 70..=100), restore_vcpu.
+message ControlMigrationRequest {
+  string vm_name = 1;
+  string action = 2;
+  uint64 value = 3;
+  bool postcopy = 4;
+}
+
+message ControlMigrationResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message MaintenanceRequest {
+  string action = 1;
+  bool evacuate = 2;
+}
+
+message MaintenanceResponse {
+  string state = 1;
+  uint32 evacuated = 2;
+}
+
+message GetConsoleRequest {
+  string vm_name = 1;
+}
+
+message GetConsoleResponse {
+  string console_type = 1;
+  string host = 2;
+  int32 port = 3;
+  int32 websocket_port = 4;
+}
+
+message GetConsoleAccessPlanRequest {
+  string vm_name = 1;
+}
+
+message GetConsoleAccessPlanResponse {
+  string vm_name = 1;
+  string recommended = 2;
+  string console_type = 3;
+  string vnc_host = 4;
+  int32 vnc_port = 5;
+  string guest_ip = 6;
+  string ssh_user = 7;
+  int32 rdp_port = 8;
+  string os_hint = 9;
+  // 10, 11 were guacamole_available / guacamole_protocols. Reserved so a newer
+  // controller talking to an older agent cannot misread the retired fields.
+  reserved 10, 11;
+  /// ssh_key | password | both | unknown — from cloud-init user-data when present.
+  string guest_auth_mode = 12;
+  /// True when the VM has a SPICE graphics device (even if VNC is also present).
+  bool has_spice = 13;
+}
+
+message CloneVmRequest {
+  string source_name = 1;
+  string new_name = 2;
+  string spec_json = 3;
+  /// linked (default), full, or xml (legacy shared disk)
+  string clone_mode = 4;
+}
+
+message CloneVmResponse {
+  string vm_name = 1;
+  string uuid = 2;
+}
+
+message GetHostInfoRequest {}
+
+message GetHostInfoResponse {
+  string cpu_model = 1;
+  string libvirt_version = 2;
+  string qemu_version = 3;
+}
+
+message PrecheckMigrateRequest {
+  string vm_name = 1;
+  string dest_cpu_model = 2;
+  string dest_libvirt_version = 3;
+}
+
+message MigrateCheckItem {
+  string name = 1;
+  bool passed = 2;
+  string message = 3;
+}
+
+message PrecheckMigrateResponse {
+  bool ok = 1;
+  repeated MigrateCheckItem checks = 2;
+}
+
+message FenceHostRequest {
+  string action = 1;
+  string method = 2;
+  string ipmi_address = 3;
+  string ipmi_username = 4;
+  string ipmi_password = 5;
+  string shell_command = 6;
+  string hostname = 7;
+}
+
+message FenceHostResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message CreateSnapshotRequest {
+  string vm_name = 1;
+  string snapshot_name = 2;
+  string description = 3;
+  bool disk_only = 4;
+  bool quiesce = 5;
+  string storage_mode = 6;
+}
+
+message CreateSnapshotResponse {
+  bool ok = 1;
+  string snapshot_name = 2;
+  string message = 3;
+  string disk_path = 4;
+}
+
+message DeleteSnapshotRequest {
+  string vm_name = 1;
+  string snapshot_name = 2;
+}
+
+message DeleteSnapshotResponse {
+  bool deleted = 1;
+}
+
+message SnapshotInfo {
+  string name = 1;
+  string state = 2;
+  int64 creation_time = 3;
+  bool is_current = 4;
+}
+
+message ListSnapshotsRequest {
+  string vm_name = 1;
+}
+
+message ListSnapshotsResponse {
+  repeated SnapshotInfo snapshots = 1;
+}
+
+message BackupVmRequest {
+  string vm_name = 1;
+  string dest_path = 2;
+}
+
+message BackupVmResponse {
+  bool ok = 1;
+  string path = 2;
+  string message = 3;
+}
+
+message RevertSnapshotRequest {
+  string vm_name = 1;
+  string snapshot_name = 2;
+}
+
+message RevertSnapshotResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message RestoreVmBackupRequest {
+  string vm_name = 1;
+  string backup_path = 2;
+}
+
+message RestoreVmBackupResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message DeleteBackupRequest {
+  string backup_path = 1;
+}
+
+message DeleteBackupResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+// Re-check a stored backup's images (qemu-img check) without touching any VM.
+message VerifyBackupRequest {
+  string backup_path = 1;
+}
+
+message VerifyBackupResponse {
+  bool ok = 1;
+  string message = 2;
+  int32 images_checked = 3;
+}
+
+message CloneFromSnapshotRequest {
+  string vm_name = 1;
+  string snapshot_name = 2;
+  string new_name = 3;
+  string new_disk_path = 4;
+  bool revert_source = 5;
+}
+
+message CloneFromSnapshotResponse {
+  bool ok = 1;
+  string vm_name = 2;
+  string uuid = 3;
+  string message = 4;
+}
+
+message ProvisionStoragePoolRequest {
+  string pool_name = 1;
+  string backend = 2;
+  string path = 3;
+}
+
+message ProvisionStoragePoolResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message ProvisionNetworkRequest {
+  string network_name = 1;
+  string backend = 2;
+  int32 vlan_id = 3;
+  string bridge = 4;
+  // Only cloud-isolated accepts these fields; legacy bridge callers leave empty.
+  string subnet_cidr = 5;
+  string subnet_uuid = 6;
+}
+
+message ProvisionNetworkResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message AttachDiskRequest {
+  string vm_name = 1;
+  string disk_path = 2;
+  string target_dev = 3;
+}
+
+message AttachDiskResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message DetachDiskRequest {
+  string vm_name = 1;
+  string target_dev = 2;
+}
+
+message DetachDiskResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message ResizeDiskRequest {
+  string vm_name = 1;
+  string target_dev = 2;
+  uint64 size_gb = 3;
+}
+
+message ResizeDiskResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message AttachNicRequest {
+  string vm_name = 1;
+  string network = 2;
+  string model = 3;
+}
+
+message AttachNicResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message DetachNicRequest {
+  string vm_name = 1;
+  string mac_address = 2;
+}
+
+message DetachNicResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message SetAutostartRequest {
+  string vm_name = 1;
+  bool enabled = 2;
+}
+
+message SetAutostartResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message SetVcpusRequest {
+  string vm_name = 1;
+  uint32 count = 2;
+}
+
+message SetVcpusResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message SetMemoryRequest {
+  string vm_name = 1;
+  uint64 memory_mb = 2;
+}
+
+message SetMemoryResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message GetVmDetailsRequest {
+  string vm_name = 1;
+}
+
+message GetVmDetailsResponse {
+  bool ok = 1;
+  string details_json = 2;
+  string message = 3;
+}
+
+message VmLibvirtQueryRequest {
+  string vm_name = 1;
+  string action = 2;
+  string payload_json = 3;
+}
+
+message VmLibvirtQueryResponse {
+  bool ok = 1;
+  string result_json = 2;
+  string message = 3;
+}
+
+message VmLibvirtInvokeRequest {
+  string vm_name = 1;
+  string action = 2;
+  string payload_json = 3;
+}
+
+message VmLibvirtInvokeResponse {
+  bool ok = 1;
+  string result_json = 2;
+  string message = 3;
+}
+
+message HostLibvirtQueryRequest {
+  string action = 1;
+  string payload_json = 2;
+}
+
+message HostLibvirtQueryResponse {
+  bool ok = 1;
+  string result_json = 2;
+  string message = 3;
+}
+
+message HostLibvirtInvokeRequest {
+  string action = 1;
+  string payload_json = 2;
+}
+
+message HostLibvirtInvokeResponse {
+  bool ok = 1;
+  string result_json = 2;
+  string message = 3;
+}
+
+message GetGuestHealthRequest {
+  string vm_name = 1;
+}
+
+message GetGuestHealthResponse {
+  bool ok = 1;
+  string state = 2;
+  bool agent_reachable = 3;
+  bool healthy = 4;
+  string os_pretty_name = 5;
+  string guest_ip = 6;
+  string guest_hostname = 7;
+  repeated string issues = 8;
+  string install_state = 9;
+  bool channel_attached = 10;
+  bool channel_connected = 11;
+  bool agent_ping = 12;
+  string agent_version = 13;
+  string diagnostics_json = 14;
+}
+
+message GetGuestObservabilityRequest {
+  string vm_name = 1;
+}
+
+message GetGuestObservabilityResponse {
+  bool ok = 1;
+  string guest_json = 2;
+  string message = 3;
+}
+
+message GuestAgentActionRequest {
+  string vm_name = 1;
+  /// sync_time | fstrim | fs_freeze_status
+  string action = 2;
+}
+
+message GuestAgentActionResponse {
+  bool ok = 1;
+  string result_json = 2;
+  string message = 3;
+}
+
+message InstallGuestToolsRequest {
+  string vm_name = 1;
+}
+
+message InstallGuestToolsResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message GetFirewallInventoryRequest {}
+
+message GetFirewallInventoryResponse {
+  bool ok = 1;
+  string inventory_json = 2;
+  string message = 3;
+}
+
+message ApplyFirewallPlanRequest {
+  string plan_json = 1;
+  bool dry_run = 2;
+}
+
+message ApplyFirewallPlanResponse {
+  bool ok = 1;
+  string result_json = 2;
+  string message = 3;
+}
+
+message GetFirewallActivityRequest {
+  uint32 hours = 1;
+}
+
+message GetFirewallActivityResponse {
+  bool ok = 1;
+  string activity_json = 2;
+  string message = 3;
+}
+
+message GuestFirewallPort {
+  uint32 port = 1;
+  string protocol = 2;
+  string bind_address = 3;
+  string process = 4;
+}
+
+message GetGuestFirewallPortsRequest {
+  string vm_name = 1;
+}
+
+message GetGuestFirewallPortsResponse {
+  bool ok = 1;
+  bool agent_reachable = 2;
+  repeated GuestFirewallPort ports = 3;
+  string message = 4;
+}
+
+message GetLinuxObservabilityRequest {}
+
+message GetLinuxObservabilityResponse {
+  bool ok = 1;
+  string json = 2;
+  string message = 3;
+}
+
+message GetSystemdNetworkDiagnosticsRequest {}
+
+message GetSystemdNetworkDiagnosticsResponse {
+  bool ok = 1;
+  string json = 2;
+  string message = 3;
+}
+
+message GetLinuxAuditRequest {}
+
+message GetLinuxAuditResponse {
+  bool ok = 1;
+  string json = 2;
+  string message = 3;
+}
+
+message GetLinuxPackageUpdatesRequest {}
+
+message GetLinuxPackageUpdatesResponse {
+  bool ok = 1;
+  string json = 2;
+  string message = 3;
+}
+
+message ApplyLinuxPackageUpgradeRequest {
+  bool dry_run = 1;
+}
+
+message ApplyLinuxPackageUpgradeResponse {
+  bool ok = 1;
+  string json = 2;
+  string message = 3;
+}
+
+message HostLinuxRebootRequest {}
+
+message HostLinuxRebootResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message GetLinuxFilesystemsRequest {}
+
+message GetLinuxFilesystemsResponse {
+  bool ok = 1;
+  string json = 2;
+  string message = 3;
+}
+
+message GetLinuxTopProcessesRequest {
+  uint32 limit = 1;
+  string order = 2;
+}
+
+message GetLinuxTopProcessesResponse {
+  bool ok = 1;
+  string json = 2;
+  string message = 3;
+}
+
+message BpfCallRequest {
+  string request_json = 1;
+}
+
+message BpfCallResponse {
+  bool ok = 1;
+  string data_json = 2;
+  string error = 3;
+}
+
+message BpfSubscribeRequest {
+  repeated string topics = 1;
+}
+
+message BpfEvent {
+  string topic = 1;
+  string event_json = 2;
+}
+
+// Reconcile the controller-owned policy set: apply every policy in
+// `policies_json` and remove bpfd policies whose id starts with `owned_prefix`
+// but are absent from the set.
+message BpfSyncPoliciesRequest {
+  string policies_json = 1;
+  string owned_prefix = 2;
+}
+
+message BpfSyncPoliciesResponse {
+  bool ok = 1;
+  string result_json = 2;
+  string message = 3;
+}
+
+message PortForwardRuleMsg {
+  string id = 1;
+  string protocol = 2;
+  uint32 host_port = 3;
+  string vm_ip = 4;
+  uint32 vm_port = 5;
+  string description = 6;
+}
+
+message ListPortForwardsRequest {}
+
+message ListPortForwardsResponse {
+  repeated PortForwardRuleMsg rules = 1;
+  string message = 2;
+}
+
+message CreatePortForwardRequest {
+  string protocol = 1;
+  uint32 host_port = 2;
+  string vm_ip = 3;
+  uint32 vm_port = 4;
+  string description = 5;
+}
+
+message CreatePortForwardResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message DeletePortForwardRequest {
+  string protocol = 1;
+  uint32 host_port = 2;
+  string vm_ip = 3;
+  uint32 vm_port = 4;
+}
+
+message DeletePortForwardResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message LoadBalancerMemberMsg {
+  string vm_ip = 1;
+  uint32 port = 2;
+  uint32 weight = 3;
+}
+
+message SetLoadBalancerRequest {
+  string lb_id = 1;
+  string protocol = 2;
+  uint32 host_port = 3;
+  repeated LoadBalancerMemberMsg members = 4;
+}
+
+message SetLoadBalancerResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message DeleteLoadBalancerRequest {
+  string lb_id = 1;
+  string protocol = 2;
+  uint32 host_port = 3;
+}
+
+message DeleteLoadBalancerResponse {
+  bool ok = 1;
+  string message = 2;
+}
+
+message ListHostGpusRequest {}
+
+message HostGpuDevice {
+  string pci_address = 1;
+  string vendor = 2;
+  string device_name = 3;
+  uint32 iommu_group = 4;
+  string mig_profile = 5;
+}
+
+message ListHostGpusResponse {
+  repeated HostGpuDevice devices = 1;
+  string nvidia_smi_summary = 2;
+}
+
+message DiskLayer {
+  string target = 1;
+  string file = 2;
+}
+
+message ForkVmRequest {
+  string source_name = 1;
+  string new_name = 2;
+  /// Empty: freeze the source now (a live fork).
+  repeated DiskLayer layers = 3;
+  bool memory = 4;
+  bool isolate = 5;
+  bool reseed = 6;
+  bool start = 7;
+  string label = 8;
+}
+
+message ForkVmResponse {
+  string uuid = 1;
+  repeated DiskLayer frozen = 2;
+  repeated DiskLayer disks = 3;
+  bool quiesced = 4;
+  bool reseeded = 5;
+  bool running = 6;
+}
+
+message RestorePointCreateRequest {
+  string vm_name = 1;
+  string label = 2;
+}
+
+message RestorePointCreateResponse {
+  repeated DiskLayer layers = 1;
+  bool quiesced = 2;
+}
+
+message RestorePointRewindRequest {
+  string vm_name = 1;
+  repeated DiskLayer layers = 2;
+  string label = 3;
+  repeated string discard = 4;
+}
+
+message RestorePointRewindResponse {
+  repeated DiskLayer disks = 1;
+  bool restarted = 2;
+}
+
+message RestorePointMergeRequest {
+  string vm_name = 1;
+  repeated DiskLayer top = 2;
+  repeated DiskLayer base = 3;
+}
+
+message RestorePointMergeResponse {}
+
+message RestorePointDiscardRequest {
+  repeated string files = 1;
+}
+
+message RestorePointDiscardResponse {
+  uint32 removed = 1;
+}
+
+message DetachForkRequest {
+  string vm_name = 1;
+}
+
+message DetachForkResponse {}
+
+message ExportFluxvmRecordRequest {
+  string vm_name = 1;
+}
+
+message ExportFluxvmRecordResponse {
+  string id = 1;
+  string record_json = 2;
+}
+
+message PrepareFluxvmReceiverRequest {
+  // Source VM record (ExportFluxvmRecord); the receiver boots its device model.
+  string record_json = 1;
+  string listen_host = 2;
+  string advertise_host = 3;
+}
+
+message PrepareFluxvmReceiverResponse {
+  string receiver_id = 1;
+  string uri = 2;
+  string token = 3;
+}
+
+message StartFluxvmMigrationRequest {
+  string vm_id = 1;
+  string destination = 2;
+  uint64 bandwidth_mbps = 3;
+  uint64 max_downtime_ms = 4;
+}
+
+message StartFluxvmMigrationResponse {}
+
+message GetFluxvmMigrationStatusRequest {
+  string vm_id = 1;
+}
+
+message GetFluxvmMigrationStatusResponse {
+  // running | completed | failed
+  string progress = 1;
+  string error = 2;
+  string status_json = 3;
+}
+
+message FinishFluxvmMigrationRequest {
+  string vm_id = 1;
+}
+
+message FinishFluxvmMigrationResponse {}
+
+message AdoptFluxvmVmRequest {
+  string receiver_id = 1;
+  string token = 2;
+}
+
+message AdoptFluxvmVmResponse {
+  string id = 1;
+  string name = 2;
+  string state = 3;
+}
+
+message AbortFluxvmMigrationRequest {
+  // Either side may be empty.
+  string source_vm_id = 1;
+  string receiver_id = 2;
+}
+
+message AbortFluxvmMigrationResponse {}
+
+// k3s node operations (install a server, join an agent, upgrade, remove, status). Off unless the
+// host sets MACHINA_AGENT_K3S_ENABLED=1; the join token travels only in this message and the
+// installer's environment.
+message K3sNodeRequest {
+  string action = 1; // install_server | join_server | join_agent | upgrade | remove | status | drain | uncordon
+  string version = 2;
+  string server_url = 3;
+  string token = 4;
+  string node_name = 5;
+  string advertise_address = 6;
+  string cluster_cidr = 7;
+  string service_cidr = 8;
+  string install_url = 9;
+  // install_server: start embedded etcd so more servers can join (an HA control plane).
+  bool cluster_init = 10;
+}
+
+message K3sNodeResponse {
+  bool ok = 1;
+  string message = 2;
+  // Set by install_server: the join token and the admin kubeconfig (127.0.0.1 server address).
+  string node_token = 3;
+  string kubeconfig = 4;
+  // Set by status: the installed k3s version and whether its service is active.
+  string version = 5;
+  bool active = 6;
+  string output_tail = 7;
+}
+
+// Copy a backup (file or multi-disk directory) to or from an S3-compatible store with the host's
+// aws CLI and credentials, and verify the sizes. The local path must be inside MACHINA_BACKUP_DIR.
+message ReplicateBackupRequest {
+  string action = 1; // push | fetch | delete (delete ignores local_path)
+  string local_path = 2; // push: the backup to upload; fetch: where to put it (must not exist)
+  string bucket = 3;
+  string key = 4; // object key (a file) or key prefix (a directory)
+  string endpoint_url = 5;
+}
+
+message ReplicateBackupResponse {
+  bool ok = 1;
+  string message = 2;
+  uint64 bytes = 3;
+  uint32 files = 4;
+  bool is_dir = 5;
+  string remote_uri = 6;
+  // SHA-256 of the checksum manifest stored next to the copy; checksummed is false for a copy
+  // made before manifests existed (verified by size only).
+  string manifest_sha256 = 7;
+  bool checksummed = 8;
+}

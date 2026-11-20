@@ -1,0 +1,35 @@
+[package]
+name = "machina-bpf-ebpf"
+version = "0.1.0"
+edition = "2024"
+license = "LicenseRef-Zyvor-Production-1.0"
+publish = false
+
+# Standalone workspace: this crate only builds for bpfel-unknown-none on nightly
+# (`-Z build-std=core`), so it is excluded from the main Machina workspace and
+# compiled by `bpf/machina-bpf/build.rs` (or `make bpf`).
+[workspace]
+
+[dependencies]
+machina-bpf-common = { path = "../machina-bpf-common" }
+aya-ebpf = { version = "0.2.1", default-features = false }
+
+[build-dependencies]
+which = { version = "6", default-features = false }
+
+[[bin]]
+name = "machina-bpf"
+path = "src/main.rs"
+
+[profile.dev]
+opt-level = 3
+debug = false
+overflow-checks = false
+panic = "abort"
+
+[profile.release]
+debug = 2
+codegen-units = 1
+strip = false
+panic = "abort"
+lto = true

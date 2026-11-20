@@ -1,0 +1,43 @@
+// Grafana Alloy: scrape Machina Prometheus, forward as JSON samples to a custom ingest.
+//
+// Machina [metrics_history].remote_write_url expects MetricsHistoryPoint JSON, not
+// Prometheus remote_write protobuf. This pipeline uses Alloy's prometheus.scrape +
+// a transform — for production, prefer POSTing from Machina directly, or use
+// prometheus.remote_write to Mimir when you add a native exporter.
+//
+// Usage:
+//   export MACHINA_URL=https://hypervisor:5092
+//   export MACHINA_TOKEN=mach_...
+//   alloy run contrib/alloy/machina-metrics-forwarder.alloy
+
+prometheus.scrape "machina" {
+  targets = [{
+    __address__ = coalesce(env("MACHINA_HOST"), "127.0.0.1:5092"),
+  }]
+  scheme        = coalesce(env("MACHINA_SCHEME"), "https")
+  metrics_path  = "/api/v1/prometheus"
+  forward_to    = [prometheus.remote_write.mimir.receiver]
+
+  authorization {
+    type             = "Bearer"
+    credentials_file = env("MACHINA_TOKEN_FILE")
+    credentials      = env("MACHINA_TOKEN")
+  }
+}
+
+// Example: forward scraped metrics to a Prometheus-compatible remote (Mimir/Cortex).
+// Remove or retarget if you only need Machina JSON ingest via the daemon config.
+prometheus.remote_write "mimir" {
+  endpoint {
+    url = coalesce(env("PROM_REMOTE_WRITE_URL"), "http://127.0.0.1:9009/api/v1/push")
+
+    basic_auth {
+      username = env("PROM_REMOTE_WRITE_USER")
+      password = env("PROM_REMOTE_WRITE_PASSWORD")
+    }
+  }
+}
+
+// Machina JSON history ingest (optional HTTP client — enable when Alloy http client is configured):
+// Use [metrics_history] remote_write_url on the daemon instead; it POSTs MetricsHistoryPoint
+// every sample interval without this Alloy hop.

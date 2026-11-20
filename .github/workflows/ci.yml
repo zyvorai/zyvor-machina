@@ -1,0 +1,191 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Least-privilege default: this pipeline only builds/tests and never pushes
+# commits, tags, packages, or PR comments, so the GITHUB_TOKEN only needs
+# read access to repo contents (to check out code). Jobs that need more must
+# declare it explicitly at the job level.
+permissions:
+  contents: read
+
+# The machina workspace has path deps on the sibling `hypersdk/guestkit` repo
+# (controller/Cargo.toml: `../../guestkit`). Both repos are laid out as siblings under the
+# workspace so `cargo metadata` can load, then the real gates run: the workspace must build
+# and its tests must pass. (The previous CI died in `cargo metadata` because guestkit was
+# never checked out and libvirt-dev was never installed, so nothing was ever actually built.)
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout machina
+        uses: actions/checkout@v4
+        with:
+          path: machina
+      - name: Checkout guestkit (sibling path dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: hypersdk/guestkit
+          # Pinned to the version Cargo.lock records; bump both together (cargo --locked fails on drift).
+          ref: v1.2.6
+          path: guestkit
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable (pinned 2026-07-24)
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2 (floating tag, pinned 2026-07-24)
+        with:
+          workspaces: machina
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libvirt-dev libpam0g-dev \
+            libclang-dev clang protobuf-compiler libssl-dev qemu-utils
+      # --- Hard gates: these fail the build ---
+      - name: Build workspace
+        working-directory: machina
+        run: cargo build --workspace --locked
+      - name: Test workspace
+        working-directory: machina
+        run: cargo test --workspace --locked
+      # --- Advisory: report but don't block (large pre-existing backlog to clean up) ---
+      - name: rustfmt (advisory)
+        working-directory: machina
+        continue-on-error: true
+        run: cargo fmt --all -- --check
+      - name: clippy (advisory)
+        working-directory: machina
+        continue-on-error: true
+        run: cargo clippy --workspace
+
+  controller-postgres:
+    # The controller's PostgreSQL build: same tests, run against a real server (see docs/guides/database.md).
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: machina
+          POSTGRES_PASSWORD: machina
+          POSTGRES_DB: machina_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U machina" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://machina:machina@127.0.0.1:5432/machina_test
+    steps:
+      - name: Checkout machina
+        uses: actions/checkout@v4
+        with:
+          path: machina
+      - name: Checkout guestkit (sibling path dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: hypersdk/guestkit
+          # Pinned to the version Cargo.lock records; bump both together (cargo --locked fails on drift).
+          ref: v1.2.6
+          path: guestkit
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable (pinned 2026-07-24)
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2 (floating tag, pinned 2026-07-24)
+        with:
+          workspaces: machina
+          key: controller-postgres
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libvirt-dev libpam0g-dev \
+            libclang-dev clang protobuf-compiler libssl-dev qemu-utils
+      - name: Test the controller on PostgreSQL
+        working-directory: machina
+        run: cargo test -p machina-controller --locked --no-default-features --features postgres
+      - name: Every literal SQL statement is accepted by PostgreSQL
+        # PREPAREs each statement the controller sends against the PostgreSQL schema (catches what SQLite tolerated: bare columns next
+        # to GROUP BY, boolean = integer, text = uuid, ...). See scripts/db/check_pg_sql.py.
+        working-directory: machina
+        run: |
+          sudo apt-get install -y postgresql-client
+          psql "$TEST_DATABASE_URL" -qc "DROP DATABASE IF EXISTS sqlcheck" -c "CREATE DATABASE sqlcheck"
+          # The baseline covers SQLite migrations 000-060; every later migration_pg file adds tables and columns the SQL uses.
+          for f in $(ls controller/migrations_pg/[0-9]*.sql | sort); do
+            psql "${TEST_DATABASE_URL%/*}/sqlcheck" -q -v ON_ERROR_STOP=1 -1 -f "$f"
+          done
+          PGURL="${TEST_DATABASE_URL%/*}/sqlcheck" python3 scripts/db/check_pg_sql.py
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      # --- Hard gates ---
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Unit tests
+        run: npm run test
+      - name: Build
+        run: npm run build
+      - name: Doc links (README, CHANGELOG, docs/)
+        run: python3 ../scripts/check-doc-links.py
+      - name: Customer docs routes match the nav
+        run: node ../scripts/customer-docs/check-routes.mjs
+      # --- Advisory ---
+      - name: OpenAPI drift check (advisory)
+        continue-on-error: true
+        run: npm run generate-openapi:check
+      - name: API/UX coverage check (advisory)
+        continue-on-error: true
+        run: npm run api-ux-coverage:check
+
+  license:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: SPDX headers (Zyvor Production License v1.0)
+        run: python3 scripts/add-spdx.py --check
+
+  # NOTE: the former `libvirt`/KVM lifecycle job was removed — it required a running
+  # hypervisor (/var/run/libvirt/libvirt-sock) that standard GitHub runners don't have, so it
+  # failed 100% of the time. Run scripts/ci-kvm-lifecycle.sh on a self-hosted KVM runner if
+  # end-to-end libvirt coverage is needed.
+
+  # SDKs and the Terraform provider: pure Go / Python, no libvirt or sibling repos needed.
+  sdks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Go SDK
+        working-directory: sdk/go
+        run: |
+          test -z "$(gofmt -l .)"
+          go vet ./...
+          go test ./...
+      - name: Terraform provider
+        working-directory: terraform/provider
+        run: |
+          test -z "$(gofmt -l .)"
+          go vet ./...
+          go build ./...
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python SDK
+        working-directory: sdk/python
+        run: python -W error::ResourceWarning -m unittest discover -s tests

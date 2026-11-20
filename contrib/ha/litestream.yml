@@ -1,0 +1,12 @@
+# Continuous replication of the controller database (SQLite WAL) with Litestream.
+# MACHINA_HA_REPLICA_URL examples:
+#   s3://my-bucket/machina/controller        (S3 / MinIO / Atlas RGW; set LITESTREAM_ACCESS_KEY_ID / LITESTREAM_SECRET_ACCESS_KEY)
+#   sftp://user@backup-host/srv/machina      (set LITESTREAM_SFTP_KEY_PATH)
+# For a replica on a mounted path (NFS, second disk) use contrib/ha/litestream-file.yml.
+dbs:
+  - path: /var/lib/machina/controller.db
+    replicas:
+      - url: ${MACHINA_HA_REPLICA_URL}
+        sync-interval: 1s          # how stale a promoted standby can be: about one second of writes
+        snapshot-interval: 6h
+        retention: 72h

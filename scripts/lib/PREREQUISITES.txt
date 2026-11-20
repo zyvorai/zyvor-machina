@@ -1,0 +1,23 @@
+Machina — Prerequisites checklist
+==================================
+
+HYPERVISOR HOST (not Kubernetes)
+  [ ] Linux x86_64, KVM capable (egrep '(vmx|svm)' /proc/cpuinfo)
+  [ ] libvirtd running: systemctl is-active libvirtd
+  [ ] qemu-kvm installed
+  [ ] virsh works: virsh list --all
+  [ ] /etc/machina/config.toml configured
+  [ ] ./install.sh completed
+
+CLIENT BUNDLE (this directory)
+  [ ] ./machina-daemon exists and is executable
+  [ ] machina-daemon started (sudo)
+  [ ] ./test-host.sh passes
+  [ ] ./test-package.sh passes
+  [ ] https://<host>:5092 reachable
+
+QUICK COMMANDS
+  ./install.sh
+  sudo ./machina-daemon --config /etc/machina/config.toml
+  ./test-host.sh
+  ./test-package.sh

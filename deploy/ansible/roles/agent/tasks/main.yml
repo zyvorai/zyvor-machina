@@ -1,0 +1,32 @@
+---
+- name: Is this node already joined?
+  ansible.builtin.stat:
+    path: /etc/machina/pki/agent.pem
+  register: machina_joined
+
+- name: Join the node
+  when: not machina_joined.stat.exists or machina_force_rejoin
+  block:
+    - name: Mint a single-use join command on the controller
+      ansible.builtin.script: mint-join-command.sh
+      delegate_to: "{{ groups[machina_controller_group][0] }}"
+      register: machina_join
+      changed_when: false
+      no_log: true   # the command carries the one-time token
+
+    - name: The controller must have its join listener on
+      ansible.builtin.assert:
+        that: machina_join.stdout | trim != 'NO_JOIN_COMMAND'
+        fail_msg: "No join command: set machina_tls_addr on the controller (MACHINA_CONTROLLER_TLS_ADDR) and run the controller role first."
+
+    - name: Run the join command (installs libvirt/QEMU, fetches the agent from the controller, pins its CA, joins)
+      ansible.builtin.shell: "{{ machina_join.stdout | trim }}"
+      args:
+        executable: /bin/bash
+      no_log: true
+
+- name: The agent is running
+  ansible.builtin.systemd:
+    name: machina-agent
+    state: started
+    enabled: true

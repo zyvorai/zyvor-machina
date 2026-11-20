@@ -1,0 +1,13 @@
+---
+# ansible-playbook -i inventory.ini site.yml
+# 1. controller: packages, join listener, published agent files
+# 2. agents: one-time token from the controller, then the same one-paste command the web wizard shows
+- name: Machina controller
+  hosts: machina_controller
+  roles:
+    - controller
+
+- name: Machina compute nodes
+  hosts: machina_agents
+  roles:
+    - agent

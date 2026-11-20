@@ -1,0 +1,33 @@
+[package]
+license = "LicenseRef-Zyvor-Production-1.0"
+name = "machina-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libc = "0.2"
+virt = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+rand = { workspace = true }
+hex = { workspace = true }
+uuid = { workspace = true }
+sha2 = "0.11"
+base64 = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+url = { workspace = true }
+prom-remote-api = { version = "0.3", default-features = false }
+# Held at 0.11: prom-remote-api 0.3 (Prometheus remote-write types) is built on prost 0.11 and the types must match.
+prost = "0.11"
+snap = { version = "1", default-features = false }
+jsonwebtoken = { version = "11", features = ["rust_crypto"] }
+
+[dev-dependencies]
+wiremock = "0.6"

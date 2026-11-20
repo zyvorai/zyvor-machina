@@ -1,0 +1,9 @@
+# Optional environment for machina-controller (systemd EnvironmentFile).
+# Copy to /etc/default/machina-platform on the hypervisor.
+
+# Per-username rate limit (requests per minute). Keys use Basic username, not shared credential blob.
+# MACHINA_RATE_LIMIT_PER_MIN=600
+# MACHINA_RATE_LIMIT_ENABLED=1
+
+# CI/E2E only: allow X-Machina-E2E header to skip rate limiting. Leave unset in production.
+# MACHINA_E2E_BYPASS_SECRET=

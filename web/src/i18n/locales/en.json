@@ -1,0 +1,61 @@
+{
+  "common": {
+    "refresh": "Refresh",
+    "language": "Language"
+  },
+  "login": {
+    "title": "Sign in",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in",
+    "ldapHint": "Directory (LDAP) authentication is enabled on this host."
+  },
+  "fleet": {
+    "title": "Fleet",
+    "subtitle": "Multi-host Machina daemons — health, VM inventory, and proxied lifecycle",
+    "disabledHint": "Enable [fleet] in machina.toml with peer URLs to aggregate remote hypervisors.",
+    "peers": "Peers",
+    "allVms": "All VMs",
+    "reachable": "Online",
+    "unreachable": "Offline",
+    "vmCount": "{{count}} VMs",
+    "colName": "Name",
+    "colPeer": "Host",
+    "colState": "State",
+    "colActions": "Actions",
+    "localHost": "Use VM page",
+    "noVms": "No VMs reported.",
+    "start": "Start on peer",
+    "stop": "Force stop on peer",
+    "shutdown": "Shutdown on peer",
+    "actionOk": "{{action}} sent to {{vm}} on {{peer}}",
+    "primaryPeer": "Primary peer: {{name}}",
+    "standbyPeer": "Standby: {{name}}",
+    "prometheusTitle": "Prometheus (aggregated scrape)",
+    "prometheusHint": "Single job for local + all fleet peers. Each series includes machina_peer (local or peer name). Use a read-only API token as Bearer auth.",
+    "prometheusCopyUrl": "Copy scrape URL",
+    "prometheusOpen": "Open in browser"
+  },
+  "rdp": {
+    "builtin": "RDP",
+    "builtinTitle": "Built-in RDP tunnel (WebSocket → guest :3389)",
+    "download": ".rdp file",
+    "downloadTitle": "Download Remote Desktop connection file",
+    "downloaded": "Saved .rdp for {{host}}:{{port}}",
+    "pageTitle": "RDP — {{name}}",
+    "back": "Back to VM",
+    "endpoint": "Guest endpoint",
+    "tunnelNote": "Machina proxies RDP over a secure WebSocket. Use the downloaded .rdp file with Microsoft Remote Desktop, or keep this page open to hold the tunnel for a compatible client.",
+    "wsStatus": "Tunnel",
+    "missingVm": "VM name required"
+  },
+  "nav": {
+    "fleet": "Fleet",
+    "dashboard": "Dashboard",
+    "vms": "Virtual Machines",
+    "audit": "Audit Log"
+  },
+  "audit": {
+    "exportNdjson": "Export NDJSON (SIEM)"
+  }
+}

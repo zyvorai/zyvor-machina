@@ -1,0 +1,19 @@
+1
+00:00:00,400 --> 00:00:03,200
+Ask Zeus
+
+2
+00:00:03,400 --> 00:00:07,000
+Spotlight with page context
+
+3
+00:00:12,000 --> 00:00:16,500
+Ops AI at your fingertips
+
+4
+00:00:28,000 --> 00:00:32,000
+Built for libvirt / QEMU / KVM
+
+5
+00:00:48,000 --> 00:00:54,000
+zyvor.dev/machina

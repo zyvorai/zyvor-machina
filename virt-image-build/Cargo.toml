@@ -1,0 +1,19 @@
+[package]
+license = "LicenseRef-Zyvor-Production-1.0"
+name = "virt-image-build"
+version = "0.1.0"
+edition = "2021"
+description = "Build a bootable VM disk with virt-builder (no install ISO). Root password via file or env only — never on argv."
+
+[lib]
+name = "virt_image_build"
+path = "src/lib.rs"
+
+[[bin]]
+name = "virt-image-build"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+serde = { workspace = true }

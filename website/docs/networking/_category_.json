@@ -1,0 +1,8 @@
+{
+  "label": "Networking & Security",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "description": "Machina's native eBPF datapath: load balancing, Kubernetes CNI, VM and host protection, and per-container policy inside guests."
+  }
+}

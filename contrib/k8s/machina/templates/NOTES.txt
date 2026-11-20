@@ -1,0 +1,14 @@
+Machina identity configuration installed.
+
+OIDC callback: configure your IdP redirect to
+  https://<host>:{{ .Values.daemon.port }}/api/v1/auth/oidc/callback
+
+Platform JWT deep links:
+  https://<host>:{{ .Values.daemon.port }}/login?token=<jwt>
+  (requires MACHINA_JWT_SECRET / auth.jwtSecret)
+
+SAML SP metadata (when enabled):
+  https://<host>:{{ .Values.daemon.port }}/api/v1/auth/saml/metadata
+
+Edit values under auth.oidc, auth.saml, auth.ldap, then:
+  helm upgrade --install machina ./contrib/k8s/machina -f my-values.yaml

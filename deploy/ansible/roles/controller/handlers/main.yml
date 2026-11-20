@@ -1,0 +1,5 @@
+---
+- name: restart machina-controller
+  ansible.builtin.systemd:
+    name: machina-controller
+    state: restarted

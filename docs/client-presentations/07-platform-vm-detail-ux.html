@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>machina — Platform VM Detail UX</title>
+<style>
+@page { size: A4; margin: 0; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; color: #1a1a2e; background: #fff; line-height: 1.6; }
+.cover { height: 100vh; background: linear-gradient(135deg, #0f0c29, #1e3a5f, #0f172a); color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; page-break-after: always; position: relative; overflow: hidden; }
+.cover::before { content: ''; position: absolute; inset: -50%; background: radial-gradient(circle at 30% 50%, rgba(249,115,22,0.18) 0%, transparent 50%), radial-gradient(circle at 70% 80%, rgba(59,130,246,0.12) 0%, transparent 50%); }
+.cover h1 { font-size: 3.2em; font-weight: 800; letter-spacing: -2px; margin-bottom: 0.2em; position: relative; }
+.cover h1 span { color: #f97316; }
+.cover p { font-size: 1.15em; opacity: 0.85; position: relative; max-width: 640px; }
+.cover .badge { display: inline-block; background: rgba(249,115,22,0.2); border: 1px solid rgba(249,115,22,0.4); padding: 0.3em 1em; border-radius: 20px; font-size: 0.9em; margin-top: 1.5em; position: relative; }
+.page { min-height: 100vh; padding: 60px 80px; page-break-after: always; position: relative; }
+.page-dark { background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; }
+.page-light { background: #f8fafc; }
+.page h2 { font-size: 2.2em; font-weight: 700; margin-bottom: 0.15em; letter-spacing: -1px; }
+.page-dark h2 { color: #fff; }
+.page h2 span { color: #f97316; }
+.page-light h2 span { color: #3b82f6; }
+.page .subtitle { font-size: 1.05em; opacity: 0.7; margin-bottom: 2em; }
+.card-grid { display: grid; gap: 20px; }
+.card-grid-2 { grid-template-columns: 1fr 1fr; }
+.card-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+.card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; }
+.card-dark { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1); color: #e2e8f0; }
+.card h3 { font-size: 1.05em; font-weight: 700; margin-bottom: 0.5em; color: #1e293b; }
+.card-dark h3 { color: #f97316; }
+.card p, .card li { font-size: 0.9em; line-height: 1.65; }
+.stat-row { display: flex; gap: 16px; margin: 1.5em 0; }
+.stat { flex: 1; text-align: center; padding: 20px 12px; background: rgba(249,115,22,0.08); border-radius: 12px; border: 1px solid rgba(249,115,22,0.15); }
+.stat .number { font-size: 2.2em; font-weight: 800; color: #f97316; line-height: 1; }
+.stat .label { font-size: 0.82em; opacity: 0.7; margin-top: 0.3em; }
+table { width: 100%; border-collapse: collapse; margin-top: 1em; font-size: 0.88em; }
+th { background: #f97316; color: #fff; padding: 12px 16px; text-align: left; font-weight: 600; }
+td { padding: 11px 16px; border-bottom: 1px solid #e2e8f0; }
+.page-dark td { border-bottom-color: rgba(255,255,255,0.08); }
+.page-dark tr:nth-child(even) { background: rgba(255,255,255,0.03); }
+.flow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 1em 0; }
+.flow .step { background: rgba(249,115,22,0.12); border: 1px solid rgba(249,115,22,0.25); padding: 10px 14px; border-radius: 8px; font-size: 0.82em; font-weight: 600; }
+.flow .arrow { color: #f97316; font-weight: 700; }
+.section-label { display: inline-block; background: rgba(249,115,22,0.12); color: #f97316; padding: 4px 14px; border-radius: 20px; font-size: 0.78em; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1em; }
+.cta-box { background: linear-gradient(135deg, #ea580c, #1e3a5f); color: #fff; border-radius: 16px; padding: 36px; text-align: center; margin-top: 1.5em; }
+.cta-box h3 { font-size: 1.4em; margin-bottom: 0.4em; }
+.page-footer { position: absolute; bottom: 30px; left: 80px; right: 80px; display: flex; justify-content: space-between; font-size: 0.75em; opacity: 0.4; }
+ul { margin: 0.4em 0 0.8em 1.3em; } li { margin-bottom: 0.35em; font-size: 0.92em; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="badge">Platform UX · June 2026</div>
+  <h1>Platform VM <span>Detail</span></h1>
+  <p style="font-size:1.5em;font-weight:700;margin-bottom:0.4em;">Machine-first, task-second operator layout</p>
+  <p>Hero strip, compact action row, prioritized attention stack, single Connect hub, and deep work on dedicated tabs — redesigned for daily VM operations.</p>
+</div>
+
+<div class="page page-dark">
+  <span class="section-label">Before → After</span>
+  <h2>The <span>Problem</span></h2>
+  <p class="subtitle">VM detail used to bury connectivity, NAT, and doctor signals inside a long Overview scroll.</p>
+  <div class="card-grid card-grid-2">
+    <div class="card card-dark">
+      <h3>Before</h3>
+      <ul>
+        <li>Daily access, NAT, and laptop checklist scattered across panels</li>
+        <li>Doctor, XML, and host FS noise on Overview</li>
+        <li>Power actions mixed with navigation chrome</li>
+        <li>No single “connect now” surface</li>
+      </ul>
+    </div>
+    <div class="card card-dark">
+      <h3>After</h3>
+      <ul>
+        <li>One Connect hub on Overview + full Access tab</li>
+        <li>Attention stack shows top blocker; chips swap banners</li>
+        <li>Action bar: Cinema, SSH, contextual power</li>
+        <li>Overview keeps live metrics only</li>
+      </ul>
+    </div>
+  </div>
+  <div class="stat-row">
+    <div class="stat"><div class="number">5</div><div class="label">Page zones</div></div>
+    <div class="stat"><div class="number">1</div><div class="label">Connect hub</div></div>
+    <div class="stat"><div class="number">13</div><div class="label">QA features (F01–F13)</div></div>
+    <div class="stat"><div class="number">Access</div><div class="label">Primary tab</div></div>
+  </div>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Platform VM Detail UX</span></div>
+</div>
+
+<div class="page page-light">
+  <span class="section-label">Layout</span>
+  <h2>Page <span>Zones</span></h2>
+  <p class="subtitle">Top-to-bottom priority matches how operators actually work.</p>
+  <table>
+    <tr><th>Zone</th><th>Component</th><th>Operator value</th></tr>
+    <tr><td><strong>Hero</strong></td><td>VmDetailHero</td><td>Live state, health pills, blocker CTA, gradient identity</td></tr>
+    <tr><td><strong>Actions</strong></td><td>VmDetailActionBar</td><td>Open Cinema, SSH, Start/Shutdown/Resume + Power &amp; more</td></tr>
+    <tr><td><strong>Attention</strong></td><td>VmAttentionStack</td><td>One expanded banner; secondary issues as chips</td></tr>
+    <tr><td><strong>Connect</strong></td><td>VmConnectHub</td><td>Cinema, SSH, laptop path, NAT, export</td></tr>
+    <tr><td><strong>Overview</strong></td><td>Info cards + usage</td><td>Desired state, compute, doctor one-liner — no XML bloat</td></tr>
+  </table>
+  <div class="flow">
+    <div class="step">Hero</div><span class="arrow">→</span>
+    <div class="step">Actions</div><span class="arrow">→</span>
+    <div class="step">Attention</div><span class="arrow">→</span>
+    <div class="step">Connect</div><span class="arrow">→</span>
+    <div class="step">Tabs (Access, Console, Doctor…)</div>
+  </div>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Platform VM Detail UX</span></div>
+</div>
+
+<div class="page page-dark">
+  <span class="section-label">Attention</span>
+  <h2>Attention <span>Stack</span></h2>
+  <p class="subtitle">Show the highest-impact issue expanded; demote the rest to chips.</p>
+  <div class="card-grid card-grid-3">
+    <div class="card card-dark"><h3>Priority 1</h3><p>Pending config shutdown — VM waiting on operator approval before power change.</p></div>
+    <div class="card card-dark"><h3>Priority 2</h3><p>Guest agent offline — metrics and IP discovery degraded until qemu-guest-agent returns.</p></div>
+    <div class="card card-dark"><h3>Priority 3</h3><p>Laptop NAT path incomplete — libvirt NAT guest missing expose-SSH or copy command.</p></div>
+  </div>
+  <h3 style="margin-top:1.2em;color:#f97316;">Interaction rules</h3>
+  <ul>
+    <li>Only <strong>one</strong> banner expanded at a time</li>
+    <li>Click a chip to swap which banner is expanded</li>
+    <li>Guest-agent dismiss persists per VM in <code>localStorage</code></li>
+    <li>Ask Zeus opens Spotlight with VM blockers via <code>vmDetailSpotlight.ts</code></li>
+  </ul>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Platform VM Detail UX</span></div>
+</div>
+
+<div class="page page-light">
+  <span class="section-label">Access tab</span>
+  <h2>Access <span>Tab</span> &amp; Slim Overview</h2>
+  <p class="subtitle">Deep connectivity work moves to Access; Overview stays scannable.</p>
+  <div class="card-grid card-grid-2">
+    <div class="card">
+      <h3>Access tab (<code>?tab=access</code>)</h3>
+      <ul>
+        <li>Full Connect hub with NAT panel expanded</li>
+        <li>Export spec JSON + domain XML</li>
+        <li>Links to Guest security &amp; ports, Guest health</li>
+        <li>Same NAT presets as Network → Hypervisor NAT</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Removed from Overview</h3>
+      <ul>
+        <li>Host resources → host detail link</li>
+        <li>Full doctor panel → Doctor tab</li>
+        <li>Domain XML editor → Settings tab</li>
+        <li>Organization fields → Settings tab</li>
+      </ul>
+    </div>
+  </div>
+  <div class="cta-box">
+    <h3>Try it</h3>
+    <p>Platform → VMs → pick a running NAT guest → Overview Connect hub → Access tab for NAT + export.</p>
+  </div>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Platform VM Detail UX</span></div>
+</div>
+
+<div class="page page-dark">
+  <span class="section-label">Quality</span>
+  <h2>Tests &amp; <span>Automation</span></h2>
+  <p class="subtitle">F01–F13 Playwright matrix covers hero, action bar, Connect hub, Access tab, ConsoleHub.</p>
+  <table>
+    <tr><th>Suite</th><th>Command</th><th>Coverage</th></tr>
+    <tr><td>Mock matrix</td><td><code>npm run test:e2e:features</code></td><td>Serial F01–F13 with platform mocks</td></tr>
+    <tr><td>Live matrix</td><td><code>npm run test:e2e:features:live</code></td><td>Read-only checks against lab host</td></tr>
+    <tr><td>Operator UX</td><td><code>platform-vm-operator.spec.ts</code></td><td>Connect hub, SSH dialog, tabs</td></tr>
+  </table>
+  <p style="margin-top:1.5em;opacity:0.85;">Docs: <strong>docs/guides/platform-vm-detail-ux.md</strong> · <strong>docs/guides/platform-feature-qa.md</strong></p>
+  <div class="page-footer"><span>HyperSDK / machina</span><span>Platform VM Detail UX · zyvor.dev</span></div>
+</div>
+
+</body>
+</html>

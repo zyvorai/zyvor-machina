@@ -1,0 +1,32 @@
+# Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved.
+# Proprietary software — see LICENSE in the repository root.
+
+[package]
+name = "vessel-core"
+version = "0.1.0"
+edition = "2021"
+license = "LicenseRef-Zyvor-Production-1.0"
+description = "Engine-agnostic container and Podman pod client for Machina"
+
+[dependencies]
+async-trait = "0.1"
+chrono = { workspace = true }
+futures = "0.3"
+futures-util = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+bollard = { version = "0.21", features = ["chrono"] }
+bytes = "1"
+http = { workspace = true }
+http-body-util = "0.1"
+hyper = { version = "1", features = ["client", "http1"] }
+hyper-util = { version = "0.1", features = ["client", "client-legacy", "http1", "tokio"] }
+hyperlocal = "0.9"
+
+[dev-dependencies]
+tokio = { workspace = true }

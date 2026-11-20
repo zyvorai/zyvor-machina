@@ -1,0 +1,53 @@
+// Grafana Alloy: scrape Machina Prometheus and loop back via native remote_write
+// into Machina metrics history (Snappy protobuf).
+//
+// Usage:
+//   export MACHINA_HOST=127.0.0.1:5092
+//   export MACHINA_SCHEME=https
+//   export MACHINA_TOKEN=mach_…
+//   # Only needed against a self-signed/local daemon cert:
+//   export MACHINA_INSECURE_SKIP_VERIFY=true
+//   alloy run contrib/alloy/machina-remote-write-receiver.alloy
+
+prometheus.scrape "machina" {
+  targets = [{
+    __address__ = coalesce(env("MACHINA_HOST"), "127.0.0.1:5092"),
+  }]
+  scheme          = coalesce(env("MACHINA_SCHEME"), "https")
+  metrics_path    = "/api/v1/prometheus"
+  scrape_interval = coalesce(env("SCRAPE_INTERVAL"), "30s")
+  forward_to      = [prometheus.remote_write.machina_history.receiver]
+
+  authorization {
+    type        = "Bearer"
+    credentials = env("MACHINA_TOKEN")
+  }
+
+  tls_config {
+    // See the comment on the matching block below — default to verifying
+    // certificates; require an explicit opt-in to skip verification.
+    insecure_skip_verify = coalesce(env("MACHINA_INSECURE_SKIP_VERIFY"), "false") == "true"
+  }
+}
+
+prometheus.remote_write "machina_history" {
+  endpoint {
+    url = coalesce(
+      env("MACHINA_REMOTE_WRITE_URL"),
+      "https://127.0.0.1:5092/api/v1/metrics/ingest/remote-write",
+    )
+
+    headers = {
+      Authorization = "Bearer " + env("MACHINA_TOKEN"),
+    }
+
+    tls_config {
+      // Default to full certificate verification. Only skip verification
+      // (e.g. against a self-signed local daemon cert) by explicitly
+      // opting in via MACHINA_INSECURE_SKIP_VERIFY=true — do not hardcode
+      // this to true, or every deployment (including ones with a valid
+      // cert on a non-loopback MACHINA_HOST) silently loses MITM protection.
+      insecure_skip_verify = coalesce(env("MACHINA_INSECURE_SKIP_VERIFY"), "false") == "true"
+    }
+  }
+}

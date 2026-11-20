@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>machina — Security &amp; Compliance</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{--accent:#3b82f6;--accent-dark:#2563eb;--accent-light:#60a5fa;--bg-dark:#0f172a;--bg-light:#f8fafc;--text-dark:#1e293b;--text-light:#e2e8f0;--card-dark:#1e293b;--card-light:#ffffff;--border:#334155;--shadow:0 4px 24px rgba(0,0,0,.12)}
+  html{font-size:16px;scroll-behavior:smooth}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;line-height:1.6;color:var(--text-dark)}
+
+  /* ---------- page types ---------- */
+  .page{min-height:100vh;padding:80px 64px;display:flex;flex-direction:column;justify-content:center}
+  @media(max-width:768px){.page{padding:48px 24px}}
+
+  .cover{background:linear-gradient(135deg,var(--bg-dark) 0%,#1e3a5f 100%);color:var(--text-light);text-align:center;position:relative;overflow:hidden}
+  .cover::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 30% 40%,rgba(59,130,246,.25) 0%,transparent 60%)}
+  .cover .brand{font-size:.9rem;text-transform:uppercase;letter-spacing:4px;color:var(--accent-light);margin-bottom:16px;position:relative}
+  .cover h1{font-size:3.2rem;font-weight:800;line-height:1.15;margin-bottom:24px;position:relative}
+  .cover .subtitle{font-size:1.25rem;opacity:.85;max-width:640px;margin:0 auto;position:relative}
+
+  .page-dark{background:var(--bg-dark);color:var(--text-light)}
+  .page-light{background:var(--bg-light);color:var(--text-dark)}
+  .page-accent{background:linear-gradient(135deg,var(--accent) 0%,var(--accent-dark) 100%);color:#fff}
+
+  .page h2{font-size:2.2rem;font-weight:700;margin-bottom:12px}
+  .page .lead{font-size:1.1rem;opacity:.8;margin-bottom:40px;max-width:720px}
+
+  /* ---------- card grid ---------- */
+  .card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;margin-top:8px}
+  .card{background:var(--card-light);border-radius:12px;padding:28px;box-shadow:var(--shadow);border:1px solid #e2e8f0}
+  .page-dark .card{background:var(--card-dark);border-color:var(--border);color:var(--text-light)}
+  .card h3{font-size:1.15rem;font-weight:700;margin-bottom:8px;color:var(--accent)}
+  .page-dark .card h3{color:var(--accent-light)}
+  .card p{font-size:.95rem;opacity:.85;line-height:1.55}
+  .card code{background:rgba(59,130,246,.12);padding:2px 6px;border-radius:4px;font-size:.85rem;font-family:'SF Mono',Consolas,monospace}
+  .page-dark .card code{background:rgba(96,165,250,.15)}
+
+  /* ---------- stat row ---------- */
+  .stat-row{display:flex;flex-wrap:wrap;gap:32px;margin:32px 0}
+  .stat{flex:1;min-width:180px;text-align:center}
+  .stat .num{font-size:2.8rem;font-weight:800;color:var(--accent);line-height:1.1}
+  .page-dark .stat .num{color:var(--accent-light)}
+  .stat .label{font-size:.95rem;opacity:.7;margin-top:4px}
+
+  /* ---------- table ---------- */
+  .tbl-wrap{overflow-x:auto;margin-top:16px}
+  table{width:100%;border-collapse:collapse;font-size:.95rem}
+  th,td{padding:14px 18px;text-align:left;border-bottom:1px solid #e2e8f0}
+  .page-dark th,.page-dark td{border-color:var(--border)}
+  th{font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--accent)}
+  .page-dark th{color:var(--accent-light)}
+  td{opacity:.9}
+
+  /* ---------- check / cross ---------- */
+  .check{color:#22c55e;font-weight:700}
+  .check::before{content:'\2713 '}
+  .cross{color:#ef4444;font-weight:700}
+  .cross::before{content:'\2717 '}
+
+  /* ---------- timeline ---------- */
+  .timeline{position:relative;padding-left:36px;margin-top:24px}
+  .timeline::before{content:'';position:absolute;left:14px;top:0;bottom:0;width:3px;background:var(--accent);border-radius:3px}
+  .timeline .step{position:relative;margin-bottom:36px}
+  .timeline .step::before{content:'';position:absolute;left:-29px;top:6px;width:14px;height:14px;border-radius:50%;background:var(--accent);border:3px solid var(--bg-dark)}
+  .page-light .timeline .step::before{border-color:var(--bg-light)}
+  .timeline .step h3{font-size:1.1rem;font-weight:700;margin-bottom:4px}
+  .timeline .step p{font-size:.95rem;opacity:.8}
+
+  /* ---------- quote ---------- */
+  .quote{border-left:4px solid var(--accent);padding:20px 28px;margin:32px 0;font-style:italic;font-size:1.05rem;opacity:.85;background:rgba(59,130,246,.06);border-radius:0 8px 8px 0}
+  .page-dark .quote{background:rgba(59,130,246,.1)}
+
+  /* ---------- CTA ---------- */
+  .cta-box{text-align:center;margin-top:48px}
+  .cta-box h2{margin-bottom:16px}
+  .cta-box p{max-width:600px;margin:0 auto 28px;font-size:1.1rem;opacity:.9}
+  .cta-btn{display:inline-block;padding:16px 48px;background:#fff;color:var(--accent-dark);font-size:1.1rem;font-weight:700;border-radius:8px;text-decoration:none;transition:transform .15s,box-shadow .15s}
+  .cta-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.2)}
+
+  /* ---------- flow ---------- */
+  .flow{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px;margin:32px 0}
+  .flow-step{background:var(--card-dark);border:1px solid var(--border);border-radius:10px;padding:18px 24px;text-align:center;min-width:150px;flex:1}
+  .page-light .flow-step{background:var(--card-light);border-color:#e2e8f0}
+  .flow-step strong{display:block;font-size:1rem;margin-bottom:4px}
+  .flow-step span{font-size:.85rem;opacity:.7}
+  .flow-arrow{font-size:1.6rem;color:var(--accent);flex:0 0 auto}
+
+  /* ---------- footer ---------- */
+  .footer{text-align:center;padding:40px 24px;font-size:.85rem;opacity:.5;background:var(--bg-dark);color:var(--text-light)}
+
+  /* ---------- diagram ---------- */
+  .diagram{background:var(--card-dark);border:1px solid var(--border);border-radius:12px;padding:32px;margin:24px 0;text-align:center}
+  .page-light .diagram{background:var(--card-light);border-color:#e2e8f0}
+  .diagram-row{display:flex;align-items:center;justify-content:center;gap:16px;margin:12px 0;flex-wrap:wrap}
+  .diagram-box{border:2px solid var(--accent);border-radius:8px;padding:12px 20px;font-weight:600;font-size:.9rem;min-width:120px}
+  .diagram-arrow{color:var(--accent);font-size:1.4rem}
+  .diagram-label{font-size:.8rem;opacity:.6;margin-top:8px}
+
+  /* ---------- badge list ---------- */
+  .badge-list{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}
+  .badge{background:rgba(59,130,246,.15);color:var(--accent-light);padding:6px 14px;border-radius:20px;font-size:.85rem;font-weight:600}
+  .page-light .badge{background:rgba(59,130,246,.1);color:var(--accent-dark)}
+</style>
+</head>
+<body>
+
+<!-- ========== PAGE 1: COVER ========== -->
+<section class="page cover">
+  <div class="brand">HyperSDK</div>
+  <h1>Security &amp; Compliance<br>Architecture</h1>
+  <p class="subtitle">How machina protects your virtualization infrastructure with defense-in-depth security, strict input validation, and comprehensive audit capabilities.</p>
+</section>
+
+<!-- ========== PAGE 2: AUTHENTICATION ========== -->
+<section class="page page-dark">
+  <h2>Authentication</h2>
+  <p class="lead">Multi-layered authentication with PAM integration, secure session management, and API token support for automation.</p>
+
+  <div class="card-grid" style="margin-bottom:40px">
+    <div class="card">
+      <h3>PAM Integration</h3>
+      <p>Authenticate against system users via Linux PAM. Supports local accounts, LDAP, SSSD, and any PAM-compatible identity provider. No separate user database to manage.</p>
+    </div>
+    <div class="card">
+      <h3>Session Management</h3>
+      <p>Secure cookie-based sessions with <code>HttpOnly</code> and <code>SameSite=Strict</code> flags. Sessions cannot be read by JavaScript or sent cross-origin. Automatic expiration and renewal.</p>
+    </div>
+    <div class="card">
+      <h3>API Tokens</h3>
+      <p>Machine-to-machine authentication via <code>mach_</code>-prefixed tokens (32 random bytes as hex; legacy <code>vs_</code> tokens remain valid until rotated). Tokens can be scoped and revoked independently of user sessions.</p>
+    </div>
+  </div>
+
+  <h3 style="margin-bottom:16px;color:var(--accent-light)">Authentication Flow</h3>
+  <div class="diagram">
+    <div class="diagram-row">
+      <div class="diagram-box">Client</div>
+      <div class="diagram-arrow">&rarr;</div>
+      <div class="diagram-box">POST /api/auth/login</div>
+      <div class="diagram-arrow">&rarr;</div>
+      <div class="diagram-box">PAM Verify</div>
+    </div>
+    <div class="diagram-label">Username + Password validated against system PAM stack</div>
+    <div class="diagram-row" style="margin-top:20px">
+      <div class="diagram-box">PAM OK</div>
+      <div class="diagram-arrow">&rarr;</div>
+      <div class="diagram-box">Generate Session</div>
+      <div class="diagram-arrow">&rarr;</div>
+      <div class="diagram-box" style="border-color:#22c55e">HttpOnly Cookie</div>
+    </div>
+    <div class="diagram-label">Secure session cookie returned (SameSite=Strict, HttpOnly)</div>
+    <div class="diagram-row" style="margin-top:28px">
+      <div class="diagram-box">Automation Client</div>
+      <div class="diagram-arrow">&rarr;</div>
+      <div class="diagram-box">Authorization: Bearer mach_...</div>
+      <div class="diagram-arrow">&rarr;</div>
+      <div class="diagram-box">Token Lookup</div>
+    </div>
+    <div class="diagram-label">API tokens bypass PAM — validated against stored token hashes</div>
+  </div>
+</section>
+
+<!-- ========== PAGE 3: AUTHORIZATION (RBAC) ========== -->
+<section class="page page-light">
+  <h2>Authorization</h2>
+  <p class="lead">Role-Based Access Control with three built-in roles. Defaults to the most restrictive role for unknown users.</p>
+
+  <div class="card-grid">
+    <div class="card" style="border-top:4px solid #ef4444">
+      <h3 style="color:#ef4444">Admin</h3>
+      <p><strong>Full access</strong> to all operations including user management, system configuration, and destructive actions.</p>
+      <div class="badge-list" style="margin-top:12px">
+        <span class="badge" style="background:rgba(239,68,68,.12);color:#ef4444">Create/Delete VMs</span>
+        <span class="badge" style="background:rgba(239,68,68,.12);color:#ef4444">Manage Users</span>
+        <span class="badge" style="background:rgba(239,68,68,.12);color:#ef4444">System Config</span>
+        <span class="badge" style="background:rgba(239,68,68,.12);color:#ef4444">Backups</span>
+        <span class="badge" style="background:rgba(239,68,68,.12);color:#ef4444">Migration</span>
+      </div>
+    </div>
+    <div class="card" style="border-top:4px solid var(--accent)">
+      <h3>Operator</h3>
+      <p><strong>Manage VMs</strong> — start, stop, create, snapshot, console access. Cannot manage users or modify system settings.</p>
+      <div class="badge-list" style="margin-top:12px">
+        <span class="badge">Create/Delete VMs</span>
+        <span class="badge">Start/Stop</span>
+        <span class="badge">Console Access</span>
+        <span class="badge">Snapshots</span>
+        <span class="badge" style="background:rgba(239,68,68,.08);color:#ef4444;text-decoration:line-through">Manage Users</span>
+      </div>
+    </div>
+    <div class="card" style="border-top:4px solid #22c55e">
+      <h3 style="color:#22c55e">ReadOnly</h3>
+      <p><strong>View only</strong> — list VMs, view metrics, read logs. Cannot modify any resource. This is the <strong>default role</strong> for unknown users.</p>
+      <div class="badge-list" style="margin-top:12px">
+        <span class="badge" style="background:rgba(34,197,94,.1);color:#22c55e">List VMs</span>
+        <span class="badge" style="background:rgba(34,197,94,.1);color:#22c55e">View Metrics</span>
+        <span class="badge" style="background:rgba(34,197,94,.1);color:#22c55e">Read Logs</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="quote">
+    Unknown or unauthenticated users default to <strong>ReadOnly</strong> permissions. The principle of least privilege is enforced at every layer.
+  </div>
+</section>
+
+<!-- ========== PAGE 4: INPUT VALIDATION & HARDENING ========== -->
+<section class="page page-dark">
+  <h2>Input Validation &amp; Hardening</h2>
+  <p class="lead">Every user input is validated, sanitized, and bounded before it reaches libvirt. Defense-in-depth at every layer.</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <h3>Name Validation</h3>
+      <p>VM, network, and pool names restricted to <code>1-64</code> characters. Only alphanumeric, hyphens, underscores, and dots allowed. Rejects empty strings and special characters.</p>
+    </div>
+    <div class="card">
+      <h3>vCPU / Memory / Disk Bounds</h3>
+      <p>vCPU capped at sane limits. Memory bounded between <code>64 MB</code> and <code>1 TB</code>. Disk resize capped at <code>0-10240 GB</code> to prevent f64 overflow and UB.</p>
+    </div>
+    <div class="card">
+      <h3>XML Escaping</h3>
+      <p>All user inputs are XML-escaped before insertion into libvirt domain XML. Prevents XML injection attacks that could alter VM definitions.</p>
+    </div>
+    <div class="card">
+      <h3>Path Canonicalization</h3>
+      <p>ISO paths and file references pass through <code>canonicalize()</code> + <code>is_file()</code> checks. Resolves symlinks and prevents path traversal attacks.</p>
+    </div>
+    <div class="card">
+      <h3>Integer Overflow Protection</h3>
+      <p>All capacity calculations use <code>checked_mul()</code> instead of unchecked arithmetic. Prevents silent overflow that could lead to zero-sized allocations.</p>
+    </div>
+    <div class="card">
+      <h3>SSRF Prevention</h3>
+      <p>Migration URIs validated against an allowlist: <code>qemu://</code>, <code>qemu+ssh://</code>, <code>qemu+tcp://</code>, <code>qemu+tls://</code>, <code>qemu+unix://</code>. Blocks arbitrary URI schemes.</p>
+    </div>
+    <div class="card">
+      <h3>Webhook URL Validation</h3>
+      <p>Webhook destinations restricted to <code>http://</code> and <code>https://</code> schemes only. Prevents <code>file://</code>, <code>ftp://</code>, and other protocol abuse.</p>
+    </div>
+    <div class="card">
+      <h3>Email Header Injection</h3>
+      <p>Alert email fields sanitized to prevent CRLF injection. Newlines and carriage returns stripped from all header values.</p>
+    </div>
+    <div class="card">
+      <h3>USB ID Validation</h3>
+      <p>USB vendor and product IDs validated as proper hexadecimal values. Prevents injection of malicious device identifiers via the USB passthrough API.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PAGE 5: NETWORK SECURITY ========== -->
+<section class="page page-light">
+  <h2>Network Security</h2>
+  <p class="lead">Minimal attack surface with same-origin enforcement, strict path validation, and systemd sandboxing.</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <h3>Same-Origin Policy</h3>
+      <p>No CORS layer configured. The API only accepts requests from the same origin, preventing cross-site request forgery and unauthorized cross-origin access.</p>
+    </div>
+    <div class="card">
+      <h3>PTY Path Validation</h3>
+      <p>Serial console paths must start with <code>/dev/pts/</code>. Prevents arbitrary file read/write through the console WebSocket endpoint.</p>
+    </div>
+    <div class="card">
+      <h3>SSH Host Validation</h3>
+      <p>SSH connection targets validated before spawning sessions. Prevents SSH to unintended hosts through the browser-based SSH terminal.</p>
+    </div>
+    <div class="card">
+      <h3>Systemd Hardening</h3>
+      <p>The daemon runs with extensive systemd sandboxing directives for defense-in-depth process isolation.</p>
+    </div>
+  </div>
+
+  <h3 style="margin-top:40px;margin-bottom:16px;color:var(--accent-dark)">Systemd Security Directives</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>Directive</th><th>Setting</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>ProtectSystem</code></td><td>strict</td><td>Mount filesystem read-only except explicit paths</td></tr>
+        <tr><td><code>NoNewPrivileges</code></td><td>true</td><td>Prevent privilege escalation via setuid/setgid</td></tr>
+        <tr><td><code>PrivateTmp</code></td><td>true</td><td>Isolated /tmp namespace per service</td></tr>
+        <tr><td><code>RestrictAddressFamilies</code></td><td>AF_UNIX AF_INET AF_INET6</td><td>Block exotic socket families</td></tr>
+        <tr><td><code>ReadWritePaths</code></td><td>/dev/pts, /var/lib/machina</td><td>Minimal writable paths for console + backups</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ========== PAGE 6: AUDIT & MONITORING ========== -->
+<section class="page page-dark">
+  <h2>Audit &amp; Monitoring</h2>
+  <p class="lead">Complete visibility into every operation with structured audit logs, real-time events, and Prometheus-compatible metrics.</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <h3>Audit Logging</h3>
+      <p>Every API call is logged with timestamp, user, action, target resource, and result. Structured log format compatible with log aggregation tools (ELK, Loki, Splunk).</p>
+    </div>
+    <div class="card">
+      <h3>Prometheus Metrics</h3>
+      <p>Export host and VM metrics in Prometheus exposition format. CPU, memory, disk I/O, and network throughput per VM. Scrape-ready at <code>/api/metrics/prometheus</code>.</p>
+    </div>
+    <div class="card">
+      <h3>Real-Time WebSocket Events</h3>
+      <p>Live event stream over WebSocket for VM state changes, errors, and system alerts. Powers the web UI dashboard and can feed external monitoring systems.</p>
+    </div>
+    <div class="card">
+      <h3>Destructive Action Safeguards</h3>
+      <p>Toast notifications and confirmation dialogs for destructive operations (delete VM, remove snapshot, wipe storage). Prevents accidental data loss with explicit user confirmation.</p>
+    </div>
+  </div>
+
+  <div class="flow" style="margin-top:48px">
+    <div class="flow-step">
+      <strong>User Action</strong>
+      <span>API call or UI click</span>
+    </div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step">
+      <strong>Auth Check</strong>
+      <span>Session / Token + RBAC</span>
+    </div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step">
+      <strong>Audit Log</strong>
+      <span>Structured record written</span>
+    </div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step">
+      <strong>Execute</strong>
+      <span>libvirt operation</span>
+    </div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step">
+      <strong>WS Event</strong>
+      <span>Real-time broadcast</span>
+    </div>
+  </div>
+</section>
+
+<!-- ========== PAGE 7: COMPLIANCE CHECKLIST ========== -->
+<section class="page page-accent">
+  <h2>Compliance Checklist</h2>
+  <p class="lead">machina addresses key security controls required by enterprise compliance frameworks.</p>
+
+  <div class="tbl-wrap">
+    <table style="background:rgba(255,255,255,.1);border-radius:12px;overflow:hidden">
+      <thead>
+        <tr>
+          <th style="color:#fff;opacity:.9">Security Control</th>
+          <th style="color:#fff;opacity:.9">Status</th>
+          <th style="color:#fff;opacity:.9">Implementation</th>
+        </tr>
+      </thead>
+      <tbody style="color:#fff">
+        <tr>
+          <td>Authentication</td>
+          <td><span class="check" style="color:#86efac">Implemented</span></td>
+          <td>PAM integration with system users, LDAP/SSSD support</td>
+        </tr>
+        <tr>
+          <td>Authorization (RBAC)</td>
+          <td><span class="check" style="color:#86efac">Implemented</span></td>
+          <td>Three-tier role model: Admin, Operator, ReadOnly</td>
+        </tr>
+        <tr>
+          <td>Encryption in Transit (TLS)</td>
+          <td><span class="check" style="color:#86efac">Implemented</span></td>
+          <td>TLS termination via reverse proxy or built-in TLS</td>
+        </tr>
+        <tr>
+          <td>Audit Logging</td>
+          <td><span class="check" style="color:#86efac">Implemented</span></td>
+          <td>All operations logged with user, action, timestamp</td>
+        </tr>
+        <tr>
+          <td>Input Validation</td>
+          <td><span class="check" style="color:#86efac">Implemented</span></td>
+          <td>9 validation layers covering all user inputs</td>
+        </tr>
+        <tr>
+          <td>SSRF Prevention</td>
+          <td><span class="check" style="color:#86efac">Implemented</span></td>
+          <td>URI scheme allowlist for migration endpoints</td>
+        </tr>
+        <tr>
+          <td>Session Management</td>
+          <td><span class="check" style="color:#86efac">Implemented</span></td>
+          <td>HttpOnly + SameSite=Strict cookies, auto-expiry</td>
+        </tr>
+        <tr>
+          <td>Least Privilege (systemd)</td>
+          <td><span class="check" style="color:#86efac">Implemented</span></td>
+          <td>ProtectSystem=strict, NoNewPrivileges, PrivateTmp</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="cta-box" style="margin-top:56px">
+    <p style="font-size:1rem;opacity:.85">Need a detailed security audit report or compliance mapping for your organization?</p>
+    <a href="#" class="cta-btn">Contact HyperSDK Security Team</a>
+  </div>
+</section>
+
+<!-- ========== FOOTER ========== -->
+<footer class="footer">
+  HyperSDK &middot; machina &mdash; Security &amp; Compliance Architecture &middot; Confidential
+</footer>
+
+</body>
+</html>

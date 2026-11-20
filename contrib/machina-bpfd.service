@@ -1,0 +1,60 @@
+[Unit]
+Description=Machina native eBPF datapath (enforcement, flows, process telemetry, QoS, capture)
+Documentation=https://github.com/zyvorai/machina
+After=network-online.target local-fs.target
+Wants=network-online.target
+Before=machina-agent.service machina-daemon.service
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+EnvironmentFile=-/etc/default/machina-bpfd
+# Clients (daemon, agent, CNI) run as root; an empty group keeps the socket 0600.
+Environment=MACHINA_BPFD_SOCKET_GROUP=
+Environment=MACHINA_BPFD_SOCK=/run/machina-bpf/bpfd.sock
+Environment=MACHINA_BPFD_STATE_DIR=/var/lib/machina/bpf
+Environment=RUST_LOG=machina_bpf=info
+Environment=MACHINA_BPF_REQUIRED=true
+
+ExecStart=/usr/local/bin/machina-bpfd
+Restart=always
+RestartSec=3
+# Stopping detaches every program: the datapath fails open, never closed.
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+RuntimeDirectory=machina-bpf
+RuntimeDirectoryMode=0750
+StateDirectory=machina/bpf
+StateDirectoryMode=0750
+
+# Load programs, attach tc/xdp/cgroup/tracepoint hooks, read perf/ringbuf,
+# signal denied processes, install the fq qdisc for QoS, and send VM L7
+# frames on AF_PACKET sockets (CAP_NET_RAW).
+CapabilityBoundingSet=CAP_BPF CAP_NET_ADMIN CAP_PERFMON CAP_SYS_ADMIN CAP_SYS_RESOURCE CAP_KILL CAP_DAC_READ_SEARCH CAP_NET_RAW
+AmbientCapabilities=CAP_BPF CAP_NET_ADMIN CAP_PERFMON CAP_SYS_ADMIN CAP_SYS_RESOURCE CAP_KILL CAP_DAC_READ_SEARCH CAP_NET_RAW
+NoNewPrivileges=true
+LimitMEMLOCK=infinity
+ProtectHome=true
+ProtectSystem=full
+PrivateTmp=true
+ProtectClock=true
+ProtectHostname=true
+RestrictRealtime=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6 AF_PACKET
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=machina-bpfd
+
+MemoryMax=512M
+TasksMax=64
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

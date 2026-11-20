@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Replace OpenStack</title>
+<!-- SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+     1600x860. Rendered by ./build.sh to docs/ux/readme-replace-openstack.jpg. Each mapping is a Machina component; gaps are
+     recorded in docs/migration/from-openstack.md and docs/claims.md. -->
+<link rel="stylesheet" href="card.css">
+<style>
+  body { height:880px; }
+  h1 { font-size:52px; }
+  .map { margin-top:24px; display:grid; grid-template-columns:1fr 1fr; gap:10px 56px; }
+  .rw { display:grid; grid-template-columns:200px 36px 1fr; align-items:center; gap:0 8px; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:10px 16px; }
+  .rw .o { font-size:21px; font-weight:700; color:#ff9f95; line-height:1.1; } .rw .o small { display:block; font-size:14px; font-weight:500; color:var(--muted); font-family:var(--mono); }
+  .rw .ar { color:var(--signal); font-size:26px; text-align:center; }
+  .rw .m { font-size:19px; line-height:1.28; color:#e5e5ea; } .rw .m b { color:var(--ink); }
+  .gaps { margin-top:20px; display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  .gaps div { background:rgba(255,159,10,.09); border:1px solid rgba(255,159,10,.35); border-radius:12px; padding:11px 16px; font-size:18px; line-height:1.3; color:#f0dcb6; }
+  .gaps b { display:block; font-family:var(--mono); font-size:14px; letter-spacing:.1em; color:var(--amber); margin-bottom:3px; }
+</style></head><body>
+<div class="bar"></div>
+<div class="wrap">
+  <div class="top"><img src="../../../web/public/zyvor-favicon.svg" alt=""><b>Zyvor</b><span>&middot;</span><span>Machina</span><span class="r2" style="margin-left:auto;color:var(--signal)">Replace OpenStack, service by service</span></div>
+  <h1>Nine services in, <em>four services out.</em></h1>
+  <div class="map">
+    <div class="rw"><div class="o">Keystone<small>identity</small></div><div class="ar">&rarr;</div><div class="m"><b>PAM, OIDC, SAML, LDAP</b> + RBAC, scoped API keys</div></div>
+    <div class="rw"><div class="o">Nova<small>compute</small></div><div class="ar">&rarr;</div><div class="m"><b>daemon + agent</b> on libvirt/KVM; controller schedules</div></div>
+    <div class="rw"><div class="o">Neutron<small>networking</small></div><div class="ar">&rarr;</div><div class="m"><b>eBPF VM edge</b>, network policy, VPC objects, NAT, Elastic IPs</div></div>
+    <div class="rw"><div class="o">Glance<small>images</small></div><div class="ar">&rarr;</div><div class="m"><b>Images + Golden Forge</b> (virt-builder, Packer)</div></div>
+    <div class="rw"><div class="o">Cinder<small>block storage</small></div><div class="ar">&rarr;</div><div class="m"><b>Volumes</b>, I/O limits, Atlas (Ceph/NFS/ZFS)</div></div>
+    <div class="rw"><div class="o">Heat<small>orchestration</small></div><div class="ar">&rarr;</div><div class="m"><b>Stacks</b>: dry run, approval, drift repair</div></div>
+    <div class="rw"><div class="o">Octavia<small>load balancing</small></div><div class="ar">&rarr;</div><div class="m"><b>Native L4 balancer</b> on the host, no amphora VM</div></div>
+    <div class="rw"><div class="o">Horizon<small>dashboard</small></div><div class="ar">&rarr;</div><div class="m"><b>Web UI</b> + browser consoles, built in</div></div>
+    <div class="rw"><div class="o">Masakari, Watcher<small>HA, placement</small></div><div class="ar">&rarr;</div><div class="m"><b>HA failover + DRS</b> in the controller</div></div>
+    <div class="rw"><div class="o">Ceilometer, Aodh<small>telemetry, alarms</small></div><div class="ar">&rarr;</div><div class="m"><b>Metrics + alarms</b> with scaling actions, Prometheus, OTLP</div></div>
+    <div class="rw"><div class="o">MariaDB, RabbitMQ<small>backing services</small></div><div class="ar">&rarr;</div><div class="m"><b>SQLite or PostgreSQL</b>; in-memory bus, NATS optional</div></div>
+    <div class="rw"><div class="o">EC2 clients<small>boto3, awscli, Terraform</small></div><div class="ar">&rarr;</div><div class="m"><b>EC2-compatible endpoint</b> on the controller</div></div>
+  </div>
+  <div class="gaps">
+    <div><b>COMPATIBILITY</b>Keystone/Nova/Glance/Cinder/Neutron façade on :5093; prefer native REST or EC2 for new automation.</div>
+    <div><b>SCALE</b>Built for fleets you own — not thousands of tenants or OVN/VXLAN/BGP-as-Neutron.</div>
+    <div><b>PROOF</b>Each feature's status (live host vs unit-only) is in docs/claims.md (C74–C76 for OpenStack).</div>
+  </div>
+  <div class="foot"><b>github.com/zyvorai/zyvor-machina</b><span class="r">OpenStack is a trademark of the Open Infrastructure Foundation</span></div>
+</div>
+</body></html>

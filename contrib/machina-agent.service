@@ -1,0 +1,47 @@
+[Unit]
+Description=Machina host agent (libvirt executor)
+Documentation=https://github.com/zyvorai/machina
+After=network-online.target machina-controller.service machina-bpfd.service
+Wants=network-online.target libvirtd.service machina-bpfd.service
+StartLimitIntervalSec=300
+StartLimitBurst=10
+# Do not Requires=libvirtd: on RHEL/CentOS 9 the monolithic unit may start
+# minutes after boot (socket-activated daemons); a hard Requires leaves agent dead.
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+EnvironmentFile=-/etc/default/machina-platform
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=MACHINA_LIBVIRT_URI=qemu:///system
+Environment=MACHINA_BPFD_SOCK=/run/machina-bpf/bpfd.sock
+
+ExecStartPre=-/usr/bin/systemctl start libvirtd.service
+# 50051/50052 sit inside the default ephemeral range (32768-60999): during a
+# restart a local outbound connection (controller, daemon) can take one as its
+# source port and hold it in a keep-alive pool, and the bind fails with EADDRINUSE
+# until that connection closes. Reserve them (appended, other reservations kept).
+ExecStartPre=-/bin/sh -c 'f=/proc/sys/net/ipv4/ip_local_reserved_ports; r=$$(cat $$f); case ",$$r," in *,50051-50052,*) ;; *) echo "$${r:+$$r,}50051-50052" > $$f ;; esac'
+# Listen addresses come from MACHINA_AGENT_LISTEN / MACHINA_AGENT_CONSOLE_LISTEN in /etc/default/machina-platform
+# (default 127.0.0.1:50051 / 127.0.0.1:50052); `machina-agent join --expose` sets them for a remote controller.
+ExecStart=/usr/local/bin/machina-agent
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+# Agent only execs virsh/qemu-img/kubectl/ipmitool/nvidia-smi etc — none need setuid/file-cap
+# escalation (it already runs as root) — safe to block new-privilege acquisition entirely.
+NoNewPrivileges=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=machina-agent
+
+MemoryMax=512M
+TasksMax=128
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

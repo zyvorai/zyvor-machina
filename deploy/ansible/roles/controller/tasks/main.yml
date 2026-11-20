@@ -1,0 +1,46 @@
+---
+- name: Copy the release packages
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/tmp/{{ item | basename }}"
+    mode: "0644"
+  loop: "{{ query('ansible.builtin.fileglob', machina_package_dir ~ '/machina*.deb') }}"
+  register: machina_pkgs
+
+- name: Install machina, machina-controller and machina-agent
+  ansible.builtin.apt:
+    deb: "{{ item.dest }}"
+    state: present
+  loop: "{{ machina_pkgs.results }}"
+  loop_control:
+    label: "{{ item.dest }}"
+
+- name: Settings for the join listener and the public URL (the env file is root-only)
+  ansible.builtin.lineinfile:
+    path: /etc/default/machina-platform
+    regexp: "^{{ item.key }}="
+    line: "{{ item.key }}={{ item.value }}"
+    mode: "0600"
+  loop:
+    - { key: MACHINA_PUBLIC_URL, value: "{{ machina_public_url }}" }
+    - { key: MACHINA_CONTROLLER_TLS_ADDR, value: "{{ machina_tls_addr }}" }
+    - { key: MACHINA_CONTROLLER_TLS_SANS, value: "{{ machina_tls_sans }}" }
+  loop_control:
+    label: "{{ item.key }}"
+  notify: restart machina-controller
+
+- name: Apply the settings now (the next steps talk to the controller)
+  ansible.builtin.meta: flush_handlers
+
+- name: Publish the agent so bare nodes can install it from this controller
+  ansible.builtin.command: machinactl dist publish
+  changed_when: true
+
+- name: Wait for the controller
+  ansible.builtin.uri:
+    url: http://127.0.0.1:5093/api/v1/health
+    status_code: 200
+  register: ctl_health
+  retries: 20
+  delay: 3
+  until: ctl_health.status == 200

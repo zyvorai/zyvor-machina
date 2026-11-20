@@ -1,0 +1,35 @@
+[Unit]
+Description=Machina platform controller (central management API)
+Documentation=https://github.com/zyvorai/machina
+After=network-online.target
+Wants=network-online.target
+# Disable burst limit — controller will retry on startup failures
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+EnvironmentFile=-/etc/default/machina-platform
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+ExecStartPre=/bin/sh -c 'test ! -x /usr/libexec/machina/production-preflight || exec /usr/libexec/machina/production-preflight'
+ExecStart=/usr/local/bin/machina-controller --host 127.0.0.1 --port 5093
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+# Controller never execs sudo/pkexec (unlike machina-daemon, which needs new-privilege
+# escalation for its optional polkit run-as-user feature) — safe to block entirely.
+NoNewPrivileges=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=machina-controller
+
+MemoryMax=1G
+TasksMax=256
+
+[Install]
+WantedBy=multi-user.target

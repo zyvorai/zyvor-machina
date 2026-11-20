@@ -1,0 +1,66 @@
+Machina — Host setup (libvirt / QEMU — not Kubernetes)
+========================================================
+
+Machina runs on a Linux hypervisor host with libvirt. It does NOT require Kubernetes.
+
+WHAT MUST EXIST FOR MACHINA TO WORK
+-----------------------------------
+  1. Linux x86_64 with hardware virtualization (VT-x / AMD-V)
+  2. libvirt + qemu-kvm (KVM hypervisor)
+  3. User in group libvirt (or root for ./machina-daemon)
+  4. ./install.sh completed; config at /etc/machina/config.toml
+  5. machina-daemon listening (default https://<host>:5092)
+
+ORDER OF OPERATIONS
+-------------------
+  Step A  ./install.sh                 # OS packages + config template
+  Step B  sudo nano /etc/machina/config.toml
+  Step C  sudo ./machina-daemon --config /etc/machina/config.toml
+  Step D  ./test-host.sh && ./test-package.sh
+  Step E  Browser: https://<server-ip>:5092
+
+STEP A — install.sh
+--------------------
+  Installs libvirt/qemu via install-client-deps.sh (dnf/apt).
+  Does NOT call the full Machina source installer recursively.
+
+STEP B — Configuration
+----------------------
+  Required settings in /etc/machina/config.toml (see machina.toml.example):
+    - listen address / TLS
+    - storage pools / default network
+    - authentication
+
+STEP C — Start daemon
+---------------------
+  sudo ./machina-daemon --config /etc/machina/config.toml
+
+  Optional systemd (if machina-daemon.service shipped):
+    sudo cp machina-daemon.service /etc/systemd/system/
+    sudo systemctl enable --now machina-daemon
+
+FULL HOST INSTALL (optional)
+----------------------------
+  For a full production host install (deps, mkosi, packer, systemd) from the tarball:
+    sudo ./install-full.sh --bind 0.0.0.0 --open-firewall
+  No git clone required — uses the bundled machina-daemon binary.
+
+FLAGS (install-full.sh / source install.sh)
+  --deps-only          OS packages only
+  --bind 0.0.0.0       Listen on all interfaces
+  --open-firewall      Open firewall for API port
+  --remote user@host   Install on remote host via SSH
+  --uninstall          Remove Machina
+
+TEST
+----
+  ./test-host.sh        libvirt / KVM / config checks
+  ./test-package.sh     binary + daemon health
+
+TROUBLESHOOTING
+---------------
+  Cannot connect to libvirt → sudo systemctl start libvirtd; usermod -aG libvirt $USER
+  Health check fails     → daemon running, TLS trust, port 5092 open
+  No VMs                 → define pools/networks in config.toml
+
+See PREREQUISITES.txt for checklist.

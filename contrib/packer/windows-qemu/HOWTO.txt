@@ -1,0 +1,25 @@
+AlmaLinux / RHEL-class host: dnf install qemu-kvm qemu-img libvirt virt-install edk2-ovmf wget curl unzip && systemctl enable --now libvirtd
+
+1) wget -O virtio-win.iso https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/latest-virtio/virtio-win.iso
+2) cp /path/to/your-windows.iso WinServer.iso
+3) packer init . && packer build windows.pkr.hcl
+4) Output: output-windows/windows.qcow2
+
+Build uses IDE for the install disk then VirtIO drivers from the second CDROM; boot the image with virtio (if=virtio) after build.
+
+Administrator / Password123! (see Autounattend.xml)
+
+SECURITY: Password123! and the open/insecure WinRM listener are build-time-
+only conveniences required so Packer can provision the image unattended.
+scripts/harden-on-first-boot.ps1 automatically reverts the insecure WinRM
+config and any AutoLogon remnants on the FIRST real boot of a VM cloned
+from this image, but it does NOT rotate the Administrator password (doing
+so automatically could break downstream first-boot customization flows
+that expect to authenticate with this known credential). Treat
+Administrator/Password123! as a publicly-known credential baked into every
+VM created from this golden image, and rotate it (e.g. via your first-boot
+customization/specialize tooling) before any such VM is exposed to an
+untrusted network.
+
+For unattended Windows 10/11 golden qcow2 without supplying your own ISO,
+see ../windows-dockur/README.md (dockur/windows via Podman; Golden Forge win10/win11).

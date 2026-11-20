@@ -1,0 +1,447 @@
+/* ============================================================================
+   machina-apple-ux.css — apple.com Story-tier layout primitives for Machina.
+   Laws: docs/design/APPLE-UX-CONTRACT.md
+   Colors: machina-daylight.css (iPhone 17 finishes)
+   ========================================================================= */
+
+.apple-section {
+  width: 100%;
+  padding: clamp(1.25rem, 2.5vw, 2.25rem) clamp(1rem, 3vw, 2rem);
+}
+
+.apple-section--tight {
+  padding-top: clamp(0.85rem, 1.5vw, 1.25rem);
+  padding-bottom: clamp(0.85rem, 1.5vw, 1.25rem);
+}
+
+.apple-eyebrow {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  line-height: 1.333;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 0 0 0.4rem;
+}
+
+/* AirPods-style centered hero band — full-bleed glow, theatrical scale */
+.apple-hero-band {
+  position: relative;
+  text-align: center;
+  overflow: hidden;
+  padding-top: clamp(3rem, 7vw, 5.5rem);
+  padding-bottom: clamp(2rem, 4vw, 3.5rem);
+}
+
+.apple-hero-band::before {
+  content: '';
+  position: absolute;
+  inset: -20% -10% auto -10%;
+  height: 28rem;
+  background: radial-gradient(60% 60% at 50% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%);
+  pointer-events: none;
+}
+
+.apple-hero-band > * {
+  position: relative;
+}
+
+.apple-hero-band .apple-display {
+  font-size: clamp(3rem, 7.5vw, 5.5rem);
+  line-height: 0.98;
+}
+
+.apple-hero-band .apple-eyebrow {
+  text-align: center;
+}
+
+.apple-hero-band .apple-lede {
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.apple-hero-band .apple-cta-row {
+  justify-content: center;
+}
+
+/* Dark theatrical variant — VM/product-shot stages */
+.apple-hero-band--dark {
+  background: radial-gradient(70% 90% at 50% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 65%), #050506;
+  padding-left: clamp(1rem, 3vw, 2rem);
+  padding-right: clamp(1rem, 3vw, 2rem);
+}
+
+.apple-hero-band--dark::before {
+  content: none;
+}
+
+.apple-hero-band--dark .apple-display,
+.apple-hero-band--dark .apple-lede {
+  color: #f5f5f7;
+}
+
+.apple-hero-band--dark .apple-lede {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* AirPods / apple.com Story display — SF Pro Display metrics */
+.apple-display {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.apple-display--sm {
+  font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.012em;
+}
+
+/* AirPods intro / hero-priceline body */
+.apple-lede {
+  font-family: var(--font-display);
+  font-size: clamp(1.0625rem, 1.6vw, 1.3125rem);
+  line-height: 1.381;
+  letter-spacing: 0.011em;
+  font-weight: 400;
+  color: var(--text-secondary);
+  max-width: 42rem;
+  margin: 0.65rem 0 0;
+}
+
+.apple-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  margin-top: 1.15rem;
+}
+
+.apple-text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  letter-spacing: -0.01em;
+  color: var(--link);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: none;
+}
+.apple-text-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  color: var(--link-hover);
+}
+
+.apple-metric-band {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.5rem;
+  width: 100%;
+  border-top: 1px solid var(--apple-hairline);
+  border-bottom: 1px solid var(--apple-hairline);
+  padding: clamp(1rem, 2vw, 1.5rem) 0;
+}
+
+@media (min-width: 1024px) {
+  .apple-metric-band {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.apple-metric-value {
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.apple-metric-label {
+  margin-top: 0.4rem;
+  font-size: 0.8125rem;
+  letter-spacing: -0.01em;
+  color: var(--text-secondary);
+}
+
+.apple-story-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  max-width: none;
+}
+
+.apple-story-stack > .apple-section + .apple-section {
+  border-top: 1px solid color-mix(in srgb, var(--apple-hairline) 70%, transparent);
+}
+
+.apple-dest-list {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.apple-dest-list > li {
+  border-top: 1px solid var(--apple-hairline);
+}
+
+.apple-dest-list > li:last-child {
+  border-bottom: 1px solid var(--apple-hairline);
+}
+
+.apple-dest-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.85rem 0;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+.apple-dest-row:hover {
+  opacity: 0.72;
+}
+
+.apple-dest-title {
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+
+.apple-dest-sub {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  letter-spacing: -0.01em;
+  margin-top: 0.15rem;
+}
+
+.apple-dest-chevron {
+  font-size: 1.25rem;
+  color: var(--link);
+  flex-shrink: 0;
+}
+
+html.apple-light .mission-control-page .mc-hero-ribbon,
+html.light-theme .mission-control-page .mc-hero-ribbon {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+/* --- All pages: Browse / Work shell ------------------------------------ */
+
+.apple-page {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1rem, 2vw, 1.5rem);
+  width: 100%;
+  max-width: none;
+}
+
+.apple-page--compact {
+  gap: 0.75rem;
+}
+
+.apple-page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .apple-page-header {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.25rem;
+  }
+  /* Keep the title/lede readable: when the action row is too wide it wraps below instead of
+     squeezing the text into a narrow column. */
+  .apple-page-header > :first-child {
+    flex: 1 1 24rem;
+  }
+  .apple-page-header > .apple-page-actions {
+    margin-left: auto;
+    /* natural width (wrap below the title when it does not fit) rather than sharing the row equally */
+    flex: 0 1 auto;
+  }
+}
+
+.apple-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.apple-page-body {
+  width: 100%;
+  min-width: 0;
+}
+
+.apple-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: clamp(1.75rem, 4vw, 2.75rem) 1.25rem;
+  border-radius: 1rem;
+  border: 1px solid var(--apple-hairline);
+  background: var(--apple-surface);
+  box-shadow: var(--shadow-1);
+}
+
+.apple-empty-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--apple-hairline);
+  color: var(--text-muted);
+  background: var(--surface-1, var(--apple-fill-tertiary));
+  margin-bottom: 0.85rem;
+}
+
+.apple-empty-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.apple-empty-copy {
+  margin: 0.5rem 0 0;
+  max-width: 28rem;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  color: var(--text-muted);
+}
+
+/* Classic + platform canvases share Work type scale */
+.mac-desktop-main .page-title,
+.liquid-glass-app .page-title {
+  font-size: clamp(1.375rem, 2.2vw, 1.75rem);
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+.mac-desktop-main .page-lede,
+.liquid-glass-app .page-lede {
+  font-size: 0.9375rem;
+  max-width: 42rem;
+}
+
+.mac-desktop-main .section-title {
+  font-size: clamp(1.0625rem, 1.6vw, 1.25rem);
+  letter-spacing: -0.02em;
+}
+
+/* Work-tier tables: quieter hairlines */
+.mac-desktop-main table,
+.liquid-glass-app table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.mac-desktop-main thead th,
+.liquid-glass-app thead th {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--apple-hairline);
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+
+.mac-desktop-main tbody td,
+.liquid-glass-app tbody td {
+  border-bottom: 1px solid color-mix(in srgb, var(--apple-hairline) 65%, transparent);
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
+  color: var(--text-primary);
+}
+
+/* Cards / panels default to white work surfaces under light */
+html.apple-light .mac-desktop-main .rounded-xl.border,
+html.light-theme .mac-desktop-main .rounded-xl.border,
+html.apple-light .mac-desktop-main .rounded-2xl.border,
+html.light-theme .mac-desktop-main .rounded-2xl.border {
+  border-color: var(--apple-hairline);
+}
+
+html.apple-light .tahoe-hero .text-white,
+html.light-theme .tahoe-hero .text-white {
+  color: var(--text-primary) !important;
+}
+
+/* Machine Finder browse chrome */
+.machine-finder-page {
+  width: 100%;
+  max-width: none;
+}
+
+.machine-finder-command-bar h1 {
+  font-size: clamp(1.375rem, 2.2vw, 1.75rem) !important;
+  letter-spacing: -0.025em;
+  font-weight: 600;
+}
+
+/* Fleet Cloud / manual page-title rows under hideHeader */
+.apple-page > .apple-eyebrow + .page-title {
+  margin-bottom: 0;
+}
+.apple-page > .apple-eyebrow {
+  margin-bottom: 0.25rem;
+}
+.apple-page > .page-title {
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--apple-hairline);
+}
+
+/* Work panels: consistent white cards */
+.apple-page .rounded-2xl.border {
+  box-shadow: var(--shadow-1);
+}
+
+html.apple-light .mac-desktop-main .divide-slate-800 > :not([hidden]) ~ :not([hidden]),
+html.light-theme .mac-desktop-main .divide-slate-800 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--apple-hairline);
+}
+
+html.apple-light .mac-desktop-main .bg-slate-900,
+html.light-theme .mac-desktop-main .bg-slate-900 {
+  background-color: #ffffff !important;
+}

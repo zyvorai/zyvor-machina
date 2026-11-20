@@ -1,0 +1,8 @@
+# Same as litestream.yml, replicating to a directory (NFS mount, second disk). Also used by `machina-ha.sh drill`.
+dbs:
+  - path: /var/lib/machina/controller.db
+    replicas:
+      - path: /replica
+        sync-interval: 1s
+        snapshot-interval: 6h
+        retention: 72h

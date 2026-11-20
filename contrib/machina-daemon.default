@@ -1,0 +1,17 @@
+# Optional environment for machina-daemon (see systemd EnvironmentFile).
+# Installed as /etc/default/machina-daemon when not present (installer uses mode 600).
+# If you copy this file by hand instead of via install.sh, once you set
+# MACHINA_PLATFORM_AUTH (a real credential) below, keep/set this file `chmod 600`
+# root-owned — it is otherwise a plaintext secret readable by any local user.
+#
+# RUST_LOG=info
+#
+# Co-located platform controller proxy (daemon → :5093 for /api/v1/platform/controller/*)
+# MACHINA_PLATFORM_CONTROLLER_URL=http://127.0.0.1:5093
+# MACHINA_PLATFORM_AUTH is a real Basic-auth credential the daemon presents to the
+# controller for every proxied request — it must match a real controller account,
+# not be left as the literal placeholder below. CHANGE_ME before uncommenting:
+# MACHINA_PLATFORM_AUTH=CHANGE_ME_user:CHANGE_ME_password
+#
+# Dev-only: bypass PAM on daemon API routes (do not set in production)
+# MACHINA_DAEMON_SKIP_AUTH=1

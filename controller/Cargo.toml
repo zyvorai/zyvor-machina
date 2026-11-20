@@ -1,0 +1,64 @@
+[package]
+name = "machina-controller"
+version = "0.1.0"
+edition = "2021"
+license = "LicenseRef-Zyvor-Production-1.0"
+
+[[bin]]
+name = "machina-controller"
+path = "src/main.rs"
+
+[features]
+# Exactly one database backend per build (see src/db/mod.rs): the embedded SQLite default, or PostgreSQL for large fleets.
+default = ["sqlite"]
+sqlite = ["sqlx/sqlite"]
+postgres = ["sqlx/postgres"]
+
+[dependencies]
+machina-core = { path = "../core" }
+machina-spec = { path = "../spec" }
+machina-translate = { path = "../translate" }
+machina-agent = { path = "../agent" }
+machina-bpf = { path = "../bpf/machina-bpf" }
+guestkit = { path = "../../guestkit", default-features = false, features = ["guest-inspect"] }
+guestkit-job-spec = { path = "../../guestkit/crates/guestkit-job-spec" }
+axum = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tower-http = { workspace = true }
+clap = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "uuid", "chrono", "json", "migrate", "macros"] }
+tonic = { version = "0.14", features = ["tls-ring", "tls-native-roots"] }
+futures-util = { workspace = true }
+tokio-stream = { workspace = true }
+async-nats = "0.50"
+bcrypt = "0.19"
+async-trait = "0.1"
+tower = { workspace = true }
+http = { workspace = true }
+base64 = { workspace = true }
+reqwest = { workspace = true }
+sha2 = "0.11"
+hmac = "0.13"
+jsonwebtoken = { version = "11", features = ["rust_crypto"] }
+urlencoding = "2"
+url = { workspace = true }
+axum-server = { workspace = true }
+rustls = { version = "0.23", default-features = false, features = ["std", "ring", "tls12"] }
+ring = "0.17"
+hex = "0.4"
+rand = { workspace = true }
+aes-gcm = { workspace = true }
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+crc32fast = "1"
+tokio-tungstenite = { version = "0.30", features = ["native-tls"] }
+native-tls = "0.2"
+lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder"] }
+bytes = "1"

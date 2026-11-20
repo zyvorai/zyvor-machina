@@ -1,0 +1,7 @@
+# Only a purge removes the generated credentials. Data under /var/lib/machina (VM backups, the controller database)
+# is never deleted automatically: remove it by hand once you are sure you do not need it.
+case "${1:-}" in purge)
+    rm -f /etc/default/machina-platform /etc/machina/INITIAL_ADMIN_PASSWORD
+    rmdir /etc/machina 2>/dev/null || true ;;
+esac
+exit 0

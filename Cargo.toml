@@ -1,0 +1,60 @@
+[workspace]
+members = [
+    "core",
+    "daemon",
+    "rvb",
+    "virt-image-build",
+    "run-as-user-helper",
+    "spec",
+    "translate",
+    "agent",
+    "controller",
+    "dbtool",
+    "vessel",
+    "bpf/machina-bpf-common",
+    "bpf/machina-bpf",
+    "bpf/machina-cni",
+    "bpf/machina-scx",
+]
+# Kernel-side eBPF programs: built by bpf/machina-bpf/build.rs for bpfel-unknown-none.
+exclude = ["bpf/machina-bpf-ebpf"]
+resolver = "2"
+
+[workspace.package]
+license = "LicenseRef-Zyvor-Production-1.0"
+[workspace.dependencies]
+virt = "0.4"
+axum = { version = "0.8", features = ["ws"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+anyhow = "1"
+thiserror = "2.0"
+tower-http = { version = "0.6", features = ["cors", "trace", "fs", "set-header"] }
+reqwest = { version = "0.12", features = ["json", "blocking", "stream"] }
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+futures-util = "0.3"
+tokio-util = { version = "0.7", features = ["io"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+pam-client = { version = "0.5", default-features = false }
+rand = "0.8"
+hex = "0.4"
+base64 = "0.22"
+hmac = "0.13"
+sha2 = "0.11"
+tower = "0.5"
+http = "1"
+axum-server = { version = "0.7", features = ["tls-rustls"] }
+portable-pty = "0.9"
+uuid = { version = "1", features = ["v4", "serde"] }
+url = "2"
+aes-gcm = "0.10"
+
+# The PostgreSQL build of machina-controller reads columns SQLite stored loosely (integers of any width, JSON and timestamps as
+# TEXT); this copy of sqlx-postgres relaxes its read-side type checks. See vendor/sqlx-postgres/MACHINA_PATCHES.md.
+[patch.crates-io]
+sqlx-postgres = { path = "vendor/sqlx-postgres" }

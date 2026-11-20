@@ -1,0 +1,149 @@
+# ─────────────────────────────────────────────────────────────────────
+# machina configuration
+# ─────────────────────────────────────────────────────────────────────
+#
+# Config file locations (checked in order, first found wins):
+#   1. /etc/machina/config.toml (system)
+#   2. ~/.machina/config.toml (per-user)
+#
+# CLI arguments override all config file values.
+# All settings below show the built-in defaults.
+
+[general]
+# How often the TUI polls the daemon for updated data (in seconds).
+# Lower values give faster updates but increase API traffic.
+# Range: 1-60 recommended.
+refresh_interval_secs = 5
+
+# Optional JSON Lines history on the daemon host (defaults shown).
+# [inventory_history]
+# enabled = true
+# interval_secs = 3600
+# max_file_mb = 64
+#
+# [k8s_inventory_history]
+# enabled = false
+# max_file_mb = 32
+#
+# [metrics_history]
+# enabled = true
+# interval_secs = 30
+# max_points = 120
+# persist = true
+# max_file_mb = 32
+#
+# Prometheus (GET /api/v1/prometheus): host/VM gauges, per-disk/NIC counters,
+# machina_http_request_duration_seconds histogram, and daemon self-metrics.
+#
+# [audit]
+# max_file_mb = 64
+# rotate_keep = 5
+# syslog_enabled = false
+# http_webhook_url = ""
+# webhook_authorization = ""
+#
+# [observability.otlp]
+# enabled = false
+# endpoint = "http://127.0.0.1:4318"
+# interval_secs = 60
+#
+# [observability.linux_audit]
+# enabled = true
+# max_events = 200
+# health_avc_threshold = 0
+[daemon]
+# Address and port the daemon binds to.
+# Use "0.0.0.0" to listen on all interfaces (default).
+# Use "127.0.0.1" to restrict to localhost only.
+host = "0.0.0.0"
+port = 5092
+
+[libvirt]
+# Libvirt connection URI.
+# Common values:
+#   "qemu:///system"   — system VMs (requires root or libvirt group)
+#   "qemu:///session"  — user-session VMs (no root needed)
+#   "qemu+ssh://user@host/system" — remote host over SSH
+#   "qemu+tcp://host/system"      — remote host over TCP
+uri = "qemu:///system"
+# When true, the daemon and UI merge qemu:///system + qemu:///session (same idea as Cockpit Machines).
+# dual_connection = false
+
+# VM create engine when the client omits `create_backend`: virt_install (default) or libvirt_xml.
+# create_backend = "virt_install"
+# Optional image builds via mkosi (`mkosi_workspace` API field). virt-builder stays off unless enabled.
+# mkosi_allowed = true
+# Legacy libguestfs virt-builder (only if you set virt_builder_allowed = true; install guestfs-tools).
+# virt_builder_allowed = false
+# Golden Forge Windows via dockur/windows (Podman + KVM). Requires podman on the host.
+# dockur_windows_allowed = false
+# dockur_disk_size = "64G"
+# dockur_ram_size = "4G"
+# dockur_cpu_cores = "2"
+# virt_builder_default_ssh_pubkey_path = ""
+# virt_builder_update = true
+# virt_builder_default_packages = ["qemu-guest-agent"]
+# virt_image_build_max_concurrent = 2
+# virt_image_build_timeout_secs = 0
+# virt_image_build_min_free_parent_bytes = 536870912
+# virt_image_build_min_free_tmp_bytes = 268435456
+
+# Browser SSH terminal (xterm.js): short-lived session ids, PTY + system `ssh`.
+# [ssh_terminal]
+# session_ttl_secs = 120
+# allow_adhoc_hosts = true
+# legacy_plain_host_websocket = false
+# [[ssh_terminal.targets]]
+# id = "lab-db"
+# host = "192.168.122.50"
+# ssh_user = "root"
+
+# KubeVirt manifest defaults for GET /api/v1/vms/{name}/kubevirt-bundle (libvirt qcow2 → CDI + VM YAML).
+# Optional: allow the daemon to run kubectl / virtctl on this host (same kubeconfig as your admin workstation).
+# [kubevirt]
+# default_namespace = "default"
+# default_storage_class = "local-path"
+# datavolume_padding_gi = 5
+# virtio_container_disk_image = "quay.io/kubevirt/virtio-container-disk:latest"
+# machine_type = "q35"
+# exec_enabled = false
+# kubectl_binary = "kubectl"
+# virtctl_binary = "virtctl"
+# kubeconfig_path = "/root/.kube/config"
+# upload_timeout_minutes = 120
+
+# FluxVM as a second VM backend next to libvirt (fluxvm-api REST).
+[fluxvm]
+enabled = false
+base_url = "http://127.0.0.1:7788"
+# token = ""            # bearer token from fluxvm [[auth.tokens]]
+# token_file = ""       # or read it from a file
+# insecure_tls = false
+# default_backend = "auto"   # auto | qemu | cloud-hypervisor | firecracker | flux-vm
+# insecure_tls also covers wss:// serial and the guest-agent console.
+# machina-agent uses this block too, unless MACHINA_FLUXVM_URL / _TOKEN / _INSECURE_TLS are set,
+# so the controller can power, migrate and HA re-create this host's FluxVM VMs.
+
+[guestkit]
+enabled = true
+base_url = "http://127.0.0.1:8080"
+insecure_tls = true
+
+# Web UI login: PAM by default, with optional OpenID Connect for browser SSO.
+# [auth]
+# pam_service = "sshd"
+# [auth.oidc]
+# enabled = true
+# issuer_url = "https://sso.example.com/realms/machina"
+# client_id = "machina-web"
+# client_secret = "replace-me"
+# redirect_url = "https://machina.example.com/api/v1/auth/oidc/callback"
+# scopes = ["openid", "profile", "email"]
+# username_claim = "preferred_username"
+# groups_claim = "groups"
+# linux_username_claim = "preferred_username"
+# admin_groups = ["machina-admins"]
+# operator_groups = ["machina-operators"]
+# default_role = "readonly"
+# button_label = "Sign in with SSO"
+# require_local_user_for_session_libvirt = true

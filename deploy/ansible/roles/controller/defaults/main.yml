@@ -1,0 +1,7 @@
+---
+# Directory on the machine running Ansible that holds the release packages
+# (machina_*.deb, machina-controller_*.deb, machina-agent_*.deb from a release).
+machina_package_dir: "{{ playbook_dir }}/packages"
+machina_public_url: "http://{{ ansible_host | default(inventory_hostname) }}:5093"
+machina_tls_addr: "0.0.0.0:5094"
+machina_tls_sans: ""

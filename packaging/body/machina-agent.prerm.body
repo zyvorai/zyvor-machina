@@ -1,0 +1,8 @@
+# Stop on removal only (deb: "remove"; rpm: "0"); an upgrade restarts the services in the new postinst.
+case "${1:-}" in remove|purge|0)
+    if have_systemd; then
+        systemctl stop machina-agent.service machina-bpfd.service >/dev/null 2>&1 || true
+        systemctl disable machina-agent.service machina-bpfd.service >/dev/null 2>&1 || true
+    fi ;;
+esac
+exit 0

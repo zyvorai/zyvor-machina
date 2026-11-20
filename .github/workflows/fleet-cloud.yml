@@ -1,0 +1,96 @@
+name: Fleet Cloud features
+
+# Runs the unit tests of every Fleet Cloud feature (docs/guides/features.json) one feature at a time, so a failure names the
+# feature, and checks the things that have broken before: migration numbering, guides that went missing, dead doc links.
+# The general CI workflow still runs the whole workspace; this one is the per-feature view.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "controller/**"
+      - "agent/**"
+      - "core/**"
+      - "spec/**"
+      - "web/src/**"
+      - "docs/**"
+      - "scripts/ci/**"
+      - ".github/workflows/fleet-cloud.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guards:
+    name: Migrations, guides, links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Migration numbers are unique and applied migrations are untouched
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}"
+            python3 scripts/ci/check-migrations.py --base "origin/${{ github.base_ref }}"
+          else
+            python3 scripts/ci/check-migrations.py
+          fi
+      - name: Every feature has a complete guide
+        run: python3 scripts/ci/check-feature-docs.py
+      - name: The feature manifest is valid
+        run: python3 scripts/ci/fleet-cloud-feature-tests.py --dry-run
+      - name: Doc links
+        run: python3 scripts/check-doc-links.py
+
+  feature-tests:
+    name: Rust unit tests per feature
+    needs: guards
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout machina
+        uses: actions/checkout@v4
+        with:
+          path: machina
+      - name: Checkout guestkit (sibling path dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: hypersdk/guestkit
+          # Pinned to the version Cargo.lock records; bump both together (cargo --locked fails on drift).
+          ref: v1.2.6
+          path: guestkit
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable (pinned 2026-07-24)
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2 (floating tag, pinned 2026-07-24)
+        with:
+          workspaces: machina
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libvirt-dev libpam0g-dev \
+            libclang-dev clang protobuf-compiler libssl-dev
+      - name: Feature tests (a feature fails if a test fails or too few tests ran)
+        working-directory: machina
+        run: python3 scripts/ci/fleet-cloud-feature-tests.py --locked
+
+  web:
+    name: Web tests for the Fleet Cloud components
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Fleet Cloud component tests (tags, instance type, volume settings, image sharing)
+        run: npx vitest run src/components/platform

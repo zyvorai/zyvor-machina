@@ -1,0 +1,105 @@
+{
+  "baseUrl": "https://80.79.5.173:5092",
+  "vms": {
+    "desktop": {
+      "id": "552807f3-b6b0-4b33-9be6-882726a3ff5f",
+      "name": "gkwin10"
+    },
+    "server": {
+      "id": "0a1baefc-2d5b-40bb-aceb-195f355a91e6",
+      "name": "ubuntu-server-24-04-v3-0a6ea5"
+    }
+  },
+  "clips": [
+    {
+      "id": "01",
+      "slug": "machina-cinema",
+      "title": "Machina · Cinema",
+      "youtubeTitle": "Machina Cinema — full-screen VM like a player",
+      "description": "Open a running desktop guest in Machina Cinema — player-style HUD, Fit/Fill scale, idle-hide controls, and one-click screenshot.",
+      "tags": ["Machina", "Cinema", "VNC", "libvirt", "KVM", "Zyvor"],
+      "durationTargetSec": 75
+    },
+    {
+      "id": "02",
+      "slug": "mission-control-live-wall",
+      "title": "Machina · Live Preview Wall",
+      "youtubeTitle": "Machina Mission Control — Live Preview Wall",
+      "description": "Watch live VM thumbnails on the Mission Control wall, then jump straight into Cinema.",
+      "tags": ["Machina", "Mission Control", "fleet", "NOC", "Zyvor"],
+      "durationTargetSec": 70
+    },
+    {
+      "id": "03",
+      "slug": "machine-finder-gallery",
+      "title": "Machina · Machine Finder Gallery",
+      "youtubeTitle": "Machina Machine Finder Gallery → Open Cinema",
+      "description": "Browse machines as a cinematic gallery of posters, then open Cinema from a tile.",
+      "tags": ["Machina", "Machine Finder", "Gallery", "Cinema", "Zyvor"],
+      "durationTargetSec": 70
+    },
+    {
+      "id": "04",
+      "slug": "studio-ops-shelf",
+      "title": "Machina · Studio + Ops Shelf",
+      "youtubeTitle": "Machina Studio + Ops Shelf — engineer console mode",
+      "description": "Switch from Cinema to Studio for Display, Serial, and Shell lenses, then open the Ops Shelf for health and access.",
+      "tags": ["Machina", "Studio", "Ops Shelf", "serial", "SSH", "Zyvor"],
+      "durationTargetSec": 80
+    },
+    {
+      "id": "05",
+      "slug": "vm-detail-connect-cinema",
+      "title": "Machina · VM Detail → Cinema",
+      "youtubeTitle": "Machina VM Detail — Connect hub to Cinema in one motion",
+      "description": "From the platform VM detail page: health, Connect checklist, and Open Cinema.",
+      "tags": ["Machina", "VM detail", "Connect", "Cinema", "Zyvor"],
+      "durationTargetSec": 70
+    },
+    {
+      "id": "06",
+      "slug": "snapshot-restore",
+      "title": "Machina · Snapshots",
+      "youtubeTitle": "Machina Snapshots — create and protect a running VM",
+      "description": "Create a libvirt snapshot from the platform UI and confirm the task completes.",
+      "tags": ["Machina", "snapshot", "backup", "libvirt", "Zyvor"],
+      "durationTargetSec": 70
+    },
+    {
+      "id": "07",
+      "slug": "nat-ssh-expose",
+      "title": "Machina · NAT SSH Expose",
+      "youtubeTitle": "Machina — expose guest SSH on the hypervisor",
+      "description": "Expose guest SSH via hypervisor NAT and copy the host:port path for laptop access.",
+      "tags": ["Machina", "SSH", "NAT", "port forward", "Zyvor"],
+      "durationTargetSec": 70
+    },
+    {
+      "id": "08",
+      "slug": "ask-zeus-spotlight",
+      "title": "Machina · Ask Zeus",
+      "youtubeTitle": "Machina Ask Zeus / Spotlight — ops AI at your fingertips",
+      "description": "Open Zeus Spotlight with page context and ask for an operational assist.",
+      "tags": ["Machina", "Zeus", "AI", "Spotlight", "Zyvor"],
+      "durationTargetSec": 65
+    },
+    {
+      "id": "09",
+      "slug": "network-canvas",
+      "title": "Machina · Network Canvas",
+      "youtubeTitle": "Machina Network Canvas — service topology at a glance",
+      "description": "Pan and zoom the Network Canvas to see how hosts, networks, and VMs connect.",
+      "tags": ["Machina", "network", "topology", "canvas", "Zyvor"],
+      "durationTargetSec": 65
+    },
+    {
+      "id": "10",
+      "slug": "create-vm-cinema",
+      "title": "Machina · Create VM → Cinema",
+      "youtubeTitle": "Machina — Create Ubuntu VM and open Cinema",
+      "description": "Guided New VM wizard: Ubuntu 24.04 Small → running → Open Cinema.",
+      "tags": ["Machina", "create VM", "Ubuntu", "Cinema", "cloud-init", "Zyvor"],
+      "durationTargetSec": 90
+    }
+  ]
+}

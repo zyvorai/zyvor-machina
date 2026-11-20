@@ -1,0 +1,31 @@
+# Builtin catalog for `rvb` prototype — expand or replace with --catalog path later.
+templates:
+  - id: fedora-42
+    distribution: fedora
+    release: "42"
+    format: disk
+    bootable: true
+    packages:
+      - cloud-init
+      - qemu-guest-agent
+      - openssh-server
+
+  - id: ubuntu-24.04
+    distribution: ubuntu
+    release: noble
+    format: disk
+    bootable: true
+    packages:
+      - cloud-init
+      - qemu-guest-agent
+      - openssh-server
+
+  - id: rockylinux-9
+    distribution: rocky
+    release: "9"
+    format: disk
+    bootable: true
+    packages:
+      - cloud-init
+      - qemu-guest-agent
+      - openssh-server

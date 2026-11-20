@@ -1,0 +1,6 @@
+apiVersion: v2
+name: machina
+description: Machina hypervisor daemon — identity, LDAP, OIDC, and SAML config via a Kubernetes Secret
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

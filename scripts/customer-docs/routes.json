@@ -1,0 +1,596 @@
+{
+  "routes": [
+    {
+      "label": "Dashboard",
+      "path": "/",
+      "category": "Core"
+    },
+    {
+      "label": "Virtual Machines",
+      "path": "/vms",
+      "category": "Core"
+    },
+    {
+      "label": "Create VM",
+      "path": "/create",
+      "category": "Core"
+    },
+    {
+      "label": "Import VM",
+      "path": "/import",
+      "category": "Core"
+    },
+    {
+      "label": "Sprites",
+      "path": "/sprites",
+      "category": "Core"
+    },
+    {
+      "label": "Fleet",
+      "path": "/fleet",
+      "category": "Core"
+    },
+    {
+      "label": "Mission Control",
+      "path": "/platform",
+      "category": "Platform"
+    },
+    {
+      "label": "Virtual Machines",
+      "path": "/platform/vms",
+      "category": "Platform"
+    },
+    {
+      "label": "Hosts",
+      "path": "/platform/hosts",
+      "category": "Platform"
+    },
+    {
+      "label": "Machine Finder",
+      "path": "/platform/hosts/finder",
+      "category": "Platform"
+    },
+    {
+      "label": "Applications",
+      "path": "/platform/applications",
+      "category": "Platform"
+    },
+    {
+      "label": "Launchpad (Mission Control)",
+      "path": "/platform/launchpad",
+      "category": "Platform"
+    },
+    {
+      "label": "Datacenter View",
+      "path": "/platform/datacenter",
+      "category": "Platform"
+    },
+    {
+      "label": "Disk Utility",
+      "path": "/platform/storage",
+      "category": "Platform"
+    },
+    {
+      "label": "Storage (Atlas)",
+      "path": "/platform/storage-atlas",
+      "category": "Platform"
+    },
+    {
+      "label": "Storage Tiers",
+      "path": "/platform/storage-tiers",
+      "category": "Platform"
+    },
+    {
+      "label": "vGPU Partitions",
+      "path": "/platform/vgpu",
+      "category": "Platform"
+    },
+    {
+      "label": "Networks",
+      "path": "/platform/networks",
+      "category": "Platform"
+    },
+    {
+      "label": "Images & ISOs",
+      "path": "/platform/content",
+      "category": "Platform"
+    },
+    {
+      "label": "Templates",
+      "path": "/platform/templates",
+      "category": "Platform"
+    },
+    {
+      "label": "Cloud-Init Studio",
+      "path": "/platform/cloud-init",
+      "category": "Platform"
+    },
+    {
+      "label": "Create ISO",
+      "path": "/platform/create-iso",
+      "category": "Platform"
+    },
+    {
+      "label": "Bare Metal",
+      "path": "/platform/baremetal",
+      "category": "Platform"
+    },
+    {
+      "label": "Migration Assistant",
+      "path": "/platform/migration",
+      "category": "Platform"
+    },
+    {
+      "label": "VM Builder",
+      "path": "/platform/vm-builder",
+      "category": "Platform"
+    },
+    {
+      "label": "Advanced Create",
+      "path": "/platform/create-advanced",
+      "category": "Platform"
+    },
+    {
+      "label": "Blueprints",
+      "path": "/platform/blueprints",
+      "category": "Platform"
+    },
+    {
+      "label": "Tasks",
+      "path": "/platform/tasks",
+      "category": "Platform"
+    },
+    {
+      "label": "Network Canvas",
+      "path": "/platform/network-canvas",
+      "category": "Platform"
+    },
+    {
+      "label": "Zyra AI",
+      "path": "/platform/zyra",
+      "category": "Platform / Security"
+    },
+    {
+      "label": "Configure Zyra",
+      "path": "/platform/zyra/configure",
+      "category": "Platform / Security"
+    },
+    {
+      "label": "Zeus Security",
+      "path": "/platform/zeus/security",
+      "category": "Platform / Security"
+    },
+    {
+      "label": "Native eBPF",
+      "path": "/platform/zyra/security/native-bpf",
+      "category": "Platform / Security"
+    },
+    {
+      "label": "Security Operations",
+      "path": "/platform/soc",
+      "category": "Platform"
+    },
+    {
+      "label": "Policy",
+      "path": "/platform/policy",
+      "category": "Platform"
+    },
+    {
+      "label": "Webhooks",
+      "path": "/platform/webhooks",
+      "category": "Platform"
+    },
+    {
+      "label": "Backup & Restore",
+      "path": "/platform/backups",
+      "category": "Platform"
+    },
+    {
+      "label": "Fleet Snapshots",
+      "path": "/platform/fleet-snapshots",
+      "category": "Platform"
+    },
+    {
+      "label": "Backup Replication",
+      "path": "/platform/backup-replication",
+      "category": "Platform"
+    },
+    {
+      "label": "Failure Domains",
+      "path": "/platform/failure-domains",
+      "category": "Platform"
+    },
+    {
+      "label": "Kubernetes Clusters",
+      "path": "/platform/k8s-clusters",
+      "category": "Platform"
+    },
+    {
+      "label": "Desktop Pools",
+      "path": "/platform/desktop-pools",
+      "category": "Platform"
+    },
+    {
+      "label": "Migration Waves",
+      "path": "/platform/migration-waves",
+      "category": "Platform"
+    },
+    {
+      "label": "Disaster Recovery",
+      "path": "/platform/placement",
+      "category": "Platform"
+    },
+    {
+      "label": "High Availability",
+      "path": "/platform/ha",
+      "category": "Platform"
+    },
+    {
+      "label": "Upgrade Matrix",
+      "path": "/platform/upgrade",
+      "category": "Platform"
+    },
+    {
+      "label": "Incident Commander",
+      "path": "/platform/zyra/incidents",
+      "category": "Platform / Security"
+    },
+    {
+      "label": "Approvals",
+      "path": "/platform/zyra/approvals",
+      "category": "Platform / Security"
+    },
+    {
+      "label": "Maintenance",
+      "path": "/platform/maintenance",
+      "category": "Platform"
+    },
+    {
+      "label": "Recommendations",
+      "path": "/platform/recommendations",
+      "category": "Platform"
+    },
+    {
+      "label": "Alerts",
+      "path": "/platform/notifications",
+      "category": "Platform"
+    },
+    {
+      "label": "Alert Rules",
+      "path": "/platform/alert-rules",
+      "category": "Platform"
+    },
+    {
+      "label": "Scheduled Jobs",
+      "path": "/platform/scheduled-jobs",
+      "category": "Platform"
+    },
+    {
+      "label": "Observability",
+      "path": "/platform/observability",
+      "category": "Platform"
+    },
+    {
+      "label": "Activity Monitor",
+      "path": "/platform/activity",
+      "category": "Platform"
+    },
+    {
+      "label": "Topology",
+      "path": "/platform/topology",
+      "category": "Platform"
+    },
+    {
+      "label": "Rightsizing",
+      "path": "/platform/zyra/rightsizing",
+      "category": "Platform / Security"
+    },
+    {
+      "label": "VM Network Policies",
+      "path": "/platform/zyra/security/network-policies",
+      "category": "Platform / Security"
+    },
+    {
+      "label": "Reports",
+      "path": "/platform/reports",
+      "category": "Platform"
+    },
+    {
+      "label": "GPU Command Center",
+      "path": "/platform/gpu",
+      "category": "Platform"
+    },
+    {
+      "label": "Settings",
+      "path": "/platform/settings",
+      "category": "Platform"
+    },
+    {
+      "label": "Users & Groups",
+      "path": "/platform/users",
+      "category": "Platform"
+    },
+    {
+      "label": "Stage Manager",
+      "path": "/platform/projects",
+      "category": "Platform"
+    },
+    {
+      "label": "Add Host",
+      "path": "/platform/enroll",
+      "category": "Platform"
+    },
+    {
+      "label": "API Keys",
+      "path": "/platform/api-keys",
+      "category": "Platform"
+    },
+    {
+      "label": "Marketplace",
+      "path": "/platform/marketplace",
+      "category": "Platform"
+    },
+    {
+      "label": "AI Providers",
+      "path": "/platform/ai-providers",
+      "category": "Platform"
+    },
+    {
+      "label": "Enterprise Features",
+      "path": "/platform/enterprise",
+      "category": "Platform"
+    },
+    {
+      "label": "Developer Hub",
+      "path": "/platform/developer",
+      "category": "Platform"
+    },
+    {
+      "label": "Support",
+      "path": "/platform/support",
+      "category": "Platform"
+    },
+    {
+      "label": "Event Log",
+      "path": "/platform/events",
+      "category": "Platform"
+    },
+    {
+      "label": "Storage Pools",
+      "path": "/storage",
+      "category": "Infrastructure"
+    },
+    {
+      "label": "Disk Images",
+      "path": "/disk-images",
+      "category": "Infrastructure"
+    },
+    {
+      "label": "Snapshots",
+      "path": "/snapshots",
+      "category": "Infrastructure"
+    },
+    {
+      "label": "Snapshot Backups",
+      "path": "/backups",
+      "category": "Infrastructure"
+    },
+    {
+      "label": "Networks",
+      "path": "/networks",
+      "category": "Infrastructure"
+    },
+    {
+      "label": "Network Filters",
+      "path": "/nwfilters",
+      "category": "Infrastructure"
+    },
+    {
+      "label": "Host Networking",
+      "path": "/host-networking",
+      "category": "Infrastructure"
+    },
+    {
+      "label": "Secrets",
+      "path": "/secrets",
+      "category": "Infrastructure"
+    },
+    {
+      "label": "Containers",
+      "path": "/containers",
+      "category": "Infrastructure"
+    },
+    {
+      "label": "Container Pods",
+      "path": "/containers/pods",
+      "category": "Infrastructure"
+    },
+    {
+      "label": "Kubernetes",
+      "path": "/k8s",
+      "category": "Kubernetes"
+    },
+    {
+      "label": "K8s Workloads",
+      "path": "/k8s/workloads",
+      "category": "Kubernetes"
+    },
+    {
+      "label": "Kata + Cloud Hypervisor",
+      "path": "/k8s/kata",
+      "category": "Kubernetes"
+    },
+    {
+      "label": "Host SSH",
+      "path": "/host-ssh",
+      "category": "Core"
+    },
+    {
+      "label": "Overview",
+      "path": "/fleet-cloud",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Instances",
+      "path": "/fleet-cloud/instances",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Create Instance",
+      "path": "/fleet-cloud/create",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Server Groups",
+      "path": "/fleet-cloud/server-groups",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Keypairs",
+      "path": "/fleet-cloud/keypairs",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Flavors",
+      "path": "/fleet-cloud/flavors",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "VM QoS",
+      "path": "/fleet-cloud/qos",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Volumes",
+      "path": "/fleet-cloud/volumes",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Volume Snapshots",
+      "path": "/fleet-cloud/volume-snapshots",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Images",
+      "path": "/fleet-cloud/images",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Networking",
+      "path": "/fleet-cloud/networking",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Security Groups",
+      "path": "/fleet-cloud/security-groups",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Floating IPs",
+      "path": "/fleet-cloud/floating-ips",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Load Balancers",
+      "path": "/fleet-cloud/load-balancers",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Network Topology",
+      "path": "/fleet-cloud/topology",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "VPCs & elastic compute",
+      "path": "/fleet-cloud/vpcs",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Heat Orchestration",
+      "path": "/fleet-cloud/heat",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Identity",
+      "path": "/fleet-cloud/identity",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Autopilot",
+      "path": "/fleet-cloud/autopilot",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Game days",
+      "path": "/fleet-cloud/chaos",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Preemptible",
+      "path": "/fleet-cloud/preemptible",
+      "category": "Fleet Cloud"
+    },
+    {
+      "label": "Host Overview",
+      "path": "/node",
+      "category": "Monitoring"
+    },
+    {
+      "label": "Live Metrics",
+      "path": "/events",
+      "category": "Monitoring"
+    },
+    {
+      "label": "System Check",
+      "path": "/system-check",
+      "category": "Monitoring"
+    },
+    {
+      "label": "Capabilities",
+      "path": "/capabilities",
+      "category": "Core"
+    },
+    {
+      "label": "Node Devices",
+      "path": "/devices",
+      "category": "Core"
+    },
+    {
+      "label": "Services",
+      "path": "/services",
+      "category": "Core"
+    },
+    {
+      "label": "Daemon Jobs",
+      "path": "/jobs",
+      "category": "Monitoring"
+    },
+    {
+      "label": "System Logs",
+      "path": "/logs",
+      "category": "Monitoring"
+    },
+    {
+      "label": "Audit Log",
+      "path": "/audit",
+      "category": "Monitoring"
+    },
+    {
+      "label": "Web Sessions",
+      "path": "/admin/sessions",
+      "category": "Monitoring"
+    },
+    {
+      "label": "Settings",
+      "path": "/settings",
+      "category": "Platform",
+      "legacy": false
+    },
+    {
+      "label": "API Docs",
+      "path": "/api-docs",
+      "category": "Platform",
+      "legacy": false
+    }
+  ]
+}

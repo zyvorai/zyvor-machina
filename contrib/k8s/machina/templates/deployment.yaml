@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "machina.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "machina.name" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "machina.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "machina.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      # machina-daemon talks to Kubernetes clusters it manages via an
+      # operator-supplied kubeconfig (see daemon/src/k8s_kubeconfig.rs), not
+      # via this pod's own ServiceAccount, so it never needs the default SA
+      # token mounted. Disable automount to reduce blast radius if the
+      # container is ever compromised.
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: machina-daemon
+          image: {{ printf "%s:%s" .Values.image.repository (.Values.image.tag | default .Chart.AppVersion) | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - containerPort: {{ .Values.daemon.port }}
+              name: https
+          env:
+            - name: MACHINA_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default (printf "%s-config" (include "machina.fullname" .)) .Values.configMap.name | quote }}
+                  key: jwtSecret
+            - name: MACHINA_DAEMON_SKIP_AUTH
+              value: {{ .Values.env.MACHINA_DAEMON_SKIP_AUTH | quote }}
+          volumeMounts:
+            - name: config
+              mountPath: {{ .Values.configMap.mountPath }}
+              readOnly: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: config
+          secret:
+            secretName: {{ default (printf "%s-config" (include "machina.fullname" .)) .Values.configMap.name | quote }}

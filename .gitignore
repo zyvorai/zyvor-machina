@@ -1,0 +1,35 @@
+.deploy-last
+
+/target
+/dist/
+.DS_Store
+**/.DS_Store
+*.log
+*.pid
+*.swp
+*.swo
+*~
+.env
+.env.local
+.vscode/
+.idea/
+
+# Local AI caches
+.grok/
+
+# Local presentation exports
+presentations/
+
+# Playwright live auth state
+web/e2e/.auth/
+
+# Python
+**/__pycache__/
+*.py[cod]
+
+# Local deploy mailer secrets
+scripts/deploy-mailer.env
+
+# Written by scripts/e2e-*.sh on every live run
+docs/e2e-last-run*.json
+docs/ux-wiring-live-report.json

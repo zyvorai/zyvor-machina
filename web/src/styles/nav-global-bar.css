@@ -1,0 +1,616 @@
+/* Copyright (c) 2026 ZyvorAI Labs Private Limited. All rights reserved. */
+/* GlobalBar + ChapterBar + SideNav — Apple.com-style shell chrome.
+   Scoped entirely to .gnb-* component roots (never bare utility classes
+   against .mac-desktop-root) — see machina-daylight.css's documented
+   .text-white/.mac-desktop-root history for why that matters here. */
+
+:root {
+  --gnb-bar-h: 3rem;
+}
+
+/* ── global bar ── */
+.gnb-bar {
+  position: sticky;
+  top: 0;
+  /* Must outrank .gnb-scrim (z-index 48, a *sibling* of this element in
+     GlobalBar.tsx, not a descendant): position:sticky + z-index makes this
+     header its own stacking context, so the flyout's own z-index:49 is only
+     compared against other elements *inside* that context — against the
+     scrim outside it, what counts is this header's z-index vs the scrim's.
+     At the old z-index:40 the scrim (48) painted on top of the whole header
+     including the flyout, so a click meant for a flyout link actually hit
+     the scrim underneath it and closed the menu instead of navigating. */
+  z-index: 50;
+  border-bottom: 1px solid var(--apple-hairline);
+  background: hsl(var(--card) / 0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+.gnb-bar-inner {
+  /* Same width and gutters as page content (Netra), so the brand lines up with the page edge. */
+  max-width: 1800px;
+  margin: 0 auto;
+  height: var(--gnb-bar-h);
+  padding: 0 clamp(20px, 3.5vw, 64px);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.gnb-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: -9px; /* optically align the Z with the page's left edge */
+  margin-right: 0.5rem;
+  flex-shrink: 0;
+}
+.gnb-brand-mark {
+  display: flex;
+  align-items: center;
+  padding: 0.25rem;
+  border-radius: 0.5rem;
+  flex-shrink: 0;
+}
+.gnb-brand-mark:hover {
+  background: var(--surface-hover, rgba(255, 255, 255, 0.06));
+}
+/* Netra: bare orange Z + a 17px/600 wordmark. */
+.gnb-logomark {
+  display: block;
+  border-radius: 6px;
+  transition: opacity 0.15s var(--ease-standard);
+}
+.gnb-brand-mark:hover .gnb-logomark {
+  opacity: 0.8;
+}
+.gnb-brand-mark {
+  min-width: 36px;
+  min-height: 36px;
+  justify-content: center;
+}
+.gnb-brand > div > button,
+.gnb-brand button {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.gnb-nav {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 0;
+}
+.gnb-nav-item {
+  height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: color 0.15s var(--ease-standard), background-color 0.15s var(--ease-standard);
+  white-space: nowrap;
+}
+.gnb-nav-item:hover,
+.gnb-nav-item[aria-expanded='true'] {
+  color: var(--text-primary);
+  background: var(--surface-hover, rgba(255, 255, 255, 0.06));
+}
+/* Netra: the active group gets a 2px blue underline that sweeps in. */
+.gnb-nav-item {
+  position: relative;
+}
+.gnb-nav-item::after {
+  content: '';
+  position: absolute;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--apple-link, #0066cc);
+  transform: scaleX(0);
+  transition: transform 0.25s var(--nl-ease, cubic-bezier(0.28, 0.11, 0.32, 1));
+}
+.gnb-nav-item[aria-current='true'] {
+  color: var(--text-primary);
+}
+.gnb-nav-item[aria-current='true']::after {
+  transform: scaleX(1);
+}
+.gnb-right {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.gnb-icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 0.625rem;
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  transition: background-color 0.15s var(--ease-standard), color 0.15s var(--ease-standard);
+  flex-shrink: 0;
+}
+.gnb-icon-btn:hover {
+  background: var(--surface-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text-primary);
+}
+.gnb-live {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  padding: 0 0.5rem;
+  white-space: nowrap;
+}
+.gnb-live i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #30d158;
+  box-shadow: 0 0 0 3px rgba(48, 209, 88, 0.18);
+  flex-shrink: 0;
+}
+.gnb-tasks {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.875rem;
+  padding: 0 0.625rem;
+  border-radius: 0.9375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #b25000;
+  background: #fff4e5;
+  white-space: nowrap;
+}
+html:not([data-theme='tahoe-light']) .gnb-tasks,
+html.dark .gnb-tasks {
+  color: #ffb454;
+  background: rgba(255, 180, 84, 0.14);
+}
+.gnb-tasks i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.gnb-new-vm {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 1.875rem;
+  padding: 0 0.75rem 0 0.625rem;
+  border-radius: 0.9375rem;
+  background: var(--accent, #0071e3);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-left: 0.25rem;
+  white-space: nowrap;
+}
+.gnb-new-vm:hover {
+  background: #0077ed;
+}
+.gnb-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #a2845e, #3c3c43);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+  margin-left: 0.25rem;
+  flex-shrink: 0;
+}
+
+/* ── flyout mega-menu ── */
+.gnb-flyout {
+  position: absolute;
+  top: calc(100% - 3px);
+  padding-top: 3px;
+  z-index: 49;
+  max-height: calc(100vh - var(--gnb-bar-h) - 24px);
+  overflow-y: auto;
+  background: var(--surface-1, var(--apple-surface, #fff));
+  border: 1px solid var(--apple-hairline);
+  border-top: none;
+  border-radius: 0 0 16px 16px;
+  box-shadow: var(--shadow-3, 0 12px 40px rgba(0, 0, 0, 0.14));
+  animation: gnb-fly 0.22s var(--nl-ease, cubic-bezier(0.28, 0.11, 0.32, 1));
+}
+@keyframes gnb-fly {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.gnb-flyout-inner {
+  padding: 20px 20px 24px;
+}
+.gnb-flyout-sections {
+  display: grid;
+  /* auto-fit: a single-section group uses the whole panel so its list can flow into columns */
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 20px 28px;
+}
+.gnb-flyout-section-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0 0 0.25rem 0.625rem;
+}
+.gnb-flyout-list {
+  display: block;
+  column-width: 12.5rem;
+  column-gap: 1rem;
+}
+.gnb-flyout-link {
+  display: block;
+  width: 100%;
+  break-inside: avoid;
+  text-align: left;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.5rem;
+  color: var(--text-primary);
+  transition: background-color 0.15s var(--ease-standard), color 0.15s var(--ease-standard);
+}
+.gnb-flyout-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.gnb-flyout-blurb {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+.gnb-flyout-link:hover {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.04));
+}
+.gnb-flyout-link:hover .gnb-flyout-label {
+  color: var(--apple-link, #0066cc);
+}
+.gnb-flyout-link-active .gnb-flyout-label {
+  color: var(--apple-link, #0066cc);
+}
+.gnb-scrim {
+  position: fixed;
+  inset: var(--gnb-bar-h) 0 0 0;
+  z-index: 48;
+  background: rgba(0, 0, 0, 0.32);
+  animation: gnb-fade 0.2s;
+}
+@keyframes gnb-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ── chapter bar ── */
+.gnb-chapter {
+  position: sticky;
+  top: var(--gnb-bar-h);
+  z-index: 35;
+  border-bottom: 1px solid var(--apple-hairline);
+  background: hsl(var(--card) / 0.72);
+  backdrop-filter: blur(calc(var(--blur-liquid, 12px) + 4px)) saturate(1.35);
+  -webkit-backdrop-filter: blur(calc(var(--blur-liquid, 12px) + 4px)) saturate(1.35);
+}
+.gnb-chapter-inner {
+  max-width: 1800px;
+  margin: 0 auto;
+  padding: 0.5rem clamp(20px, 3.5vw, 64px) 0.625rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.gnb-chapter-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  min-width: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+.gnb-chapter-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.gnb-chapter-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gnb-chapter-links {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  overflow-x: auto;
+}
+.gnb-chapter-link {
+  padding: 0.3125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: background-color 0.15s var(--ease-standard), color 0.15s var(--ease-standard);
+}
+.gnb-chapter-link:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover, rgba(255, 255, 255, 0.06));
+}
+.gnb-chapter-link-active {
+  color: var(--text-primary);
+  background: var(--apple-fill-secondary, var(--surface-hover));
+  font-weight: 500;
+}
+
+/* ── responsive ── */
+/* Below 1025px the group buttons are replaced by the burger, which opens .gnb-sheet. */
+@media (max-width: 1024px) {
+  .gnb-nav {
+    display: none;
+  }
+  .gnb-burger {
+    display: grid !important;
+  }
+}
+.gnb-burger {
+  display: none;
+}
+.gnb-burger-lines,
+.gnb-burger-lines::before,
+.gnb-burger-lines::after {
+  content: '';
+  display: block;
+  width: 16px;
+  height: 1.5px;
+  background: currentColor;
+  position: relative;
+}
+.gnb-burger-lines::before {
+  position: absolute;
+  top: -5px;
+}
+.gnb-burger-lines::after {
+  position: absolute;
+  top: 5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gnb-bar *,
+  .gnb-chapter *,
+  .gnb-sheet * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ── Machine Finder link + attention dot ── */
+.gnb-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  text-decoration: none;
+}
+.gnb-attn {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff9f0a;
+  flex-shrink: 0;
+}
+
+/* ── Page gutter: Netra's 1800px content width with fluid side padding ── */
+.nl-page-gutter {
+  max-width: 1800px;
+  padding-left: clamp(20px, 3.5vw, 64px);
+  padding-right: clamp(20px, 3.5vw, 64px);
+}
+
+/* ── Mobile / tablet navigation sheet ── */
+.gnb-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  background: var(--page-bg, #fff);
+  padding-top: env(safe-area-inset-top, 0);
+  animation: gnb-sheet-in 0.22s var(--nl-ease, cubic-bezier(0.28, 0.11, 0.32, 1));
+}
+@keyframes gnb-sheet-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.gnb-sheet-head {
+  height: var(--gnb-bar-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(16px, 4vw, 28px);
+  border-bottom: 1px solid var(--apple-hairline);
+}
+.gnb-sheet-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.gnb-sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px clamp(16px, 4vw, 28px) 24px;
+}
+.gnb-sheet-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--text-primary);
+  text-decoration: none;
+  border-bottom: 1px solid var(--apple-hairline);
+}
+.gnb-sheet-link.active,
+.gnb-sheet-link.is-active {
+  color: var(--apple-link, #0066cc);
+}
+.gnb-sheet-link--item {
+  min-height: 44px;
+  font-size: 15px;
+  font-weight: 400;
+  border-bottom: none;
+  padding-left: 4px;
+}
+.gnb-sheet-count {
+  font-size: 12px;
+  color: #8b4b00;
+  background: rgba(255, 159, 10, 0.16);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.gnb-sheet-group > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  border-bottom: 1px solid var(--apple-hairline);
+}
+.gnb-sheet-group > summary::-webkit-details-marker {
+  display: none;
+}
+.gnb-sheet-group[open] > summary svg {
+  transform: rotate(180deg);
+}
+.gnb-sheet-section-label {
+  margin: 12px 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+.gnb-sheet-foot {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px clamp(16px, 4vw, 28px) calc(12px + env(safe-area-inset-bottom, 0));
+  border-top: 1px solid var(--apple-hairline);
+}
+
+/* ── Mid widths (1025–1279px): the nav, brand and controls share one row ── */
+@media (min-width: 1025px) and (max-width: 1279px) {
+  .gnb-tasks {
+    max-width: 7rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+@media (min-width: 1025px) and (max-width: 1119px) {
+  /* "Live" collapses to its dot (the text stays in the DOM for assistive tech). */
+  .gnb-live {
+    font-size: 0;
+    padding: 0 0.375rem;
+  }
+}
+
+/* ── ChapterBar: same 2px underline language as the top bar ── */
+.gnb-chapter-inner {
+  align-items: stretch;
+  min-height: 44px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.gnb-chapter-title {
+  align-items: center;
+}
+.gnb-chapter-links {
+  align-items: stretch;
+  gap: 0.125rem;
+}
+.gnb-chapter-link {
+  position: relative;
+  align-items: center;
+  border-radius: 0.375rem;
+  padding: 0 0.75rem;
+  font-size: 0.8125rem;
+}
+.gnb-chapter-link-active {
+  background: transparent;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.gnb-chapter-link-active::after {
+  content: '';
+  position: absolute;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--apple-link, #0066cc);
+}
+.gnb-chapter-links > div {
+  display: flex;
+  align-items: stretch;
+}
+.gnb-chapter-more {
+  height: 100%;
+}
+
+/* ── Very small phones (<= 400px): the bar's controls overflowed 360px by ~19px on every page.
+   Search is also in the burger sheet (and ⌘K), so the duplicate icon goes. ── */
+@media (max-width: 400px) {
+  .gnb-icon-btn[aria-label='Search'] {
+    display: none;
+  }
+}
+@media (max-width: 340px) {
+  /* 320px phones: Ask Zyra is reachable from the sheet and Spotlight. */
+  .gnb-icon-btn[aria-label^='Ask'] {
+    display: none;
+  }
+}

@@ -1,0 +1,159 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body {
+    margin: 0; padding: 0; width: 1920px; height: 1080px;
+    background: #070b14;
+    background-image:
+      radial-gradient(ellipse 60% 50% at 20% 0%, rgba(37,99,235,0.18), transparent 55%),
+      radial-gradient(ellipse 50% 45% at 85% 100%, rgba(56,189,248,0.12), transparent 55%);
+    display: flex; align-items: center; justify-content: center;
+    font-family: -apple-system, "SF Pro Text", Segoe UI, sans-serif;
+  }
+  .window {
+    width: 1620px; height: 920px;
+    background: #0b0f1a;
+    border: 1px solid rgba(56,189,248,0.25);
+    border-radius: 14px;
+    box-shadow: 0 40px 100px rgba(0,0,0,0.55);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .titlebar {
+    height: 46px; flex: none;
+    background: #11172a;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    display: flex; align-items: center; padding: 0 18px; gap: 10px;
+  }
+  .dot { width: 13px; height: 13px; border-radius: 50%; }
+  .dot.red { background: #ff5f57; }
+  .dot.yellow { background: #febc2e; }
+  .dot.green { background: #28c840; }
+  .titletext {
+    flex: 1; text-align: center; color: #8a93a8; font-size: 14px;
+    font-family: ui-monospace, "SF Mono", monospace; letter-spacing: 0.02em;
+    margin-right: 60px;
+  }
+  .body {
+    flex: 1; padding: 28px 34px; overflow: hidden;
+    font-family: ui-monospace, "SF Mono", "Menlo", monospace;
+    font-size: 22px; line-height: 1.55; color: #d7dee8;
+  }
+  .line { white-space: pre-wrap; word-break: break-all; }
+  .prompt { color: #38bdf8; }
+  .cmd { color: #f4f7fc; }
+  .out { color: #9aa5b8; }
+  .ok { color: #34d399; }
+  .cursor {
+    display: inline-block; width: 11px; height: 24px; background: #38bdf8;
+    vertical-align: text-bottom; margin-left: 2px;
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+</style>
+</head>
+<body>
+  <div class="window">
+    <div class="titlebar">
+      <div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div>
+      <div class="titletext">sus@175.110.122.71 — machinactl sprite demo</div>
+    </div>
+    <div class="body" id="term"></div>
+  </div>
+<script>
+const term = document.getElementById('term');
+const PROMPT = 'sus@lab-host:~$ ';
+
+// Real captured output from a live sprite created via `machinactl sprite create`
+// on 175.110.122.71 — nothing here is fabricated.
+const steps = [
+  { type: 'cmd', text: 'machinactl sprite create --golden-image debian-egress-test \\\n  --backend libvirt --network-egress --ttl-seconds 1800' },
+  { type: 'out', cls: 'plain', text:
+`{
+  "sprite_id": "f625d42b-8f9e-4713-ab52-d6c5ae23346e",
+  "state": "running",
+  "backend": "libvirt",
+  "network_egress": true
+}` },
+  { type: 'cmd', text: 'ssh root@192.168.122.82' },
+  { type: 'out', cls: 'plain', text: 'Linux egress-test 6.1.0-9-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.27-1\nroot@egress-test:~#' },
+  { type: 'cmd', text: 'networkctl status' },
+  { type: 'out', cls: 'plain', text:
+`●        State: routable
+  Online state: online
+       Address: 192.168.122.82 on enp1s0
+       Gateway: 192.168.122.1 on enp1s0
+           DNS: 192.168.122.1
+
+enp1s0: DHCPv4 address 192.168.122.82/24, gateway 192.168.122.1 acquired` },
+  { type: 'cmd', text: 'curl -sS -o /dev/null -w "HTTP %{http_code} in %{time_total}s from %{remote_ip}\\n" https://github.com' },
+  { type: 'out', cls: 'ok', text: 'HTTP 200 in 0.094791s from 140.82.121.3' },
+];
+
+function scrollToEnd() { term.scrollTop = term.scrollHeight; }
+
+async function typeLine(prefix, prefixCls, text, cls, speed) {
+  const line = document.createElement('div');
+  line.className = 'line';
+  const pre = document.createElement('span');
+  pre.className = prefixCls;
+  pre.textContent = prefix;
+  line.appendChild(pre);
+  const span = document.createElement('span');
+  span.className = cls;
+  line.appendChild(span);
+  const cursor = document.createElement('span');
+  cursor.className = 'cursor';
+  line.appendChild(cursor);
+  term.appendChild(line);
+  scrollToEnd();
+  for (let i = 0; i < text.length; i++) {
+    span.textContent += text[i];
+    if (text[i] === '\n') scrollToEnd();
+    await new Promise(r => setTimeout(r, speed));
+  }
+  cursor.remove();
+  return line;
+}
+
+async function printBlock(text, cls) {
+  const pre = document.createElement('div');
+  pre.className = 'line out ' + (cls || '');
+  pre.textContent = text;
+  term.appendChild(pre);
+  scrollToEnd();
+  await new Promise(r => setTimeout(r, 250));
+}
+
+async function run() {
+  await new Promise(r => setTimeout(r, 800));
+  for (const step of steps) {
+    if (step.type === 'cmd') {
+      await typeLine(PROMPT, 'prompt', step.text, 'cmd', 26);
+      await new Promise(r => setTimeout(r, 350));
+    } else {
+      await printBlock(step.text, step.cls);
+      await new Promise(r => setTimeout(r, 1400));
+    }
+  }
+  const finalLine = document.createElement('div');
+  finalLine.className = 'line';
+  const pre = document.createElement('span');
+  pre.className = 'prompt';
+  pre.textContent = PROMPT;
+  finalLine.appendChild(pre);
+  const cursor = document.createElement('span');
+  cursor.className = 'cursor';
+  finalLine.appendChild(cursor);
+  term.appendChild(finalLine);
+  scrollToEnd();
+  await new Promise(r => setTimeout(r, 2500));
+  document.title = 'DONE';
+  window.__demoDone = true;
+}
+run();
+</script>
+</body>
+</html>

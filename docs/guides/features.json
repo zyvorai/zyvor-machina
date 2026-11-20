@@ -1,0 +1,37 @@
+{
+  "comment": "Single source of truth for the Fleet Cloud features: which guide documents each, and which unit tests prove it. scripts/ci/fleet-cloud-feature-tests.py runs the tests and fails when a feature runs fewer than `min` tests (a renamed or deleted test must not pass silently); scripts/ci/check-feature-docs.py checks the guides.",
+  "features": [
+    {"id": "tags-ids", "title": "Tags and EC2-style ids", "guide": "docs/guides/tags-and-ids.md",
+     "tests": [{"crate": "machina-controller", "filters": ["resource_ids", "api::tags"], "min": 6}]},
+    {"id": "launching", "title": "Launching instances (user data, key pairs, run-instances, instance types, terminated state)", "guide": "docs/guides/launching-instances.md",
+     "tests": [
+       {"crate": "machina-controller", "filters": ["type_change_tests", "run_instances_tests"], "min": 5},
+       {"crate": "machina-core", "filters": ["meta_data_tests", "seed_scratch_tests"], "min": 4},
+       {"crate": "machina-spec", "filters": ["user_data"], "min": 1}]},
+    {"id": "security-groups", "title": "Security groups: audit, preview, enforce", "guide": "docs/guides/security-groups.md",
+     "tests": [{"crate": "machina-controller", "filters": ["sg_enforce"], "min": 7}]},
+    {"id": "storage", "title": "Volumes and images", "guide": "docs/guides/volumes-and-images.md",
+     "tests": [
+       {"crate": "machina-controller", "filters": ["iotune_tests", "image_access_tests", "visibility_tests"], "min": 3},
+       {"crate": "machina-core", "filters": ["iotune_tests"], "min": 2}]},
+    {"id": "addressing", "title": "Network interfaces, Elastic IPs, NAT gateway, subnet delete", "guide": "docs/guides/networking-addresses-nat.md",
+     "tests": [
+       {"crate": "machina-controller", "filters": ["pick_address_tests", "engine::eip", "elastic_ips", "subnet_delete", "a_subnet_with_reserved"], "min": 9},
+       {"crate": "machina-core", "filters": ["dhcp_host_tests"], "min": 2},
+       {"crate": "machina-agent", "filters": ["eip::tests", "natgw"], "min": 8}]},
+    {"id": "load-balancing", "title": "Load balancer health checks", "guide": "docs/guides/load-balancer-health-checks.md",
+     "tests": [
+       {"crate": "machina-controller", "filters": ["lb_health"], "min": 4},
+       {"crate": "machina-agent", "filters": ["lbprobe"], "min": 4}]},
+    {"id": "scaling", "title": "Alarms, metric statistics, instance groups", "guide": "docs/guides/alarms-and-scaling.md",
+     "tests": [{"crate": "machina-controller", "filters": ["engine::alarms", "api::alarms", "metric_stats", "groups_and_unused_templates", "a_group_with_running_members"], "min": 14}]},
+    {"id": "ec2-api", "title": "EC2-compatible API", "guide": "docs/guides/ec2-api-tutorial.md",
+     "tests": [{"crate": "machina-controller", "filters": ["api::ec2"], "min": 15}]},
+    {"id": "scoped-keys", "title": "Project-scoped API keys", "guide": "docs/guides/scoped-api-keys.md",
+     "tests": [{"crate": "machina-controller", "filters": ["scoped_key_tests", "scope_tests", "a_project_scoped_api_key"], "min": 6}]},
+    {"id": "metadata", "title": "Instance metadata service", "guide": "docs/guides/metadata-service.md",
+     "tests": [
+       {"crate": "machina-agent", "filters": ["imds::tests"], "min": 5},
+       {"crate": "machina-controller", "filters": ["engine::imds"], "min": 3}]}
+  ]
+}

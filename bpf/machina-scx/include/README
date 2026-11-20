@@ -1,0 +1,3 @@
+scx/ is tools/sched_ext/include/scx from Linux v7.0 (GPL-2.0), BPF-side
+headers only. sched_ext has no stable BPF ABI: refresh these together with
+the minimum supported kernel.
