@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Host-local IPAM (IPv4 and IPv6): one file per allocated address, created
 //! with `O_EXCL` so concurrent CNI invocations never hand out the same IP.

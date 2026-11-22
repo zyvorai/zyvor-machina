@@ -2,7 +2,7 @@
 name = "machina-dbtool"
 version = "0.1.0"
 edition = "2021"
-license = "LicenseRef-Zyvor-Production-1.0"
+license = "LicenseRef-Zyvor-Production-2.0"
 description = "Copy a Machina controller's SQLite database into PostgreSQL (and check the copy)"
 
 [[bin]]

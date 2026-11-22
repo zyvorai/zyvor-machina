@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Trust ladder: each action class is `ask` (a person approves every one) or `auto` (autopilot mode may approve
 //! queued proposals of that class itself, capped per run). Only low-blast-radius, reversible classes can climb;

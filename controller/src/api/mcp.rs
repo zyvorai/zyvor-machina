@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Machina as an MCP server (streamable-HTTP transport, JSON responses): `POST /api/v1/mcp` takes one JSON-RPC 2.0
 //! message. Any MCP client (Claude Desktop/Code, an IDE, another agent) can look at the fleet and *propose*

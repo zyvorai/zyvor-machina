@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! More EC2 actions: volumes, security groups, images, VPCs and subnets, network interfaces, key pairs, reboot and
 //! instance-type changes. Each one is a thin mapping onto the controller's own handlers, so authorization, validation and

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 """boto3 test for Machina's ELBv2 API (service `elasticloadbalancing`): a network balancer, a target group with an instance,
 a listener, health, tags, attributes, paging, and the things the layer-4 balancer refuses.

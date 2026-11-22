@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Capacity, cost, rightsizing, placement, webhooks, and host fence.
 //! Propose calls file an approval action. They do not resize or move a VM by themselves.

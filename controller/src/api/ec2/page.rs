@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Opaque `NextToken` for EC2 describe calls. A token is the last id already returned, so the
 //! next page is every id strictly greater than it. Short pages are the end: no empty token.

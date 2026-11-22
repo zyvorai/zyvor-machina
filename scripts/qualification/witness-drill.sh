@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 #
 # HA witness (claim C65): with a witness configured (MACHINA_WITNESS_URLS), cut the controller from
 # it, check HA pauses without marking any host offline, then restore and check HA resumes.

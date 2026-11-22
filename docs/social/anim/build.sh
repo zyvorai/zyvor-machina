@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 # Regenerate the animated SVGs (gen.mjs) and render GIF fallbacks for places that do not play SVG animation.
 # Needs node, ffmpeg and Google Chrome. Frames are made by pausing the CSS animations at each timestamp in headless Chrome.

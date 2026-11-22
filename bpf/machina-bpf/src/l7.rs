@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! First-payload L7 classification: TLS ClientHello (SNI, ALPN) and HTTP/1.x
 //! request heads. Pure parsing of a possibly truncated buffer, never panics.

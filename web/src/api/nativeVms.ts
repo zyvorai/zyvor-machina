@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // Native VM lifecycle (controller::api::vms) used as the "instance" backend for
 // the Fleet Cloud compute pages — Phase 4 of the external-cloud-client replacement.

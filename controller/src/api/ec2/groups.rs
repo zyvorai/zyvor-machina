@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Instance groups and subnet NAT. Groups are `asg-` ids, not the AWS Auto Scaling API.
 //! NAT is the host masquerade already on `PUT /api/v1/cloud/subnets/{id}/nat`, not a `nat-` object.

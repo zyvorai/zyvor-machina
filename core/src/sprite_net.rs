@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Shared helpers for disposable "sprite" microVM backends that supervise
 //! their own VMM child process directly (`crate::cloud_hypervisor`,

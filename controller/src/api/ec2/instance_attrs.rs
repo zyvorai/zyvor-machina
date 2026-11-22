@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Instance attributes: `ModifyInstanceAttribute` / `DescribeInstanceAttribute`, monitoring, the metadata service
 //! options, console output and the small stubs Terraform asks for (`GetPasswordData`, credit specifications).

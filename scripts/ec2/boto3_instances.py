@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 """boto3 test of Machina's EC2 instance-side actions: attributes, termination protection, monitoring, metadata options,
 volumes, key pairs, images, launch templates with versions, placement groups, spot requests and instant fleets.

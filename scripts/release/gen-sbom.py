@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 """CycloneDX 1.5 SBOM for a Machina release, from the lockfiles (Rust: Cargo.lock; web: web/package-lock.json;
 Go: go.sum of the SDK and provider). Standard library only. Usage: gen-sbom.py VERSION OUT.json"""
@@ -79,7 +79,7 @@ def main():
         "metadata": {
             "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "tools": [{"vendor": "Zyvor AI Labs", "name": "machina gen-sbom.py"}],
-            "component": {"type": "application", "name": "machina", "version": version, "bom-ref": "machina", "licenses": [{"license": {"name": "LicenseRef-Zyvor-Production-1.0"}}]},
+            "component": {"type": "application", "name": "machina", "version": version, "bom-ref": "machina", "licenses": [{"license": {"name": "LicenseRef-Zyvor-Production-2.0"}}]},
         },
         "components": comps,
     }

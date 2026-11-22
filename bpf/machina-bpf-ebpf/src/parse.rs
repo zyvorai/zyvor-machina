@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Packet parsing through `bpf_skb_load_bytes` (TC, cgroup_skb) and
 //! `bpf_xdp_load_bytes` (XDP, so the parse can run in a subprogram).

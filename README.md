@@ -33,11 +33,11 @@
 | | |
 | --- | --- |
 | **Get it** | [Machina 0.5.0](https://github.com/zyvorai/zyvor-machina/releases/tag/macos-v0.5.0): `Machina-0.5.0.dmg` (SHA-256 `edc3a7a9404858eb6651755c753c046b71132c6325a241d4e7218064c0bfaa75`) |
-| **Trial key** | The app runs without a key. For a 30-day trial key, email **sales@zyvor.dev**; to keep using it afterwards, get a licence at [zyvor.dev/buy](https://zyvor.dev/buy#machina-mac) (USD 40 per Mac per year, or INR 3,999 in India incl. 18% GST). The app checks the signed key (`ZYV1.`) offline. The 30-day trial applies to the paid production licence and support, not to the free software; no data is lost when it ends. |
+| **Trial key** | The app runs without a key. For a 30-day trial key, email **sales@zyvor.dev**; to keep using it afterwards, get a licence at [zyvor.dev/buy](https://zyvor.dev/buy#machina-mac) (USD 40 per Mac per year, or INR 3,999 in India incl. 18% GST). The app checks the signed key (`ZYV1.`) offline. The 30-day trial applies to the paid production licence and support; no data is lost when it ends. |
 | **Requirements** | Apple silicon, macOS 15 or later |
 | **Notarized** | Signed with a Developer ID and notarized by Apple |
 
-The Mac app is a native client for a Machina daemon and fleet controller. Its source is in a private repository; the server in this repository is source-available under the [Zyvor Production License v1.0](LICENSE).
+The Mac app is a native client for a Machina daemon and fleet controller. Its source is in a private repository; the server in this repository is source-available under the [Zyvor Production Licence v2.0](LICENSE).
 
 ---
 
@@ -404,10 +404,10 @@ Start with [Engineering onboarding](docs/ENGINEERING_ONBOARDING.md); architectur
 
 ## License
 
-Machina is source-available under the **[Zyvor Production License v1.0](LICENSE)** (SPDX `LicenseRef-Zyvor-Production-1.0`).
+Machina is source-available under the **[Zyvor Production Licence v2.0](LICENSE)** (SPDX `LicenseRef-Zyvor-Production-2.0`).
 
-- **Free** for evaluation, development, testing, research, education, homelabs and all other non-production use.
-- **Production use** requires an annual enterprise subscription: USD 300 per CPU socket per year worldwide (excl. tax) or INR 29,699 per CPU socket per year in India (incl. 18% GST). Machina for Mac (the native client) is USD 40 per Mac per year worldwide or INR 3,999 in India; the team price is USD 34 / INR 3,399 per Mac with a minimum of 5 Macs (USD 169 / INR 16,995), by invoice. Prices: INR incl. 18% GST in India; US dollars excl. tax elsewhere (VAT, GST or sales tax added where applicable). Pay online by UPI, card or netbanking where a buy page exists; international cards work (charged in rupees). Orders of USD 5,000 or more and quotes are invoiced in USD through Skydo. Custom pricing: contact [sales@zyvor.dev](mailto:sales@zyvor.dev). A 30-day trial key is available for production evaluation. Buy or get a quote: [zyvor.dev/buy](https://zyvor.dev/buy#machina). Plans, support levels and terms: [SUBSCRIPTION-MODEL.md](docs/SUBSCRIPTION-MODEL.md) · [licensing model](docs/legal/LICENSING-MODEL.md).
+- A 30-day trial is available on request from sales@zyvor.dev (a paid evaluation Order at no charge); production and any other use needs a paid Order.
+- **Production use** requires a paid Order, an annual enterprise subscription: USD 300 per CPU socket per year worldwide (excl. tax) or INR 29,699 per CPU socket per year in India (incl. 18% GST). Machina for Mac (the native client) is USD 40 per Mac per year worldwide or INR 3,999 in India; the team price is USD 34 / INR 3,399 per Mac with a minimum of 5 Macs (USD 169 / INR 16,995), by invoice. Prices: INR incl. 18% GST in India; US dollars excl. tax elsewhere (VAT, GST or sales tax added where applicable). Pay online by UPI, card or netbanking where a buy page exists; international cards work (charged in rupees). Orders of USD 5,000 or more and quotes are invoiced in USD through Skydo. Custom pricing: contact [sales@zyvor.dev](mailto:sales@zyvor.dev). Buy or get a quote: [zyvor.dev/buy](https://zyvor.dev/buy#machina). Plans, support levels and terms: [SUBSCRIPTION-MODEL.md](docs/SUBSCRIPTION-MODEL.md) · [licensing model](docs/legal/LICENSING-MODEL.md).
 
 Contributions are welcome under the same license; see [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities privately per [SECURITY.md](SECURITY.md).
 

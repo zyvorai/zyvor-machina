@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Consolidation: find under-used hosts whose VMs all fit elsewhere, plan the
 //! live migrations that empty them, and offer them for power-down. Applied

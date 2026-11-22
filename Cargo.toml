@@ -21,7 +21,7 @@ exclude = ["bpf/machina-bpf-ebpf"]
 resolver = "2"
 
 [workspace.package]
-license = "LicenseRef-Zyvor-Production-1.0"
+license = "LicenseRef-Zyvor-Production-2.0"
 [workspace.dependencies]
 virt = "0.4"
 axum = { version = "0.8", features = ["ws"] }

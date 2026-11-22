@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Transparent L7 proxy for VM flows on proxy entries: `terminatingTLS`,
 //! `originatingTLS`, and `headerMatches` with ADD / DELETE / REPLACE or a

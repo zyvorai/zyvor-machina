@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 import {useState} from 'react';
 import type {ReactNode} from 'react';
@@ -24,7 +24,7 @@ function Hero() {
       <div className={clsx('container', styles.heroInner)}>
         <div className={styles.heroCopy}>
           <div className={styles.heroBadge}>
-            <span className={styles.heroDot} /> Free for non-production · Zyvor Production License
+            <span className={styles.heroDot} /> 30-day trial on request · Zyvor Production Licence v2.0
           </div>
           <Heading as="h1" className={styles.wordmark}>
             machina
@@ -367,7 +367,7 @@ function Trust() {
           </div>
           <div className={styles.badges}>
             <img src={`${REPO}/actions/workflows/ci.yml/badge.svg`} alt="CI status" />
-            <img src="https://img.shields.io/badge/License-Zyvor%20Production%20v1.0-0071e3.svg" alt="Zyvor Production License v1.0" />
+            <img src="https://img.shields.io/badge/License-Zyvor%20Production%20v1.0-0071e3.svg" alt="Zyvor Production Licence v2.0" />
             <img src="https://img.shields.io/github/stars/zyvorai/zyvor-machina?style=social" alt="GitHub stars" />
           </div>
         </Reveal>
@@ -386,7 +386,7 @@ function EnterpriseCta() {
             Ready to run <span className="mx-gradient">your own cloud?</span>
           </Heading>
           <p className={styles.ctaLede}>
-            Non-production use is free. Production runs on an annual enterprise subscription with updates, upgrades and
+            A 30-day trial is available on request. Production runs on an annual enterprise subscription with updates, upgrades and
             the support level you choose.
           </p>
           <div className={styles.heroCtas} style={{justifyContent: 'center'}}>

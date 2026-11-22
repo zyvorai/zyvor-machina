@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // Integration smoke test: fresh SQLite DB → migrate → bootstrap → hit every GET route.
 // Run with: cargo test -p machina-controller --test routes_smoke

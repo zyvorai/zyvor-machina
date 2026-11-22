@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Volume attributes and the native L4 load balancer. The balancer is not ELBv2: one listener,
 //! kernel round-robin, TCP or HTTP health checks.

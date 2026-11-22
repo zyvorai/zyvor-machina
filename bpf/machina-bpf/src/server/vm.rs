@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! VM edge (`mn_vm_edge_in/out` on VM taps) and the QEMU sandbox
 //! (`mn_qemu_device` + `mn_qemu_egress` on machine-qemu scopes).

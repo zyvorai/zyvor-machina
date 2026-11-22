@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // VMM guard: BPF-LSM hooks on QEMU cgroups. Audit by default; enforcement
 // needs `bpf` as an active LSM and a lease.

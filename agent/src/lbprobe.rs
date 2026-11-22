@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Health probes for load balancer members (`lb.probe`): a TCP connect, or an HTTP GET that must answer 2xx/3xx. The agent
 //! runs them because only the host can reach its guests' private addresses.

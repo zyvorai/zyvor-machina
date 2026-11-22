@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // Competitive comparison data. Every Machina cell starts with a status
 // (Yes / Partial / Planned / No) and must trace to a row in docs/claims.md

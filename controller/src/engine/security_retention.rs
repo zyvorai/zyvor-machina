@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Bounded retention for security/audit evidence. The default is deliberately
 //! conservative (365 days); set MACHINA_AUDIT_RETENTION_DAYS=0 to keep forever.

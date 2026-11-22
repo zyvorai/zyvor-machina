@@ -7,7 +7,7 @@ name = "machina-sdk"
 version = "0.1.0"
 description = "Python client for the Machina private cloud controller API"
 requires-python = ">=3.9"
-license = { text = "LicenseRef-Zyvor-Production-1.0" }
+license = { text = "LicenseRef-Zyvor-Production-2.0" }
 dependencies = []
 
 [tool.setuptools.packages.find]

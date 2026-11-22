@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
-"""Stamp the Zyvor Production License v1.0 header on every tracked source file.
+"""Stamp the Zyvor Production Licence v2.0 header on every tracked source file.
 
 Idempotent: replaces the legacy "Proprietary software" header and any older SPDX
 line, then writes the two-line header used across Zyvor open-source repos.
@@ -17,7 +17,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-SPDX = "LicenseRef-Zyvor-Production-1.0"
+SPDX = "LicenseRef-Zyvor-Production-2.0"
 SLASH = {".rs", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".go", ".proto"}
 HASH = {".py", ".sh"}
 SKIP_PARTS = ("web/public/", "/vendor/", "node_modules/", "/dist/", "/target/")

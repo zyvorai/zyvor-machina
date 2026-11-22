@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! The controller's network listener for joining nodes, off unless `MACHINA_CONTROLLER_TLS_ADDR`
 //! is set (for example `0.0.0.0:5094`). It serves HTTPS with a certificate from the fleet CA and

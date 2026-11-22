@@ -11,7 +11,7 @@ description: |
   Enrol the host with: machina-agent join --controller URL --token TOKEN
 vendor: Zyvor AI Labs
 homepage: https://zyvor.dev
-license: LicenseRef-Zyvor-Production-1.0
+license: LicenseRef-Zyvor-Production-2.0
 contents:
   - src: ${STAGE}/bin/machina-agent
     dst: /usr/bin/machina-agent

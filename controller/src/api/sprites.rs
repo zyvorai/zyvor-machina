@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Read-only fleet view of sprites — see `engine::sprite_inventory` for why
 //! this never touches the `vms` table/reconciler. Data comes entirely from

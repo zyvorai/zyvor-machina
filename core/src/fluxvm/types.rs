@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Minimal serde mirrors of the `fluxvm-api` wire types. Every field is
 //! defaulted and unknown fields are ignored so FluxVM schema additions never

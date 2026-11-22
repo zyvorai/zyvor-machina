@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 """Every Fleet Cloud feature in docs/guides/features.json needs a guide that says what it is, how to configure it, how to use
 it, how to check it works, and where it stops. Also checks that the guides are linked from docs/guides/README.md.

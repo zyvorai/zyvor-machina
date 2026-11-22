@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! A reachability witness for HA. With two racks or sites, a controller that has lost its own
 //! network sees every host go silent, and without a tie-breaker it would fence them all and restart

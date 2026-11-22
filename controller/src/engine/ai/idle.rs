@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Idle-machine detection for FinOps. A running VM is idle when, over at least a day of recorded samples, its CPU
 //! averaged under 5% and never went above 25%. Savings are the VM's compute cost at the cluster's FinOps rates.

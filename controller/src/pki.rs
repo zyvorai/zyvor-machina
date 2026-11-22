@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! The fleet's transport PKI. The controller keeps a CA (separate from the VM network policy CA),
 //! signs one certificate per node when it joins (the node keeps its key and sends a CSR), and has

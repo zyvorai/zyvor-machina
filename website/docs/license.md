@@ -1,18 +1,18 @@
 ---
 sidebar_position: 4
 title: License
-description: Machina is source-available under the Zyvor Production License v1.0.
+description: Machina is source-available under the Zyvor Production Licence v2.0.
 ---
 
 # License
 
 Machina is source-available under the
-**[Zyvor Production License v1.0](https://github.com/zyvorai/zyvor-machina/blob/main/LICENSE)**
-(SPDX `LicenseRef-Zyvor-Production-1.0`).
+**[Zyvor Production Licence v2.0](https://github.com/zyvorai/zyvor-machina/blob/main/LICENSE)**
+(SPDX `LicenseRef-Zyvor-Production-2.0`).
 
 | Use | Terms |
 | --- | --- |
-| Evaluation, development, testing, research, education, homelabs and other non-production use | Free |
+| Trial | A 30-day trial on request from sales@zyvor.dev (a paid evaluation Order at no charge) |
 | Production use: live business operations, customer environments, production workloads or data | Annual enterprise subscription |
 
 Production list price: USD 300 per CPU socket per year worldwide (excl. tax), or INR 29,699 in India (incl. 18% GST). Prices: INR incl. 18% GST in India; US dollars excl. tax elsewhere (VAT, GST or sales tax added where applicable). Buy or get a quote at [zyvor.dev/buy](https://zyvor.dev/buy); custom pricing: sales@zyvor.dev. A 30-day trial key is available for production evaluation.

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // Live E2E: Practical VM operations — snapshot lifecycle, disk hot-attach, power cycle,
 // CD-ROM insert/eject, VM clone, host resources, metrics, port forwarding, console token.

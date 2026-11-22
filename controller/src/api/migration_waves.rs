@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Migration waves: plan a batch of VMs, start them a few at a time through the Transiva gateway,
 //! follow each Transiva job, and keep a manual cutover checklist. Transiva/h2kvm still does the

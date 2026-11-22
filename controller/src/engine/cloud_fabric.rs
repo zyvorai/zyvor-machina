@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Reconciles Fleet Cloud / EC2 VPC forwarding into each host agent and
 //! decorates the existing WireGuard overlay with VPC source ownership and

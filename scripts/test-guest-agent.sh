@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 # Test guest agent (GuestKit implements QGA on org.qemu.guest_agent.0) for a libvirt VM.
 # Usage: ./scripts/test-guest-agent.sh [VM_NAME] [LIBVIRT_URI]

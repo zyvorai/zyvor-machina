@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! FluxVM backend glue: client from `[fluxvm]`, fail-soft listing for the merged
 //! VM list, and `GET /api/v1/fluxvm/status` for the UI.

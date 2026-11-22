@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! `machina-scx`: loads the scx_machina struct_ops scheduler, takes vCPU
 //! profiles on stdin and reports per-VM stats on stdout every second. Runs

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Optional `?connection=system|session` for Cockpit-style dual libvirt hypervisors,
 //! and `?backend=fluxvm` for VMs managed by `fluxvm-api` instead of libvirt.

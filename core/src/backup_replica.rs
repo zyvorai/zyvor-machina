@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Replicating a backup to a second site over S3 (any S3-compatible store). Pure planning only: it
 //! validates the destination, builds the `aws` arguments and checks the result by comparing the

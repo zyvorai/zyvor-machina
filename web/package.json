@@ -57,5 +57,5 @@
   "overrides": {
     "undici": "^8.12.2"
   },
-  "license": "LicenseRef-Zyvor-Production-1.0"
+  "license": "LicenseRef-Zyvor-Production-2.0"
 }

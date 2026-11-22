@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 # Build qcow2 Linux guest images with HashiCorp Packer (QEMU builder).
 # QEMU builder options follow: https://developer.hashicorp.com/packer/integrations/hashicorp/qemu/latest/components/builder/qemu

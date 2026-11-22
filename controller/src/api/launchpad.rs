@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // Launchpad catalog — a quick-launch app/template shortcut catalog that was
 // superseded by the Blueprints feature (`api/blueprints.rs`) before it shipped.

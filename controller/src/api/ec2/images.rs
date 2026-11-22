@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Snapshot and image actions. A snapshot is a `volume_snapshots` row (`snap-`). An image is a
 //! template (`ami-`). `CreateImage` registers a private template pointing at the instance's first

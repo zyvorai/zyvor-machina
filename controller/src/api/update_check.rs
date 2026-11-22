@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! "A new version is available" for the UI banner. Off unless the operator sets `MACHINA_UPDATE_CHECK_URL` to a
 //! URL that returns `{"version": "x.y.z", "url": "release notes"}` (their own mirror, or a public feed): the

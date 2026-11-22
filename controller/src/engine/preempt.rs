@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Preemptible instances. When a host's free memory falls below its reserve,
 //! or a regular VM can't be placed anywhere, preemptible VMs on that host are

@@ -3,7 +3,7 @@ name = "rvb"
 version = "0.1.0"
 edition = "2021"
 description = "Prototype control-plane CLI: virt-builder-style UX over the mkosi image engine"
-license = "LicenseRef-Zyvor-Production-1.0"
+license = "LicenseRef-Zyvor-Production-2.0"
 publish = false
 
 [[bin]]

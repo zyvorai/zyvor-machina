@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Failed tasks, made readable: the last N hours grouped by operation and cause, each with a
 //! plain-language hint, plus "acknowledge" so a counter shows what is new instead of history.

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Backups nobody has ever read back are a hope, not a backup. The leader re-checks stored backups on a schedule:
 //! the owning host's agent runs `qemu-img check` on every image (a multi-disk backup checks every disk) and the result

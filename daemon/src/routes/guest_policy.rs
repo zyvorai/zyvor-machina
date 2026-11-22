@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Per-container eBPF policy inside a guest, relayed to the in-guest GuestKit
 //! agent (`guestkitctl call guestkit.netpolicy.* / guestkit.lsm.*` over QGA

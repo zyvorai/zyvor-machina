@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Security group rules as objects (`sgr-` ids): the describe, in-place modify and description updates that Terraform's
 //! `aws_vpc_security_group_*_rule` resources use. Authorize/Revoke stay in `more.rs`; both read and write the same

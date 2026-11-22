@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // Native standalone storage volumes (controller::api::volumes) — Phase 4 of the
 // external-cloud-client replacement, the Cinder equivalent. Goes through the platform

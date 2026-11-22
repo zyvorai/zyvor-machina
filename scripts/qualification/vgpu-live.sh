@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 #
 # vGPU partitions (claim C59): on a host whose GPU driver exposes mediated devices, create a
 # partition, attach it to a disposable VM through the controller, check the VM is pinned (the

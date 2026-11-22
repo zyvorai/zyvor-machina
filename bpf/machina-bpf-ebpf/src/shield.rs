@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! XDP DDoS shield (run inline from the uplink dispatcher): per-source,
 //! per-class (SYN / UDP / ICMP / other) PPS token buckets for packets towards

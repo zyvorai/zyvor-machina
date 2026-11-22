@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Migration waves: the pure rules behind `api/migration_waves.rs`. A wave is an ordered list of
 //! VMs to move in with Transiva/h2kvm. Each `advance` call asks Transiva how the started jobs are

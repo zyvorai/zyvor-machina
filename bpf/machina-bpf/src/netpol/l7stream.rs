@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Incremental L7 inspection of one TCP byte stream (client → server). The
 //! VM edge hands bpfd every segment past the flow's allowed window; bpfd

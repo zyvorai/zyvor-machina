@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Wake-on-traffic: restores a sleeping (managed-saved) VM when the local
 //! machina-bpfd publishes `vm_wake` for it. The controller notices the VM is

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! NAT gateway for private cloud subnets (`nat.sync`): instances in a subnet reach the outside through the host, whose uplink
 //! address they are masqueraded behind. Three pieces per subnet: a MASQUERADE rule for traffic leaving the subnet, a FORWARD

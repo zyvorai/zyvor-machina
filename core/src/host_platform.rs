@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Distro-aware host insight: package updates, accounts, network counters, firewall summary.
 //! Targets common families: Debian/Ubuntu (apt), Fedora/RHEL (dnf/microdnf/yum), Arch (pacman),

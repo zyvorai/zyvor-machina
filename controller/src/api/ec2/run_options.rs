@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! The `RunInstances` parameters beyond image, type, count, key, user data and subnet. Each one is either applied
 //! or refused with a clear error; none is dropped silently, because a client (Terraform above all) records what it

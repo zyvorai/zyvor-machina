@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Emergency node isolation: the `XDP_F_NODEISO` bit of the uplink
 //! dispatcher (ingress) plus `mn_nodeiso` first on TCX egress. Its lease is

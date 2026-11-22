@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! iSCSI storage pools. A libvirt `iscsi` pool logs in to one target and exposes each LUN the array
 //! presents as a volume; LUNs are provisioned on the array, not by Machina, so volumes here are only

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Fleet-managed k3s clusters (admin only, off unless `MACHINA_K3S_FLEET=1`). Create, scale, upgrade
 //! and delete are asynchronous: the call records the intent and returns the cluster, a background

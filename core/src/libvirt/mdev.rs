@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Mediated devices (vGPU partitions). A GPU whose driver supports mediated devices lists the
 //! partition types it can carve out under `/sys/class/mdev_bus/<pci>/mdev_supported_types/`;

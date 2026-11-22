@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // One-click VM quarantine: every flow of the VM is cut for a fixed time,
 // whatever the enforcement mode, and the kernel lifts it at the deadline.

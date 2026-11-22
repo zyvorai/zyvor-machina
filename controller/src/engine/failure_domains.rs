@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Failure domains: a host's `site` + `rack` labels name the unit that is lost together
 //! (a rack's PDU or top-of-rack switch, a room). Two things use them:

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Closes the loop for the adaptive migration engine: read the live migration status from the source host's agent, ask
 //! `adaptive_migration::decide` for the next step, and apply the part of it that a running libvirt migration can take (bandwidth,

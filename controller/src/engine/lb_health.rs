@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Load balancer health checks. Every 5 s the leader looks for load balancers whose check is due, has the owning host's agent
 //! probe each member (`lb.probe`), moves each member's health through `step`, and re-applies the rule set when a member

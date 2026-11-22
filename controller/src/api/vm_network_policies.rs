@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Fleet VM network policies (CiliumNetworkPolicy schema), VM labels and
 //! the fleet flow API (Hubble-style, polled from every host's bpfd).

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 """boto3 chain against Machina's Auto Scaling (/autoscaling) and, for the launch template, EC2: launch configuration, group
 (min 0, desired 0: nothing is launched), policy, tags, activities, then teardown. One line per action.

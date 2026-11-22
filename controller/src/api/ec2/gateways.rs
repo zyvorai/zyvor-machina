@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Internet gateways, NAT gateways, DHCP options and VPC attributes on `POST /ec2`, plus the read-only describes Terraform
 //! issues while refreshing a VPC (prefix lists, endpoints, egress-only gateways).

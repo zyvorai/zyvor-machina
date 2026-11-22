@@ -1,6 +1,6 @@
 #!/bin/bash
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 # Terraform `external` data source: prints {"command": "<one-time join command>"}.
 # Reads the controller target from the query (JSON on stdin) and mints the token over SSH.

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Async REST client for `fluxvm-api` (`/v1/vms…`). FluxVM is UUID-keyed;
 //! Machina is name-keyed, so every per-VM call goes through [`FluxvmClient::resolve`].

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! VM edge L7. The kernel copies every TCP segment past a flow's window in
 //! VM_L7_FLOW to VM_L7_EVENTS and, with enforcement live, holds it. Per
