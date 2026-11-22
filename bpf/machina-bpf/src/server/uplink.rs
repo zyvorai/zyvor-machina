@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! The uplink XDP dispatcher (`mn_xdp_uplink`): one XDP program per
 //! interface, with the DDoS shield inline and the NodePort fast path behind

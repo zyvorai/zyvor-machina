@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Shared helpers for engine unit tests: an `AppState` backed by a fresh
 //! in-memory SQLite database and an in-memory task bus. Keep the returned

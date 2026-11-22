@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // Capture the README screenshots (docs/ux/machina-*.png) from a live deployment.
 // Uses the system Google Chrome, so no Playwright browser download is needed.

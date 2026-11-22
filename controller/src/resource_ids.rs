@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! EC2-style resource ids (`i-0123456789abcdef0`, `vol-…`, `sg-…`) for Machina's UUID-keyed resources.
 //!

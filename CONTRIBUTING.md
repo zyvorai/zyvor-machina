@@ -7,9 +7,9 @@
    - `make fmt-check`, `make lint`, `make test`
    - `cd web && npm run build && npm test`
    - `./scripts/add-spdx.py --check`
-5. Contributions are accepted under the [Zyvor Production License v1.0](LICENSE). New source files carry the two-line header `./scripts/add-spdx.py` writes:
+5. Contributions are accepted under the [Zyvor Production Licence v2.0](LICENSE). New source files carry the two-line header `./scripts/add-spdx.py` writes:
 
    ```
    // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-   // SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+   // SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
    ```

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! WireGuard overlay between hosts. Each host owns a fleet prefix (a `/24`
 //! of the IPv4 base, a `/64` of the IPv6 base); its VMs get fleet addresses

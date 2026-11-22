@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Alarms over `metric_samples` (OK / ALARM / INSUFFICIENT_DATA) with a step-scaling action on an instance group.
 //! The evaluator runs on the leader only and stops writing as soon as its leadership epoch moves.

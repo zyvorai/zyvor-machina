@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Pure planning for the agent's k3s node operations (install a server, join an agent, upgrade,
 //! remove). Everything here validates input and builds the installer's arguments and environment;

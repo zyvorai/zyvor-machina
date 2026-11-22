@@ -2,7 +2,7 @@
 name = "machina-spec"
 version = "0.1.0"
 edition = "2021"
-license = "LicenseRef-Zyvor-Production-1.0"
+license = "LicenseRef-Zyvor-Production-2.0"
 description = "Declarative VM/cluster spec types for the Machina control plane"
 
 [dependencies]

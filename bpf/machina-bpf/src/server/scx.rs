@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Supervises the `machina-scx` helper (sched_ext struct_ops, loaded with
 //! libbpf). bpfd hands it vCPU profiles, moves those threads to SCHED_EXT

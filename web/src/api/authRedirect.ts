@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // Centralized handling for a *persistent* 401 (session truly expired / not authenticated).
 // Without this, a 401 on any secondary API call bubbles up as a raw "401 " Error and, if a

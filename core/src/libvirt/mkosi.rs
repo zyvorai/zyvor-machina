@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Optional [mkosi](https://github.com/systemd/mkosi) integration: build a disk image from a workspace
 //! containing `mkosi.conf`, then attach it as the VM root volume (alternative to virt-builder / golden images).

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 """End-to-end boto3 chain against Machina's EC2 API, one line per action: VPC, subnet, internet gateway, route table + route +
 association, security group + rules, EBS volume, instance, volume attach/detach, tags, then teardown in reverse order.

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // One place for locale-aware dates, numbers and relative times, and for the document's
 // `lang`/`dir`. Pages used to call toLocale*() directly (about 116 call sites); new code

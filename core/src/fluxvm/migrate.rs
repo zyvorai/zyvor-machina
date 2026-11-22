@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! FluxVM live migration between two `fluxvm-api` endpoints (or one, host to
 //! itself): adopt-mode receiver on the target, `migration/start` on the source,

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! The wake set (`netpol::wake`): the nftables tables, plus a poller that
 //! turns a moving counter into a `vm_wake` stream event. The poller only

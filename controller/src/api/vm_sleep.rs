@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Scale-to-zero: project sleep defaults and the fleet sleep summary.
 //! Per-VM sleep/wake and policy live with the VM power routes.

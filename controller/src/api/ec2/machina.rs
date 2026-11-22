@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Machina actions on the EC2 endpoint. Stock boto3 will not call these; `aws ec2` will with
 //! `--cli-input-json`, and the Terraform provider can stop special-casing the REST port.

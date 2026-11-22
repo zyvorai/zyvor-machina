@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // VM-aware sched_ext scheduler: listed VMs' vCPU threads run on the
 // machina_scx BPF scheduler under a lease; everything else stays on CFS.

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // DNS threat feeds: domain lists checked against VM DNS replies. A match
 // raises a threat_domain alert; blocking feeds also deny egress to the

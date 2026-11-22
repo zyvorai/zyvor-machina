@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! After-the-fact safety for AI actions: remember what a machine looked like before an action ran,
 //! check afterwards that the action did what it claimed, and undo the ones that can be undone.

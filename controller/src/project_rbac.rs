@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Project-scoped access. Machina's global roles (admin/operator/viewer) say what a person may do; project roles say
 //! *where*. With `MACHINA_PROJECT_RBAC=enforce`, a non-admin local user can only see and act on machines in projects

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Controller fencing on the agent. Every controller call carries `x-machina-epoch` (the leadership epoch). The
 //! agent remembers the highest epoch it has seen and refuses anything lower, so a controller that lost leadership

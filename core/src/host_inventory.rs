@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Host hardware inventory from Linux sysfs (CPU topology, NUMA) and SMBIOS/DMI tables under
 //! `/sys/class/dmi/id` — same conceptual sources ESXi uses (firmware-exposed identity + ACPI/SMBIOS),

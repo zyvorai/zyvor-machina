@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Thin authenticated gateway from Machina to Transiva/h2kvm's existing web API.
 //! This keeps migration/conversion ownership in Transiva while giving Machina a

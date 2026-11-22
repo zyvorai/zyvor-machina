@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! EC2-compatible Query API (`POST /ec2`), signed with AWS SigV4 so awscli / boto3 work with `--endpoint-url`.
 //!

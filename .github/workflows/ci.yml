@@ -155,7 +155,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: SPDX headers (Zyvor Production License v1.0)
+      - name: SPDX headers (Zyvor Production Licence v2.0)
         run: python3 scripts/add-spdx.py --check
 
   # NOTE: the former `libvirt`/KVM lifecycle job was removed — it required a running

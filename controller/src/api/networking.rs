@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Security groups and ports — Phase B of the next-gen roadmap
 //! (`/Users/ssahani/.claude/plans/lazy-munching-quilt.md`). Native `/api/v1/...`

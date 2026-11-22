@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! The step-by-step story of a host joining the fleet, shown in the web UI as a live terminal.
 //! Events are keyed by the enrollment token (known to whoever issued it) and, once the host

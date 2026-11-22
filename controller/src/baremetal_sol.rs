@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Serial-over-LAN console for bare-metal servers: `ipmitool sol activate` on a pseudo
 //! terminal, bridged to a WebSocket the web terminal (xterm) already knows how to speak.

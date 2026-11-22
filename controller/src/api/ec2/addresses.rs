@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Elastic IP actions on `POST /ec2`. Allocation ids are the ones `elastic_ips::allocation_id`
 //! already returns. An association id is `eipassoc-` plus the same 17 hex digits: the address

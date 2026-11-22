@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 import argparse, concurrent.futures, json, statistics, time, urllib.request
 p=argparse.ArgumentParser(); p.add_argument('--url', required=True); p.add_argument('--token', required=True); p.add_argument('--requests', type=int, default=1000); p.add_argument('--concurrency', type=int, default=32); a=p.parse_args()

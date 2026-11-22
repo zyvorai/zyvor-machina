@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Off-site backup replication. A completed backup is copied to an S3-compatible `backup_targets`
 //! row by the agent on the host that holds it (so the data never passes through the controller),

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Replicates a backup to (or fetches one from) an S3-compatible store for the controller. It runs
 //! on the host that holds the backup, with that host's `aws` CLI and credentials, so the data never

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 #
 # Off-site backup replication (claim C64): copy a real backup to a real S3-compatible bucket
 # through the agent on the host that holds it, check the copy is verified and checksummed, pull it

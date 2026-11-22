@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! `/api/v1/elastic-ip-pools` and `/api/v1/elastic-ips`: public addresses a host holds and maps 1:1 to instances (see
 //! `agent/src/eip.rs` for what happens on the host).

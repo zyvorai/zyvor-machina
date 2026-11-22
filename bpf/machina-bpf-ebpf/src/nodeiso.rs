@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Node isolation: emergency drop-all on the uplink with an allowlist.
 //! Ingress runs inline from the XDP uplink dispatcher (ahead of the shield

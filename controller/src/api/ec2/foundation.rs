@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! What every EC2 client relies on and no single action owns: `DryRun`, `ClientToken` idempotency, one filter
 //! engine (wildcards, `tag:KEY`, `tag-key`, `tag-value`, loud errors for unknown names) and `MaxResults`/`NextToken`

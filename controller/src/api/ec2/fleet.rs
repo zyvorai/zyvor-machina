@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Account, zone, and launch-template actions. A zone is a host. A launch template is a
 //! `cloud_launch_templates` row (`lt-`); creating one needs `ProjectId` because templates are

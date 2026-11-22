@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Generate KubeVirt + CDI manifests to migrate a libvirt qcow2 (or raw) root disk to Kubernetes,
 //! following the same layering as [hyper2kvm](https://github.com/ssahani/hyper2kvm) docs: DataVolume

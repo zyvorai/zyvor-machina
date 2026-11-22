@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! ELBv2 without a database: ARNs, the query-parameter shapes the SDKs send (`Targets.member.1.Id`), what is
 //! accepted or refused, and the XML each object renders to. `elbv2.rs` holds the handlers.

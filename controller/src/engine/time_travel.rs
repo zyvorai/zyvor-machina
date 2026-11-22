@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Time travel: restore points, rewind and forks on qcow2 backing chains
 //! (`machina_core::libvirt::fork`). A restore point records the frozen layer

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! WebSocket proxy from the machina UI to KubeVirt VNC / serial console subresources.
 //! Spawns a short-lived `kubectl proxy` on localhost (uses kubeconfig auth) and dials the

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! A fresh, fully migrated database for one test, on whichever backend this build uses. Not part of the public API: it is `pub`
 //! only so the integration tests in `controller/tests` can use it too.

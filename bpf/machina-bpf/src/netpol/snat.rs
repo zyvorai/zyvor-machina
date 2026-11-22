@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Per-project egress addresses: VM traffic leaving the host is source-NATed
 //! to a project's egress IP by the nftables tables `ip machina_egress`

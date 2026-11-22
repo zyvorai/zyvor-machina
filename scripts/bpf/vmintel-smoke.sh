@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 # VM runtime intelligence smoke test: boots a throwaway KVM microVM (host
 # kernel, no root fs; it panics and idles) in a private cgroup, tracks it as an

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // Full VM feature E2E — write operations, power lifecycle, HW add/remove, snapshots,
 // port forwards, CPU/memory edit, settings, and ConsoleHub UX.

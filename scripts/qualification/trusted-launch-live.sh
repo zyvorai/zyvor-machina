@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 #
 # Secure Boot and vTPM (claim C60): create a VM with secure_boot and vtpm on a real host, check
 # libvirt accepted the firmware auto-selection, SMM and the TPM, start it, and check the firmware

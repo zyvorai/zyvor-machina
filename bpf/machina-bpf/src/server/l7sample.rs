@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Sampled plaintext L7 (`mn_l7s_ingress`/`mn_l7s_egress` cgroup_skb).
 //! Samples are decoded to an operation name here and the payload dropped.

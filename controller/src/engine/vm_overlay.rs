@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! WireGuard overlay between hosts (`machina_bpf::netpol::overlay`): fleet
 //! prefixes per host, fleet addresses per VM address, and the peer list

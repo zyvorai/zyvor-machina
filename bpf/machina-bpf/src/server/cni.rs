@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! machina-cni datapath state: pod endpoints, identities, NetworkPolicy
 //! entries and service frontends (with Maglev tables), reconciled into the

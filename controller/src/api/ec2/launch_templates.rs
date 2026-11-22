@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Launch templates with versions. `CreateLaunchTemplate` stores `LaunchTemplateData.*` as version 1, further versions
 //! are added with `CreateLaunchTemplateVersion`, `ModifyLaunchTemplate` moves the default, and `RunInstances` resolves

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 import type {ReactNode} from 'react';
 import clsx from 'clsx';
@@ -53,7 +53,7 @@ const ASSETS: Asset[] = [
   {
     title: 'Subscription model',
     meta: 'Markdown',
-    blurb: 'Plans, support levels and terms for production use. Non-production use is free under the Zyvor Production License.',
+    blurb: 'Plans, support levels and terms for production use. A 30-day trial is available on request under the Zyvor Production Licence v2.0.',
     files: [{label: 'Read on GitHub', href: `${REPO}/blob/main/docs/SUBSCRIPTION-MODEL.md`}],
   },
   {

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Bridge-less direct redirect (`mn_direct` on the outer device's ingress,
 //! `mn_direct_out` on the tap's ingress), per VM, under the enforcement lease.

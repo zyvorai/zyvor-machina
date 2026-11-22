@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! VM quarantine: a monotonic deadline in the taps' VM_EDGE entries plus
 //! allowlist entries (direction | POLICY_QUARANTINE) in VM_POLICY. The

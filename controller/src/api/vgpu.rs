@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! vGPU (mediated device) partitions across the fleet. The agent on each host lists, creates and
 //! removes partitions and attaches them to VMs (see `machina_core::libvirt::mdev`); this module is

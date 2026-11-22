@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Fleet-managed k3s clusters. A cluster is one server node plus agent nodes, each on an enrolled
 //! host. The controller asks each host's agent (`K3sNode` RPC) to install, join, upgrade or remove

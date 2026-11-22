@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! "Trusted launch" for new VMs: UEFI with Secure Boot enforced (Microsoft and distribution keys
 //! pre-enrolled) plus an emulated TPM 2.0. Windows 11 needs both; hardened Linux images want them.

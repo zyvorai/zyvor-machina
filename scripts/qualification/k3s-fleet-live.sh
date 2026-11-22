@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 #
 # Fleet k3s clusters (claim C61): create a cluster on real hosts through the controller, wait for
 # it, check every node and the kubeconfig, optionally upgrade it (with drain), then delete it.

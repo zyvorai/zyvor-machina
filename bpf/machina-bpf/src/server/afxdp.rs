@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! AF_XDP fast path: `mn_xdp_afxdp` on one dedicated interface, with XSK
 //! sockets registered per queue over the bpfd socket (SCM_RIGHTS). bpfd only

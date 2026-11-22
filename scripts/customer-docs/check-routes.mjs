@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // Fails when scripts/customer-docs/routes.json drifts from the web app:
 // every nav entry in web/src/utils/routes.ts needs a routes.json entry, every

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Cloud Hypervisor as an alternate microVM backend for disposable "sprite"
 //! sandboxes (see `crate::libvirt::sprite` for the original libvirt/QEMU

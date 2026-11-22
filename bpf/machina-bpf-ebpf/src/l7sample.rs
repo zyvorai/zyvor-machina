@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Sampled plaintext application protocols (Redis, PostgreSQL, MySQL, Kafka,
 //! HTTP/2 + gRPC) on a cgroup's sockets. Observe only: always allows the

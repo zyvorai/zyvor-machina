@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! L7 rules of `toPorts` (`rules.http`, `rules.kafka`, `rules.dns`,
 //! `serverNames`): the rule model, the request parsers and the matcher.

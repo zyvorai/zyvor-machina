@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // Builds `machina-bpf-ebpf` for bpfel-unknown-none and stages the object at
 // `$OUT_DIR/machina-bpf.o` for `include_bytes_aligned!`.

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! VPC peering and subnet IPAM. Accepted peerings are reconciled into the
 //! authenticated machina-wg fabric; forwarding becomes active when a route table selects the peering.

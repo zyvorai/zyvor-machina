@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Simple VDI desktop pools (see `engine/desktop_pools.rs` for the rules). A pool clones a stopped
 //! template VM into numbered desktops; a user checks one out (it is powered on if needed) and

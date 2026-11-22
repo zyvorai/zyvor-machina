@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 /** One-line descriptions shown under each item in the top-bar flyouts (Netra-style mega panels). */
 const BLURBS: Record<string, string> = {

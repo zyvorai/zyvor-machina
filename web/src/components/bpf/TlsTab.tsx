@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // JA3/JA4 ClientHello fingerprints (mn_tlsfp + tap L7) and HTTP metadata
 // from libssl uprobes (plaintext bodies never leave bpfd).

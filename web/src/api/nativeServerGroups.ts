@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 // Native anti-affinity "server groups" — not a separate stored resource like a
 // Nova server group. Machina's placement/DRS engine (controller::engine::placement)

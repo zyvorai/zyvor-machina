@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Mint short-lived platform JWTs for same-host calls into the co-located
 //! `machina-daemon` (e.g. sprite inventory pull for fleet visibility).

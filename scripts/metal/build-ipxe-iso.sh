@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 #
 # Build the tiny iPXE ISOs a BMC mounts as virtual media, so a machine reaches the Machina
 # boot service without DHCP/TFTP on its network. The script baked into iPXE asks DHCP for an

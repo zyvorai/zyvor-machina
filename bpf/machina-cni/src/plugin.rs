@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! CNI 1.0 plugin. Pods get a veth pair, a /32 (and, dual-stack, a /128)
 //! address and default routes via the link-local gateways 169.254.1.1 /

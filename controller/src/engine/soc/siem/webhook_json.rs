@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Generic JSON webhook forwarder: POSTs batches of ECS events as NDJSON to any
 //! endpoint you run (Loki push proxy, Vector, Fluent Bit, Wazuh, Graylog, a

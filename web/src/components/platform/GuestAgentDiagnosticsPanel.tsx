@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 import { useEffect, useState } from 'react'
 import { CheckCircle2, Clock, Loader2, Network, Play, Terminal, Users, XCircle } from 'lucide-react'

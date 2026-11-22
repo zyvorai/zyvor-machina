@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Chaos faults (`netpol::chaos`). A ticker ends faults at their lease;
 //! the root qdisc a tap had before its first fault (bpfd's QoS `fq`) is put

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 """boto3 check of Machina's EC2 VPC networking actions: internet gateways, route tables and routes, network ACLs, DHCP
 options, VPC attributes, security group rules, network interface addresses, DryRun and the refusals.

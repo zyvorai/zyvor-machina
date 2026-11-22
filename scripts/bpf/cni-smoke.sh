@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 # machina-cni smoke: the real CNI plugin wires three dual-stack netns "pods"
 # against a private machina-bpfd, then checks routing, same-node redirect,

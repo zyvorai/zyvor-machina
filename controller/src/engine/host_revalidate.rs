@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Re-checks hosts whose last validation failed. A host that failed once (agent not up yet, a
 //! token mismatch while it was being set up) otherwise keeps showing "failed" until someone

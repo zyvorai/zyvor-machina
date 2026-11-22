@@ -12,7 +12,7 @@ description: |
   Install machina-controller for the multi-host control plane and machina-agent on each compute node.
 vendor: Zyvor AI Labs
 homepage: https://zyvor.dev
-license: LicenseRef-Zyvor-Production-1.0
+license: LicenseRef-Zyvor-Production-2.0
 contents:
   - src: ${STAGE}/bin/machina-daemon
     dst: /usr/bin/machina-daemon

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
@@ -151,7 +151,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Zyvor AI Labs. Zyvor Production License v1.0. OpenStack is a trademark of the Open Infrastructure Foundation.`,
+      copyright: `Copyright © ${new Date().getFullYear()} Zyvor AI Labs. Zyvor Production Licence v2.0. OpenStack is a trademark of the Open Infrastructure Foundation.`,
     },
     prism: {
       theme: prismThemes.github,

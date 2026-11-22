@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import type { NativeStack, StackPlan, StackPolicy } from '../../api/stacks'

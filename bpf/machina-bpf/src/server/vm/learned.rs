@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Source addresses each VM's tap sent from: identities for addresses the
 //! inventory can't see (static IPv6, extra NICs, no guest agent). Bounded

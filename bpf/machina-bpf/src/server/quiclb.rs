@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! QUIC CID-aware load balancer: services on the uplink XDP dispatcher's
 //! `XDP_F_QUICLB` slot, with per-service Maglev tables from `cni`.

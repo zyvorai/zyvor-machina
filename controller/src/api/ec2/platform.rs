@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Stacks, migrations, HA, audit, notifications, projects, and scheduled jobs.
 //! None of these are on the merged `POST /ec2` match. Stack create stays on REST:

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Optional `kubectl` / `virtctl` execution for KubeVirt migration ([`machina_core::config::KubeVirtConfig`]).
 //! Disabled unless `[kubevirt] exec_enabled = true`.

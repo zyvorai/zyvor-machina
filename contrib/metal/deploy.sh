@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 #
 # Machina bare-metal image deploy. Runs inside the Machina ramdisk (machina-metal-run
 # fetches it from the controller). Reads the deploy plan from the URL in $MACHINA_PLAN,

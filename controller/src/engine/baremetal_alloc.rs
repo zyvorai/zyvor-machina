@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Zones and allocation for bare metal. An allocation request picks the smallest
 //! `ready` machine that satisfies it (so large machines stay free for large requests),

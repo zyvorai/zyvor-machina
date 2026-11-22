@@ -106,7 +106,7 @@ The design contracts are enforced with `node web/scripts/ux-audit.mjs`.
 | Topic | Document |
 |-------|----------|
 | User journeys and acceptance criteria | [USER_STORIES.md](USER_STORIES.md) |
-| Subscription model (Zyvor Production License) | [SUBSCRIPTION-MODEL.md](SUBSCRIPTION-MODEL.md), [legal/README.md](legal/README.md) |
+| Subscription model (Zyvor Production Licence v2.0) | [SUBSCRIPTION-MODEL.md](SUBSCRIPTION-MODEL.md), [legal/README.md](legal/README.md) |
 | Social and launch cards | [social/README.md](social/README.md) |
 | Client presentations | [client-presentations/](client-presentations/) |
 | Changelog | [../CHANGELOG.md](../CHANGELOG.md) |

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Real forecasting. A leader-only recorder samples VM memory/CPU and storage-pool fill every five minutes into
 //! `metric_samples`; `time_to_threshold` fits a straight line to the recent samples and says when the metric

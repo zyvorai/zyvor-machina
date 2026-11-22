@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! `/dist/*`: the agent binaries and unit files a bare node downloads in `install.sh`, published
 //! by `machinactl dist publish` into `MACHINA_DIST_DIR` (default /var/lib/machina/dist) together

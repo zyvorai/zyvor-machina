@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 #
 # iSCSI storage (claim C66): discover a real array's targets, log in as a storage pool, attach a
 # LUN to a disposable VM as a block disk, check the domain, detach it and remove the pool.

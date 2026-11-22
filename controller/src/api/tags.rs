@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! EC2-style key/value tags on any taggable resource (`/api/v1/tags/{type}/{id}`), plus id resolution
 //! (`/api/v1/ids/{ec2_id}`). A resource may be named by UUID or by its EC2-style id (`i-0123456789abcdef0`).

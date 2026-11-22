@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-# SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+# SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 #
 # Build the Machina bare-metal ramdisk (kernel + initrd + squashfs rootfs) with mkosi.
 # Run on a Linux build host as root (mkosi needs it for the package manager); never on a

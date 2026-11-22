@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! OpenStack-compatible REST façade (Keystone / Nova / Glance / Cinder / Neutron subset).
 //! Thin JSON wrappers over Fleet Cloud handlers so `openstack` CLI and Terraform's

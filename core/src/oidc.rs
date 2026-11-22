@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Shared OIDC Authorization Code Flow protocol logic — discovery, JWKS, and
 //! id_token validation — used by both `machina-daemon` (single-host, cookie

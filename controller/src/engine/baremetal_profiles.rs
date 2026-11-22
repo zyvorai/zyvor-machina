@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Deploy profiles and the one-step "give me N machines like this" path. A profile names
 //! an image, the SSH keys, a zone and a minimum size. `provision` allocates N ready

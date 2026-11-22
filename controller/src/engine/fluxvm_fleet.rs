@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! FluxVM VMs across the fleet: inventory rows (`inventory_source = 'fluxvm'`)
 //! from each host agent, lifecycle through the agent, live migration between

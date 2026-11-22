@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! DNS threat feeds. While any feed exists, every running VM's taps are
 //! programmed with DNS capture, and each reply naming a listed domain (or a

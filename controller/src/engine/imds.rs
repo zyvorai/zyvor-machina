@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Pushes instance metadata to each host's agent (`imds.sync`), which serves it at 169.254.169.254 to the guest it belongs to.
 //! The leader pushes every 30 s. A host that cannot be reached keeps its previous table until the next push.

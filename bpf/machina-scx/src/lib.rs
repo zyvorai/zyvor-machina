@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Line protocol between machina-bpfd and its `machina-scx` child: commands on
 //! stdin, one JSON object per line on stdout. Closing stdin stops the

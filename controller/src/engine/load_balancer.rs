@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Native L4 load balancer reconciliation. Pushes a load balancer's current
 //! (protocol, host_port, enabled members) to the owning host's agent, which installs a

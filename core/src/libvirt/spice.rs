@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Resolve libvirt SPICE endpoints, mirroring the robustness of the VNC resolver
 //! (`vnc.rs`). A plain XML scan only sees a numeric `port` when the guest was

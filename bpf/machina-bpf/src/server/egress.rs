@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Per-project egress IPs: the `ip`/`ip6 machina_egress` nftables tables. They are
 //! address translation, not a security control, so it stays installed while

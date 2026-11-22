@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Bridge-less direct redirect. `mn_direct` (outer device ingress, first in
 //! the TCX chain) sends frames for a VM's MAC or IP straight out of its tap,

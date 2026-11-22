@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! OS image catalog for bare-metal deploys: well-known cloud images (Ubuntu, Debian,
 //! Rocky, AlmaLinux) by name, or any URL, always checked against a checksum before the

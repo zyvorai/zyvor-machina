@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! OS deploy for allocated bare-metal servers: render an unattended-install document
 //! (Ubuntu autoinstall or Red Hat-family kickstart) whose first boot runs the normal

@@ -1,5 +1,5 @@
 // Copyright 2026 Zyvor AI Labs · https://zyvor.dev
-// SPDX-License-Identifier: LicenseRef-Zyvor-Production-1.0
+// SPDX-License-Identifier: LicenseRef-Zyvor-Production-2.0
 
 //! Executes k3s node operations for the controller (see `machina_core::k3s_node` for the validation
 //! and installer plan). This runs root installers, so it is off unless the host's operator sets
